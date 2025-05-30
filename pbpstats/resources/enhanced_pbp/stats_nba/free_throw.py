@@ -19,7 +19,36 @@ class StatsFreeThrow(FreeThrow, StatsEnhancedPbpItem):
         """
         returns True if shot was made, False otherwise
         """
-        return "MISS " not in self.description
+        # Explicit "MISS" always means missed
+        if "MISS " in self.description:
+            return False
+
+        # Explicit points in description often means made (e.g., "(2 PTS)")
+        if " PTS)" in self.description:
+            return True
+        
+        # NEW: If it's a final FT of a trip (or 1 of 1, or technical)
+        # AND its description is ambiguous (no "MISS", no explicit " PTS)")
+        # AND the *next immediate event* is a rebound by the opposing team,
+        # then infer it was a miss.
+        # This relies on self.next_event being populated.
+        if (self.is_end_ft or self.is_ft_1_of_1 or self.is_technical_ft) and \
+        self.next_event is not None and \
+        hasattr(self.next_event, 'event_type') and self.next_event.event_type == 4 and \
+        hasattr(self.next_event, 'team_id') and hasattr(self, 'team_id') and \
+        self.next_event.team_id != 0 and self.team_id != 0 and \
+        self.next_event.team_id != self.team_id:
+            # Check if the rebound is a "real" rebound and not a placeholder for FT 1 of 2 etc.
+            # This check can be complex. For a simple start, any opponent rebound after ambiguous final FT is a strong hint.
+            # Further refinement: ensure rebound_event.is_real_rebound would be good if that property
+            # doesn't itself depend critically on this FT's is_made status in a circular way.
+            # For now, we assume an opponent rebound following an ambiguous final FT means the FT was missed.
+            # print(f"DEBUG FT Event {self.event_num} ({self.description}): Inferred MISS due to subsequent opponent rebound {self.next_event.event_num}")
+            return False
+
+        # Default: if not explicitly "MISS" and no other strong indicator of miss, assume made.
+        # This maintains original behavior for FTs that explicitly state points or are not followed by opponent rebound.
+        return True
 
     def get_offense_team_id(self):
         """
