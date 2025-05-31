@@ -24,6 +24,7 @@ Quickstart Guide
    :maxdepth: 4
 
    quickstart
+   usage_overview
 
 Contents
 --------------
