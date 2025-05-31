@@ -20,6 +20,9 @@ pip install pbpstats
 # Resources
 [Documentation](https://pbpstats.readthedocs.io/en/latest/)
 
+For a high level tour of the library APIs and an example showing how to
+export possession level data for RAPM see ``docs/usage_overview.rst``.
+
 # Local Development
 Using [poetry](https://python-poetry.org/) for package managment. Install it first if it is not install on your system.
 
