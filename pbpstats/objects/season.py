@@ -50,7 +50,16 @@ class Season(object):
             attr_name = data_loader[0].replace(client.DATA_LOADER_SUFFIX, "")
             source_loader_cls = data_source_map[attr_name]
             source_loader = source_loader_cls(self.data_directory)
-            data = data_loader[1](league, season, season_type, source_loader)
+            try:
+                data = data_loader[1](
+                    league,
+                    season,
+                    season_type,
+                    source_loader,
+                    enable_data_nba_fallback=self.enable_data_nba_fallback,
+                )
+            except TypeError:
+                data = data_loader[1](league, season, season_type, source_loader)
             resource_cls = getattr(self, attr_name)
             setattr(
                 self,
