@@ -49,6 +49,10 @@ the settings and it will be saved in the appropriate subdirectory.
 
 Options for ``data_provider`` are 'stats_nba' and 'data_nba' and 'live'.
 
+Set ``enable_data_nba_fallback`` to ``True`` in the top-level settings to allow
+the loader to fetch data from ``data.nba.com`` if the stats API play-by-play
+cannot be parsed.  This fallback is not available for WNBA games.
+
 See the code examples below for some examples settings.
 
 Resource options are:

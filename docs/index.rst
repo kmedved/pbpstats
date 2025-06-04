@@ -16,6 +16,8 @@ Features
 * Supports NBA, WNBA and G-League stats
 * All stats on pbpstats.com are derived from these stats
 * Fixes order of events for some common cases in which events are out of order
+* Optional fallback to data.nba.com when stats.nba.com play-by-play cannot be
+  parsed (NBA and G League only)
 
 Quickstart Guide
 ----------------

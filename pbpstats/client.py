@@ -41,6 +41,7 @@ class Client(object):
     def __init__(self, settings):
         data_loader = DataLoaderFactory()
         self.settings = settings
+        self.enable_data_nba_fallback = settings.get("enable_data_nba_fallback", False)
         self.data_directory = settings.get("dir")
         self._load_objects()
         self._load_resources()
@@ -81,6 +82,11 @@ class Client(object):
         for name, object_cls in object_dict.items():
             setattr(self, name, object_cls)
             setattr(getattr(self, name), "data_directory", self.data_directory)
+            setattr(
+                getattr(self, name),
+                "enable_data_nba_fallback",
+                self.enable_data_nba_fallback,
+            )
 
     def _load_resources(self):
         """
