@@ -231,6 +231,49 @@ class StatsNbaEnhancedPbpLoader(StatsNbaPbpLoader, NbaEnhancedPbpLoader):
             ] = rebound_event
 
         elif (
+            rows[issue_event_index][event_type_index] == 4
+            and rows[issue_event_index - 1][event_type_index] == 3
+        ):
+            # Handles cases where a rebound event incorrectly follows a made technical free throw.
+            # Technical FTs are dead-ball events and should not have rebounds.
+            previous_event_row = rows[issue_event_index - 1]
+
+            # Check if the previous event is a Free Throw (EVENTMSGTYPE: 3)
+            if previous_event_row[event_type_index] == 3:
+                is_technical_ft = False
+                # Check all description columns for the word "Technical"
+                try:
+                    home_desc_idx = headers.index("HOMEDESCRIPTION")
+                    visitor_desc_idx = headers.index("VISITORDESCRIPTION")
+                    neutral_desc_idx = headers.index("NEUTRALDESCRIPTION")
+
+                    home_desc = previous_event_row[home_desc_idx] or ""
+                    visitor_desc = previous_event_row[visitor_desc_idx] or ""
+                    neutral_desc = previous_event_row[neutral_desc_idx] or ""
+
+                    # A free throw is technical if "Technical" is in its description
+                    if (
+                        "Technical" in home_desc
+                        or "Technical" in visitor_desc
+                        or "Technical" in neutral_desc
+                    ):
+                        is_technical_ft = True
+
+                    # A free throw is made if "MISS" is NOT in its description
+                    is_made = "MISS" not in (home_desc + visitor_desc)
+
+                except (ValueError, IndexError):
+                    # Fallback if description columns are missing, assume not technical
+                    is_technical_ft = False
+                    is_made = True
+
+                # If the previous event was a made technical FT, this rebound is invalid.
+                if is_technical_ft and is_made:
+                    # Delete the spurious rebound event from the raw data list
+                    del self.source_data["resultSets"][0]["rowSet"][issue_event_index]
+                    # The method will then call _save_data_to_file() at the end, persisting the fix.
+
+        elif (
             rows[issue_event_index + 1][event_type_index] == 4
             and rows[issue_event_index + 1][event_num_index] == int(event_num) - 1
         ):

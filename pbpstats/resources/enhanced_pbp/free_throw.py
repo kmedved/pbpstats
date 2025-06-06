@@ -237,10 +237,6 @@ class FreeThrow(metaclass=abc.ABCMeta):
         """
         returns string description of free throw type
         """
-        if self.game_id == "0022301195" and self.event_num == 138:
-            # override for when penalty FTs were not shot at time of the foul
-            # and officials noticed this afterwards to they were shot later
-            return "Penalty"
         if self.is_technical_ft:
             return "Technical"
         num_fts = self.num_ft_for_trip
