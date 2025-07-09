@@ -10,6 +10,7 @@ A package to scrape and parse NBA, WNBA and G-League play-by-play data.
 * Supports NBA, WNBA and G-League stats
 * All stats on pbpstats.com are derived from these stats
 * Fixes order of events for some common cases in which events are out of order
+* Smarter inference of made/missed free-throws when the play-by-play feed omits "MISS"
 
 # Installation
 Tested on Python >=3.8

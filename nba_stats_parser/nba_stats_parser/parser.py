@@ -56,6 +56,11 @@ def parse_game_data(
         if i > 0:
             evt.previous_event = events[i - 1]
             events[i - 1].next_event = evt
+
+    # populate FT is_made cache before rebounds query it
+    for evt in events:
+        if isinstance(evt, models.FreeThrow):
+            _ = evt.is_made
     # starters from boxscore
     starters_by_team: Dict[int, List[int]] = {}
     for row in raw_boxscore.get("PlayerStats", []):
