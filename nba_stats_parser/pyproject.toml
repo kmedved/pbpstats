@@ -1,0 +1,14 @@
+[tool.poetry]
+name = "nba_stats_parser"
+version = "0.1.0"
+description = "NBA stats fetching and parsing using pbpstats core logic"
+authors = []
+
+[tool.poetry.dependencies]
+python = "^3.8"
+nba-api = "*"
+pandas = "*"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
