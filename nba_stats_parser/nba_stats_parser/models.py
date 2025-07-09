@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import abc
 from collections import defaultdict
+from functools import cached_property
 from typing import Dict, List, Optional
 
 import pbpstats
@@ -246,9 +247,31 @@ class FreeThrow(Event):
     def __init__(self, event: Dict, order: int):
         super().__init__(event, order)
 
-    @property
+    @cached_property
     def is_made(self) -> bool:
-        return "MISS" not in self.description
+        if "MISS" in self.description:
+            return False
+        if " PTS)" in self.description:
+            return True
+        is_final = (
+            "1 of 1" in self.description
+            or "2 of 2" in self.description
+            or "3 of 3" in self.description
+            or "Technical" in self.description
+        )
+
+        if (
+            is_final
+            and self.next_event is not None
+            and isinstance(self.next_event, Rebound)
+            and self.next_event.team_id != self.team_id
+        ):
+            return False
+        return True
+
+    @property
+    def was_ambiguous_raw(self) -> bool:
+        return "MISS" not in self.description and " PTS)" not in self.description
 
     def get_offense_team_id(self) -> int:
         return self.team_id
@@ -267,6 +290,10 @@ class Rebound(Event):
 
     def __init__(self, event: Dict, order: int):
         super().__init__(event, order)
+        try:
+            _ = self.missed_shot
+        except Exception:
+            pass
 
     @property
     def is_real_rebound(self) -> bool:
@@ -274,9 +301,11 @@ class Rebound(Event):
 
     @property
     def oreb(self) -> bool:
-        if hasattr(self, "missed_shot"):
-            return self.team_id == self.missed_shot.team_id
-        return False
+        try:
+            missed = self.missed_shot
+        except RuntimeError:
+            return False
+        return self.team_id == missed.team_id
 
     def get_offense_team_id(self) -> int:
         return self.team_id
@@ -288,6 +317,20 @@ class Rebound(Event):
     @property
     def event_stats(self) -> List[Dict]:
         return []
+
+    @property
+    def missed_shot(self) -> Event:
+        if hasattr(self, "_missed_shot"):
+            return self._missed_shot
+
+        if (
+            isinstance(self.previous_event, (FieldGoal, FreeThrow))
+            and not self.previous_event.is_made
+        ):
+            self._missed_shot = self.previous_event
+            return self._missed_shot
+
+        raise RuntimeError("previous event is not a missed shot")
 
 
 class Turnover(Event):

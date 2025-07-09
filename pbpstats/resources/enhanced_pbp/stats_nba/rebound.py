@@ -22,6 +22,11 @@ class StatsRebound(Rebound, StatsEnhancedPbpItem):
 
     def __init__(self, *args):
         super().__init__(*args)
+        # Populate missed_shot cache once previous_event is available
+        try:
+            _ = self.missed_shot
+        except Exception:
+            pass
 
     def get_offense_team_id(self):
         """
@@ -53,21 +58,27 @@ class StatsRebound(Rebound, StatsEnhancedPbpItem):
         :raises: :obj:`~pbpstats.resources.enhanced_pbp.rebound.EventOrderError`:
             If rebound event is not immediately following a missed shot event.
         """
+        if hasattr(self, "_missed_shot"):
+            return self._missed_shot
+
         if isinstance(self.previous_event, (FieldGoal, FreeThrow)):
             if not self.previous_event.is_made:
-                return self.previous_event
+                self._missed_shot = self.previous_event
+                return self._missed_shot
         elif (
             isinstance(self.previous_event, Turnover)
             and self.previous_event.is_shot_clock_violation
         ):
             if isinstance(self.previous_event, FieldGoal):
-                return self.previous_event.previous_event
+                self._missed_shot = self.previous_event.previous_event
+                return self._missed_shot
         elif isinstance(self.previous_event, JumpBall):
             prev_event = self.previous_event.previous_event
             while isinstance(prev_event, (Substitution, Timeout)):
                 prev_event = prev_event.previous_event
             if isinstance(prev_event, (FieldGoal, FreeThrow)):
-                return prev_event
+                self._missed_shot = prev_event
+                return self._missed_shot
         raise EventOrderError(
             f"previous event: {self.previous_event} is not a missed free throw or field goal"
         )
@@ -86,4 +97,8 @@ class StatsRebound(Rebound, StatsEnhancedPbpItem):
         """
         returns True if rebound is an offensive rebound, False otherwise
         """
-        return self.team_id == self.missed_shot.team_id
+        try:
+            missed = self.missed_shot
+        except EventOrderError:
+            return False
+        return self.team_id == missed.team_id
