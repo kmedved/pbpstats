@@ -25,6 +25,14 @@ Quickstart Guide
 
    quickstart
 
+Advanced Analytics Guide
+-------------------------
+
+.. toctree::
+   :maxdepth: 4
+
+   rapm_guide
+
 Contents
 --------------
 .. toctree::
