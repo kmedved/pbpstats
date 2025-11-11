@@ -227,3 +227,142 @@ def map_eventmsgactiontype(
         return None
 
     return None
+
+
+def cdn_to_stats_row(action: Dict[str, Any], game_id: str) -> Dict[str, Any]:
+    """
+    Convert a CDN liveData action into a Stats v2-style row dict expected by StatsNba items.
+
+    :param dict action: CDN action dictionary
+    :param str game_id: 10-digit NBA game ID
+    :returns: Dict with v2-compatible fields (GAME_ID, EVENTNUM, EVENTMSGTYPE, etc.)
+    """
+    evt_type = map_eventmsgtype(action)
+
+    # Special handling for period/game start/end
+    t = (action.get("actionType") or "").lower().strip()
+    st = (action.get("subType") or "").lower().strip()
+    if evt_type is None and t in ("period", "game"):
+        evt_type = 12 if st == "start" else 13 if st == "end" else None
+
+    # Build base row
+    row: Dict[str, Any] = {
+        "GAME_ID": game_id,
+        "EVENTNUM": action.get("actionNumber") or action.get("orderNumber"),
+        "PERIOD": action.get("period"),
+        "PCTIMESTRING": iso_to_pctimestring(action.get("clock")),
+        "EVENTMSGTYPE": evt_type,
+        "EVENTMSGACTIONTYPE": map_eventmsgactiontype(action, evt_type),
+    }
+
+    # v2 descriptions are split by team; we supply neutral and let the item build unified description
+    row["HOMEDESCRIPTION"] = None
+    row["NEUTRALDESCRIPTION"] = action.get("description") or ""
+    row["VISITORDESCRIPTION"] = None
+
+    # Scores (v2 kept a single SCORE string). Use home-away order here.
+    sh = action.get("scoreHome")
+    sa = action.get("scoreAway")
+    if sh is not None and sa is not None:
+        row["SCORE"] = f"{sh}-{sa}"
+        diff = int(sh) - int(sa)
+        row["SCOREMARGIN"] = "TIE" if diff == 0 else str(diff)
+    else:
+        row["SCORE"] = None
+        row["SCOREMARGIN"] = None
+
+    # WCTIMESTRING - v2 has this but CDN doesn't provide it; leave None
+    row["WCTIMESTRING"] = None
+
+    # Primary actor & team
+    if action.get("teamId") is not None:
+        row["PLAYER1_TEAM_ID"] = action["teamId"]
+    else:
+        row["PLAYER1_TEAM_ID"] = None
+
+    if action.get("personId") is not None:
+        row["PLAYER1_ID"] = action["personId"]
+    else:
+        row["PLAYER1_ID"] = None
+
+    # PERSON*TYPE fields - v2 has these (1-7 codes), CDN doesn't have direct mapping
+    # Leave as 0 for now (can be enhanced later if needed)
+    row["PERSON1TYPE"] = 0
+    row["PERSON2TYPE"] = 0
+    row["PERSON3TYPE"] = 0
+
+    # PLAYER1 name/team fields - v2 has these but CDN doesn't provide
+    # Leave as None (existing code may derive from roster data)
+    row["PLAYER1_NAME"] = None
+    row["PLAYER1_TEAM_CITY"] = None
+    row["PLAYER1_TEAM_NICKNAME"] = None
+    row["PLAYER1_TEAM_ABBREVIATION"] = action.get("teamTricode")
+
+    # Initialize PLAYER2/3 fields
+    row["PLAYER2_ID"] = None
+    row["PLAYER2_NAME"] = None
+    row["PLAYER2_TEAM_ID"] = None
+    row["PLAYER2_TEAM_CITY"] = None
+    row["PLAYER2_TEAM_NICKNAME"] = None
+    row["PLAYER2_TEAM_ABBREVIATION"] = None
+
+    row["PLAYER3_ID"] = None
+    row["PLAYER3_NAME"] = None
+    row["PLAYER3_TEAM_ID"] = None
+    row["PLAYER3_TEAM_CITY"] = None
+    row["PLAYER3_TEAM_NICKNAME"] = None
+    row["PLAYER3_TEAM_ABBREVIATION"] = None
+
+    # Secondary actors by context
+    if t in ("2pt", "3pt"):
+        # Shots: PLAYER2 = assist, PLAYER3 = block
+        if action.get("assistPersonId") is not None:
+            row["PLAYER2_ID"] = action["assistPersonId"]
+            row["PLAYER2_TEAM_ID"] = action.get("teamId")  # Same team as shooter
+
+        if action.get("blockPersonId") is not None:
+            row["PLAYER3_ID"] = action["blockPersonId"]
+            # Block is by opponent, don't set team here (may need opponent team ID)
+
+    elif t == "turnover":
+        # Turnover: PLAYER2 = steal
+        if action.get("stealPersonId") is not None:
+            row["PLAYER2_ID"] = action["stealPersonId"]
+
+    elif t == "foul":
+        # Foul: PLAYER2 = foul drawn
+        if action.get("foulDrawnPersonId") is not None:
+            row["PLAYER2_ID"] = action["foulDrawnPersonId"]
+
+    elif t in ("jumpball", "jump ball"):
+        # Jump ball: store recovered as PLAYER3 to match v2 convention
+        if action.get("jumpBallWonPersonId") is not None:
+            row["PLAYER2_ID"] = action["jumpBallWonPersonId"]
+        if action.get("jumpBallRecoverdPersonId") is not None:
+            row["PLAYER3_ID"] = action["jumpBallRecoverdPersonId"]
+
+    # VIDEO_AVAILABLE_FLAG - v2 has this, default to 0
+    row["VIDEO_AVAILABLE_FLAG"] = 0
+
+    # Non-breaking extras for future analytics (pass through CDN-specific fields)
+    for k in (
+        "x",
+        "y",
+        "xLegacy",
+        "yLegacy",
+        "shotDistance",
+        "area",
+        "areaDetail",
+        "isTargetScoreLastPeriod",
+        "timeActual",
+        "orderNumber",
+        "qualifiers",
+        "descriptor",
+        "subType",
+        "edited",
+        "shotActionNumber",
+    ):
+        if action.get(k) is not None:
+            row[k] = action[k]
+
+    return row
