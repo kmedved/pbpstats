@@ -9,6 +9,9 @@ class StatsNbaPbpWebLoader(StatsNbaWebLoader):
     """
     A ``StatsNbaPbpWebLoader`` object should be instantiated and passed into ``StatsNbaPbpLoader`` when loading data directly from the NBA Stats API
 
+    This loader uses the playbyplayv3 endpoint (migrated from the deprecated playbyplayv2 endpoint).
+    The v3 response is automatically transformed to v2 format for backward compatibility.
+
     :param str file_directory: (optional, use it if you want to store the response data on disk)
         Directory in which data should be either stored.
         The specific file location will be `stats_<game_id>.json` in the `/pbp` subdirectory.
@@ -25,16 +28,17 @@ class StatsNbaPbpWebLoader(StatsNbaWebLoader):
             if self.league == G_LEAGUE_STRING
             else self.league
         )
-        self.base_url = f"https://stats.{league_url_part}.com/stats/playbyplayv2"
+        self.base_url = f"https://stats.{league_url_part}.com/stats/playbyplayv3"
         self.parameters = {
-            "GameId": self.game_id,
-            "StartPeriod": 0,
+            "GameID": self.game_id,
+            "StartPeriod": 1,
             "EndPeriod": 10,
-            "RangeType": 2,
-            "StartRange": 0,
-            "EndRange": 55800,
         }
-        return self._load_request_data()
+        response_data = self._load_request_data()
+        # Transform v3 response to v2 format for backward compatibility
+        if response_data:
+            self.source_data = self.transform_v3_to_v2_format(response_data)
+        return self.source_data
 
     def _save_data_to_file(self):
         if self.file_directory is not None and os.path.isdir(self.file_directory):

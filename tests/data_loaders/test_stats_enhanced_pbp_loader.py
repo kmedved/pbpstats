@@ -105,14 +105,11 @@ class TestStatsEnhancedPbpLoader:
     def test_web_loader_loads_data(self):
         with open(f"{self.data_directory}/pbp/stats_{self.game_id}.json") as f:
             pbp_response = json.loads(f.read())
-        base_url = "https://stats.nba.com/stats/playbyplayv2"
+        base_url = "https://stats.nba.com/stats/playbyplayv3"
         query_params = {
-            "GameId": self.game_id,
-            "StartPeriod": 0,
+            "GameID": self.game_id,
+            "StartPeriod": 1,
             "EndPeriod": 10,
-            "RangeType": 2,
-            "StartRange": 0,
-            "EndRange": 55800,
         }
         pbp_url = furl(base_url).add(query_params).url
         responses.add(responses.GET, pbp_url, json=pbp_response, status=200)
@@ -271,14 +268,11 @@ class TestStatsEnhancedPbpLoader:
         game_id = "0021900001"
         with open(f"{self.data_directory}/pbp/raw_stats_{game_id}.json") as f:
             pbp_response = json.loads(f.read())
-        base_url = "https://stats.nba.com/stats/playbyplayv2"
+        base_url = "https://stats.nba.com/stats/playbyplayv3"
         query_params = {
-            "GameId": game_id,
-            "StartPeriod": 0,
+            "GameID": game_id,
+            "StartPeriod": 1,
             "EndPeriod": 10,
-            "RangeType": 2,
-            "StartRange": 0,
-            "EndRange": 55800,
         }
         pbp_url = furl(base_url).add(query_params).url
         responses.add(responses.GET, pbp_url, json=pbp_response, status=200)
