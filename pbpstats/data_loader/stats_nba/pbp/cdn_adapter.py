@@ -242,6 +242,7 @@ def cdn_to_stats_row(action: Dict[str, Any], game_id: str) -> Dict[str, Any]:
     # Special handling for period/game start/end
     t = (action.get("actionType") or "").lower().strip()
     st = (action.get("subType") or "").lower().strip()
+    desc = (action.get("descriptor") or "").lower().strip()
     if evt_type is None and t in ("period", "game"):
         evt_type = 12 if st == "start" else 13 if st == "end" else None
 
@@ -365,4 +366,70 @@ def cdn_to_stats_row(action: Dict[str, Any], game_id: str) -> Dict[str, Any]:
         if action.get(k) is not None:
             row[k] = action[k]
 
+    # Add helper boolean flags for easier downstream processing
+    # These supplement EVENTMSGACTIONTYPE when subtype codes are missing
+    _add_helper_flags(row, action, evt_type, t, st, desc)
+
     return row
+
+
+def _add_helper_flags(
+    row: Dict[str, Any],
+    action: Dict[str, Any],
+    evt_type: Optional[int],
+    action_type: str,
+    subtype: str,
+    descriptor: str,
+):
+    """
+    Add boolean helper flags to assist possession logic and analytics.
+
+    These flags bridge gaps where EVENTMSGACTIONTYPE may be None but we can
+    infer the event type from CDN fields.
+    """
+    # Foul flags
+    if evt_type == 6:  # Foul
+        row["is_shooting_foul"] = subtype == "shooting" or "shooting" in descriptor
+        row["is_offensive_foul"] = (
+            subtype == "offensive"
+            or subtype == "charge"
+            or "offensive" in descriptor
+            or "charge" in descriptor
+        )
+        row["is_loose_ball_foul"] = (
+            subtype == "looseball"
+            or subtype == "loose ball"
+            or "loose ball" in descriptor
+        )
+        row["is_charge"] = subtype == "charge" or "charge" in descriptor
+        row["is_technical"] = subtype == "technical" or "technical" in descriptor
+        row["is_flagrant"] = "flagrant" in subtype or "flagrant" in descriptor
+        row["is_away_from_play_foul"] = (
+            "away-from-play" in subtype
+            or "awayfromplay" in subtype
+            or "away from play" in descriptor
+        )
+        row["is_defensive_3_seconds"] = (
+            "defensive3second" in subtype or "defensive 3 second" in descriptor
+        )
+        row["is_transition_take_foul"] = "take" in subtype or "take foul" in descriptor
+
+    # Free throw flags
+    if evt_type == 3:  # FT
+        row["is_end_ft"] = subtype in ("1of1", "2of2", "3of3")
+        # Determine num_ft_for_trip from subtype
+        if "1of1" in subtype:
+            row["num_ft_for_trip"] = 1
+        elif "2of2" in subtype or "1of2" in subtype:
+            row["num_ft_for_trip"] = 2
+        elif "3of3" in subtype or "2of3" in subtype or "1of3" in subtype:
+            row["num_ft_for_trip"] = 3
+        else:
+            row["num_ft_for_trip"] = None
+
+        row["is_technical_ft"] = "technical" in descriptor
+        row["is_flagrant_ft"] = "flagrant" in descriptor
+
+    # Target score flag (from CDN isTargetScoreLastPeriod)
+    if action.get("isTargetScoreLastPeriod") is not None:
+        row["is_target_score_last_period"] = action["isTargetScoreLastPeriod"]
