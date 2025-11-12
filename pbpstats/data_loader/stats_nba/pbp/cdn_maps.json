@@ -1,0 +1,72 @@
+{
+  "FT_MAP": {
+    "1of1": 12,
+    "1of2": 10,
+    "2of2": 11,
+    "1of3": 13,
+    "2of3": 14,
+    "3of3": 15
+  },
+  "SHOT_MAP": {
+    "jumpshot": 1,
+    "bankshot": 1,
+    "fadeaway": 1,
+    "pullup": 1,
+    "stepback": 1,
+    "layup": 2,
+    "fingerroll": 2,
+    "drivinglayup": 2,
+    "runninglayup": 2,
+    "dunk": 3,
+    "hook": 4,
+    "tipin": 5,
+    "tip": 5
+  },
+  "TOV_MAP": {
+    "badpass": 1,
+    "lostball": 2,
+    "doubledribble": 3,
+    "traveling": 5,
+    "shotclock": 9,
+    "backcourt": 10,
+    "eightsecond": 11,
+    "fivesecond": 12,
+    "3secondviolation": 13,
+    "outofbounds": 15,
+    "stepoutofbounds": 15,
+    "offensivefoul": 18,
+    "palming": 24,
+    "carry": 24,
+    "carrying": 24,
+    "inbound": 29,
+    "offensivegoaltending": 7,
+    "offensivebasketinterference": 7
+  },
+  "FOUL_MAP": {
+    "shooting": 1,
+    "personal": 2,
+    "blocking": 2,
+    "looseball": 3,
+    "offensive": 4,
+    "charge": 6,
+    "technical": 11,
+    "doubletechnical": 14,
+    "flagranttype1": 12,
+    "flagranttype2": 13,
+    "awayfromplay": 17,
+    "clearpath": 20,
+    "defensive3second": 22,
+    "illegaldefense": 22,
+    "take": 30,
+    "transitiontake": 30,
+    "team": 0
+  },
+  "VIOL_MAP": {
+    "kickedball": 1,
+    "defensivegoaltending": 2,
+    "delayofgame": 3,
+    "lane": 4,
+    "doublelane": 5,
+    "jumpballviolation": 6
+  }
+}

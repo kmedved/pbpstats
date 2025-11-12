@@ -139,6 +139,23 @@ def test_jumpball_recovered_sets_player3():
     assert row["PLAYER3_ID"] == 333
 
 
+def test_jumpball_recovered_alt_spelling():
+    action = {
+        "actionNumber": 6,
+        "orderNumber": 6,
+        "period": 1,
+        "clock": "PT11M59S",
+        "actionType": "JumpBall",
+        "jumpBallRecoveredPersonId": 444,
+        "timeActual": "2024-01-01T00:06:31Z",
+    }
+
+    row = cdn_to_stats_row(action, GAME_ID)
+
+    assert row["EVENTMSGTYPE"] == 10
+    assert row["PLAYER3_ID"] == 444
+
+
 def test_period_start_and_end_map_to_events():
     start = {
         "actionNumber": 1,

@@ -56,6 +56,11 @@ _EXTRA_HEADERS = [
     "areaDetail",
     "isTargetScoreLastPeriod",
     "timeActual",
+    "descriptor",
+    "qualifiers",
+    "personIdsFilter",
+    "possession",
+    "periodType",
 ]
 
 _HEADER_DEFAULTS: Dict[str, Any] = {
@@ -107,7 +112,9 @@ class StatsNbaPbpWebLoader(StatsNbaWebLoader):
     """
 
     def __init__(self, file_directory=None):
+        super().__init__()
         self.file_directory = file_directory
+        self._session = requests.Session()
 
     def load_data(self, game_id):
         self.game_id = game_id
@@ -142,7 +149,7 @@ class StatsNbaPbpWebLoader(StatsNbaWebLoader):
         return self._load_request_data()
 
     def _load_from_cdn(self):
-        data = get_pbp_actions(self.game_id)
+        data = get_pbp_actions(self.game_id, session=self._session)
         game = data.get("game") or {}
         actions = game.get("actions") or []
         actions.sort(key=self._action_sort_key)
@@ -159,7 +166,14 @@ class StatsNbaPbpWebLoader(StatsNbaWebLoader):
                 json.dump(self.source_data, outfile)
 
     def _should_use_cdn(self) -> bool:
-        return self.league == NBA_STRING
+        if self.league != NBA_STRING:
+            return False
+        use_cdn_env = os.getenv("PBPSTATS_USE_CDN", "1")
+        try:
+            use_cdn = int(use_cdn_env) != 0
+        except ValueError:
+            use_cdn = use_cdn_env.strip().lower() in ("true", "yes", "on")
+        return use_cdn
 
     @staticmethod
     def _action_sort_key(action: Dict[str, Any]) -> Tuple[int, int]:

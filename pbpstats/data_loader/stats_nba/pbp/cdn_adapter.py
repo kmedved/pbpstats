@@ -1,14 +1,18 @@
 # -*- coding: utf-8 -*-
 from __future__ import annotations
 
+import json
 import logging
+import os
 import re
-from typing import Any, Dict, Optional, Set, Tuple
+from typing import Any, Dict, Mapping, Optional, Set, Tuple
 
 # ISO8601 duration: PTmmMss(.ff)S
 _CLOCK = re.compile(r"^PT(?:(\d+)M)?(?:(\d+(?:\.\d+)?)S)?$")
 _log = logging.getLogger(__name__)
 _seen_unknown: Set[Tuple[str, str, str]] = set()
+_DEFAULT_JSON_PATH = os.path.join(os.path.dirname(__file__), "cdn_maps.json")
+_MAP_GROUPS = ("FT_MAP", "SHOT_MAP", "TOV_MAP", "FOUL_MAP", "VIOL_MAP")
 
 
 def _warn_once(key: Tuple[str, str, str]) -> None:
@@ -143,6 +147,78 @@ VIOL_MAP = {
     "jumpballviolation": 6,
 }
 
+_BASE_MAPS = {
+    "FT_MAP": dict(FT_MAP),
+    "SHOT_MAP": dict(SHOT_MAP),
+    "TOV_MAP": dict(TOV_MAP),
+    "FOUL_MAP": dict(FOUL_MAP),
+    "VIOL_MAP": dict(VIOL_MAP),
+}
+
+
+def _merge_group(dst: Dict[str, int], src: Mapping[str, Any]) -> None:
+    for key, value in src.items():
+        if isinstance(value, int):
+            dst[_canon(key)] = value
+        else:
+            _log.warning("Ignoring non-integer map value for key %r: %r", key, value)
+
+
+def _load_json_file(path: str) -> Dict[str, Any]:
+    with open(path, "r", encoding="utf-8") as file_obj:
+        return json.load(file_obj)
+
+
+def _apply_json_maps(
+    runtime_maps: Dict[str, Dict[str, int]], maps_blob: Mapping[str, Any]
+) -> None:
+    for group in _MAP_GROUPS:
+        blob = maps_blob.get(group)
+        if isinstance(blob, dict):
+            _merge_group(runtime_maps[group], blob)
+        elif blob is not None:
+            _log.warning("Ignoring non-dict mapping for %s in JSON file", group)
+
+
+def _runtime_maps_reset() -> Dict[str, Dict[str, int]]:
+    return {group: dict(_BASE_MAPS[group]) for group in _MAP_GROUPS}
+
+
+def reload_cdn_maps(paths: Optional[str] = None) -> None:
+    """
+    Reload runtime mapping tables from packaged JSON + optional overlays.
+    Overlays are read from colon/pathsep-separated files passed in explicitly
+    or via the `PBPSTATS_CDN_MAPS` environment variable.
+    """
+    global FT_MAP, SHOT_MAP, TOV_MAP, FOUL_MAP, VIOL_MAP
+    runtime = _runtime_maps_reset()
+    try:
+        if os.path.isfile(_DEFAULT_JSON_PATH):
+            _apply_json_maps(runtime, _load_json_file(_DEFAULT_JSON_PATH))
+    except Exception as exc:
+        _log.warning("Failed loading packaged cdn_maps.json: %s", exc)
+    raw_paths = paths if paths is not None else os.getenv("PBPSTATS_CDN_MAPS")
+    if raw_paths:
+        for path in raw_paths.split(os.pathsep):
+            candidate = path.strip()
+            if not candidate:
+                continue
+            try:
+                _apply_json_maps(runtime, _load_json_file(candidate))
+                _log.info("Applied CDN map overlay: %s", candidate)
+            except FileNotFoundError:
+                _log.warning("CDN map overlay not found: %s", candidate)
+            except Exception as exc:
+                _log.warning("Error applying CDN map overlay %s: %s", candidate, exc)
+    FT_MAP = runtime["FT_MAP"]
+    SHOT_MAP = runtime["SHOT_MAP"]
+    TOV_MAP = runtime["TOV_MAP"]
+    FOUL_MAP = runtime["FOUL_MAP"]
+    VIOL_MAP = runtime["VIOL_MAP"]
+
+
+reload_cdn_maps()
+
 
 def map_eventmsgactiontype(
     action: Dict[str, Any], evt_type: Optional[int]
@@ -241,8 +317,11 @@ def cdn_to_stats_row(action: Dict[str, Any], game_id: str) -> Dict[str, Any]:
             row["PLAYER1_ID"] = action["jumpBallWonPersonId"]
         if action.get("jumpBallLostPersonId") is not None:
             row["PLAYER2_ID"] = action["jumpBallLostPersonId"]
-        if action.get("jumpBallRecoverdPersonId") is not None:
-            row["PLAYER3_ID"] = action["jumpBallRecoverdPersonId"]
+        recovered = action.get("jumpBallRecoverdPersonId")
+        if recovered is None:
+            recovered = action.get("jumpBallRecoveredPersonId")
+        if recovered is not None:
+            row["PLAYER3_ID"] = recovered
 
     extras = (
         "x",
@@ -254,6 +333,11 @@ def cdn_to_stats_row(action: Dict[str, Any], game_id: str) -> Dict[str, Any]:
         "areaDetail",
         "isTargetScoreLastPeriod",
         "timeActual",
+        "descriptor",
+        "qualifiers",
+        "personIdsFilter",
+        "possession",
+        "periodType",
     )
     for key in extras:
         if action.get(key) is not None:

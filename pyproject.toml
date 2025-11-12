@@ -31,6 +31,9 @@ description = "A package to scrape and parse NBA, WNBA and G-League play-by-play
 authors = ["dblackrun <darryl.blackport@gmail.com>"]
 license = "MIT License"
 
+[[tool.poetry.include]]
+path = "pbpstats/data_loader/stats_nba/pbp/*.json"
+
 [tool.poetry.dependencies]
 python = "^3.8"
 requests = "^2.27.1"
