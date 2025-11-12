@@ -67,7 +67,7 @@ _HEADER_DEFAULTS: Dict[str, Any] = {
     "WCTIMESTRING": None,
     "PCTIMESTRING": "0:00",
     "HOMEDESCRIPTION": None,
-    "NEUTRALDESCRIPTION": None,
+    "NEUTRALDESCRIPTION": "",
     "VISITORDESCRIPTION": None,
     "SCORE": None,
     "SCOREMARGIN": None,
@@ -168,9 +168,13 @@ class StatsNbaPbpWebLoader(StatsNbaWebLoader):
     @staticmethod
     def _dedupe_actions(actions: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         deduped: List[Dict[str, Any]] = []
-        index_by_key: Dict[Tuple[Any, Any], int] = {}
+        index_by_key: Dict[Tuple[Any, Any, Any], int] = {}
         for action in actions:
-            key = (action.get("actionNumber"), action.get("timeActual"))
+            key = (
+                action.get("actionNumber"),
+                action.get("timeActual"),
+                action.get("orderNumber"),
+            )
             if key in index_by_key:
                 idx = index_by_key[key]
                 existing = deduped[idx]

@@ -1,11 +1,33 @@
 # -*- coding: utf-8 -*-
 from __future__ import annotations
 
+import logging
 import re
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Set, Tuple
 
 # ISO8601 duration: PTmmMss(.ff)S
 _CLOCK = re.compile(r"^PT(?:(\d+)M)?(?:(\d+(?:\.\d+)?)S)?$")
+_log = logging.getLogger(__name__)
+_seen_unknown: Set[Tuple[str, str, str]] = set()
+
+
+def _warn_once(key: Tuple[str, str, str]) -> None:
+    if key not in _seen_unknown:
+        _seen_unknown.add(key)
+        _log.warning("Unmapped PBP subtype: %s", key)
+
+
+def _canon(value: Optional[str]) -> str:
+    """
+    Canonicalize subtype/descriptor strings so that common presentation
+    variants (spaces, hyphens, underscores, case) map to the same key.
+    Examples:
+      "Double Dribble" -> "doubledribble"
+      "defensive-goaltending" -> "defensivegoaltending"
+    """
+    if not value:
+        return ""
+    return value.lower().replace(" ", "").replace("-", "").replace("_", "")
 
 
 def iso_to_pctimestring(iso: Optional[str]) -> str:
@@ -29,6 +51,8 @@ def map_eventmsgtype(action: Dict[str, Any]) -> Optional[int]:
     shot_result = (action.get("shotResult") or "").lower()
     if t in ("2pt", "3pt"):
         return 1 if shot_result == "made" else 2
+    if t == "heave":
+        return 1 if shot_result == "made" else 2
     mapping = {
         "freethrow": 3,
         "rebound": 4,
@@ -39,64 +63,115 @@ def map_eventmsgtype(action: Dict[str, Any]) -> Optional[int]:
         "timeout": 9,
         "jumpball": 10,
         "instantreplay": 18,
-        "heave": 2,
     }
     return mapping.get(t)
 
 
 FT_MAP = {"1of1": 12, "1of2": 10, "2of2": 11, "1of3": 13, "2of3": 14, "3of3": 15}
-SHOT_MAP = {"jumpshot": 1, "layup": 2, "dunk": 3, "hook": 4, "tipin": 5}
+SHOT_MAP = {
+    "jumpshot": 1,
+    "bankshot": 1,
+    "fadeaway": 1,
+    "pullup": 1,
+    "stepback": 1,
+    "layup": 2,
+    "fingerroll": 2,
+    "drivinglayup": 2,
+    "runninglayup": 2,
+    "dunk": 3,
+    "hook": 4,
+    "tipin": 5,
+    "tip": 5,
+}
 TOV_MAP = {
+    # Core turnover types
     "badpass": 1,
     "lostball": 2,
+    "doubledribble": 3,
     "traveling": 5,
     "shotclock": 9,
-    "3-second-violation": 13,
+    "backcourt": 10,
+    "eightsecond": 11,
+    "fivesecond": 12,
+    "3secondviolation": 13,
     "outofbounds": 15,
+    "stepoutofbounds": 15,
     "offensivefoul": 18,
     "palming": 24,
+    "carry": 24,
+    "carrying": 24,
+    "inbound": 29,
+    # Offensive BI/GT frequently scored as turnover in feeds
+    "offensivegoaltending": 7,
+    "offensivebasketinterference": 7,
 }
 FOUL_MAP = {
+    # Personal family
     "shooting": 1,
+    "personal": 2,
+    "blocking": 2,
     "looseball": 3,
     "offensive": 4,
     "charge": 6,
+    # Technicals / flagrants
     "technical": 11,
-    "flagrant-type-1": 12,
-    "flagrant-type-2": 13,
-    "away-from-play": 17,
+    "doubletechnical": 14,
+    "flagranttype1": 12,
+    "flagranttype2": 13,
+    # Special situations
+    "awayfromplay": 17,
+    "clearpath": 20,
     "defensive3second": 22,
+    "illegaldefense": 22,
     "take": 30,
+    "transitiontake": 30,
+    "team": 0,
+}
+VIOL_MAP = {
+    "kickedball": 1,
+    "defensivegoaltending": 2,
+    "delayofgame": 3,
+    "lane": 4,
+    "doublelane": 5,
+    "jumpballviolation": 6,
 }
 
 
 def map_eventmsgactiontype(
     action: Dict[str, Any], evt_type: Optional[int]
 ) -> Optional[int]:
-    t = (action.get("actionType") or "").lower()
-    st = (action.get("subType") or "").lower()
-    desc = (action.get("descriptor") or "").lower()
+    t = _canon(action.get("actionType"))
+    st = _canon(action.get("subType"))
+    desc = _canon(action.get("descriptor"))
 
     if evt_type in (1, 2):
-        return SHOT_MAP.get(st)
-    if evt_type == 3:
-        return FT_MAP.get(st) or (
+        result = SHOT_MAP.get(st) or SHOT_MAP.get(desc)
+        if result is not None:
+            return result
+    elif evt_type == 3:
+        result = FT_MAP.get(st) or (
             11 if "technical" in desc else 12 if "flagrant" in desc else None
         )
-    if evt_type == 5:
-        return TOV_MAP.get(st)
-    if evt_type == 6:
-        return FOUL_MAP.get(st) or FOUL_MAP.get(desc)
-    if t == "period":
-        if st == "start":
-            return 12
-        if st == "end":
-            return 13
-    if t == "game":
-        if st == "start":
-            return 12
-        if st == "end":
-            return 13
+        if result is not None:
+            return result
+    elif evt_type == 5:
+        result = TOV_MAP.get(st) or TOV_MAP.get(desc)
+        if result is not None:
+            return result
+    elif evt_type == 6:
+        result = FOUL_MAP.get(st) or FOUL_MAP.get(desc)
+        if result is not None:
+            return result
+    elif evt_type == 7:
+        result = VIOL_MAP.get(st) or VIOL_MAP.get(desc)
+        if result is not None:
+            return result
+    if t in ("period", "game"):
+        return 0
+    if evt_type is not None:
+        _warn_once((t, st, desc))
+        return 0
+    _warn_once((t, st, desc))
     return None
 
 
@@ -118,9 +193,10 @@ def cdn_to_stats_row(action: Dict[str, Any], game_id: str) -> Dict[str, Any]:
         "EVENTNUM": action.get("actionNumber") or action.get("orderNumber"),
         "PERIOD": action.get("period"),
         "PCTIMESTRING": iso_to_pctimestring(action.get("clock")),
+        "WCTIMESTRING": action.get("timeActual") or None,
         "EVENTMSGTYPE": evt_type,
         "EVENTMSGACTIONTYPE": map_eventmsgactiontype(action, evt_type),
-        "NEUTRALDESCRIPTION": action.get("description"),
+        "NEUTRALDESCRIPTION": action.get("description") or "",
     }
 
     score_home = action.get("scoreHome")

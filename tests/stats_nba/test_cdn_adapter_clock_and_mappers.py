@@ -1,11 +1,13 @@
 # -*- coding: utf-8 -*-
 import pytest
 
+import pbpstats.data_loader.stats_nba.pbp.cdn_adapter as cdn_adapter
 from pbpstats.data_loader.stats_nba.pbp.cdn_adapter import (
     FOUL_MAP,
     FT_MAP,
     SHOT_MAP,
     TOV_MAP,
+    VIOL_MAP,
     iso_to_pctimestring,
     map_eventmsgactiontype,
     map_eventmsgtype,
@@ -31,13 +33,15 @@ def test_map_eventmsgtype_for_shots_and_specials():
     missed = {"actionType": "2pt", "shotResult": "Missed"}
     ft = {"actionType": "FreeThrow"}
     replay = {"actionType": "InstantReplay"}
-    heave = {"actionType": "Heave"}
+    heave_made = {"actionType": "Heave", "shotResult": "Made"}
+    heave_missed = {"actionType": "Heave", "shotResult": "Missed"}
 
     assert map_eventmsgtype(made) == 1
     assert map_eventmsgtype(missed) == 2
     assert map_eventmsgtype(ft) == 3
     assert map_eventmsgtype(replay) == 18
-    assert map_eventmsgtype(heave) == 2
+    assert map_eventmsgtype(heave_made) == 1
+    assert map_eventmsgtype(heave_missed) == 2
 
 
 def test_map_eventmsgactiontype_for_common_actions():
@@ -59,7 +63,44 @@ def test_map_eventmsgactiontype_for_common_actions():
     assert map_eventmsgactiontype(foul, 6) == FOUL_MAP["technical"]
 
     period_start = {"actionType": "Period", "subType": "start"}
-    assert map_eventmsgactiontype(period_start, None) == 12
+    assert map_eventmsgactiontype(period_start, 12) == 0
     period_end = {"actionType": "Period", "subType": "end"}
-    assert map_eventmsgactiontype(period_end, None) == 13
+    assert map_eventmsgactiontype(period_end, 13) == 0
 
+
+def test_shot_subtype_aliases_map_correctly():
+    action = {
+        "actionType": "3pt",
+        "shotResult": "Made",
+        "subType": "Finger Roll",
+    }
+    assert map_eventmsgactiontype(action, 1) == SHOT_MAP["fingerroll"]
+
+    tip = {
+        "actionType": "2pt",
+        "shotResult": "Missed",
+        "subType": "Tip-In",
+    }
+    assert map_eventmsgactiontype(tip, 2) == SHOT_MAP["tipin"]
+
+
+def test_violation_subtypes_use_defined_codes():
+    action = {"actionType": "Violation", "subType": "Delay of Game"}
+    assert map_eventmsgactiontype(action, 7) == VIOL_MAP["delayofgame"]
+
+    desc_action = {
+        "actionType": "Violation",
+        "descriptor": "Jump Ball Violation",
+    }
+    assert map_eventmsgactiontype(desc_action, 7) == VIOL_MAP["jumpballviolation"]
+
+
+def test_unknown_actiontype_logs_once_and_returns_zero(caplog):
+    cdn_adapter._seen_unknown.clear()
+    with caplog.at_level("WARNING"):
+        action = {"actionType": "Turnover", "subType": "Mystery"}
+        assert map_eventmsgactiontype(action, 5) == 0
+        # second call should not duplicate warning
+        assert map_eventmsgactiontype(action, 5) == 0
+    assert len(caplog.records) == 1
+    assert "Unmapped PBP subtype" in caplog.text

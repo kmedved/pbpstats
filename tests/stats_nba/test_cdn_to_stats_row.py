@@ -20,6 +20,7 @@ def test_made_three_with_assist_sets_expected_fields():
         "assistPersonId": 456,
         "scoreHome": 3,
         "scoreAway": 0,
+        "timeActual": "2024-01-01T00:00:10Z",
     }
 
     row = cdn_to_stats_row(action, GAME_ID)
@@ -28,6 +29,7 @@ def test_made_three_with_assist_sets_expected_fields():
     assert row["EVENTNUM"] == 15
     assert row["PERIOD"] == 1
     assert row["PCTIMESTRING"] == "11:38"
+    assert row["WCTIMESTRING"] == "2024-01-01T00:00:10Z"
     assert row["EVENTMSGTYPE"] == 1
     assert row["EVENTMSGACTIONTYPE"] == 1
     assert row["PLAYER1_ID"] == 123
@@ -50,6 +52,7 @@ def test_missed_two_with_block_sets_player3():
         "teamId": 1,
         "scoreHome": 25,
         "scoreAway": 24,
+        "timeActual": "2024-01-01T00:05:00Z",
     }
 
     row = cdn_to_stats_row(action, GAME_ID)
@@ -69,6 +72,7 @@ def test_turnover_with_steal_sets_player2():
         "subType": "lostball",
         "personId": 100,
         "stealPersonId": 200,
+        "timeActual": "2024-01-01T00:05:15Z",
     }
 
     row = cdn_to_stats_row(action, GAME_ID)
@@ -87,6 +91,7 @@ def test_foul_drawn_person_sets_player2():
         "descriptor": "Shooting",
         "personId": 250,
         "foulDrawnPersonId": 300,
+        "timeActual": "2024-01-01T00:05:30Z",
     }
 
     row = cdn_to_stats_row(action, GAME_ID)
@@ -104,6 +109,7 @@ def test_free_throw_trip_sets_eventmsgactiontype():
         "actionType": "FreeThrow",
         "shotResult": "Made",
         "subType": "2of2",
+        "timeActual": "2024-01-01T00:06:00Z",
     }
 
     row = cdn_to_stats_row(action, GAME_ID)
@@ -120,6 +126,7 @@ def test_jumpball_recovered_sets_player3():
         "clock": "PT12M00S",
         "actionType": "JumpBall",
         "jumpBallRecoverdPersonId": 333,
+        "timeActual": "2024-01-01T00:06:30Z",
     }
 
     row = cdn_to_stats_row(action, GAME_ID)
@@ -135,6 +142,7 @@ def test_period_start_and_end_map_to_events():
         "clock": "PT12M00S",
         "actionType": "Period",
         "subType": "start",
+        "timeActual": "2024-01-01T00:00:00Z",
     }
     end = {
         "actionNumber": 120,
@@ -142,13 +150,32 @@ def test_period_start_and_end_map_to_events():
         "clock": "PT0M00S",
         "actionType": "Period",
         "subType": "end",
+        "timeActual": "2024-01-01T00:15:00Z",
     }
 
     row_start = cdn_to_stats_row(start, GAME_ID)
     row_end = cdn_to_stats_row(end, GAME_ID)
 
     assert row_start["EVENTMSGTYPE"] == 12
-    assert row_start["EVENTMSGACTIONTYPE"] == 12
+    assert row_start["EVENTMSGACTIONTYPE"] == 0
     assert row_end["EVENTMSGTYPE"] == 13
-    assert row_end["EVENTMSGACTIONTYPE"] == 13
+    assert row_end["EVENTMSGACTIONTYPE"] == 0
+    assert row_start["WCTIMESTRING"] == "2024-01-01T00:00:00Z"
+    assert row_end["WCTIMESTRING"] == "2024-01-01T00:15:00Z"
 
+
+def test_missing_description_defaults_to_empty_string():
+    action = {
+        "actionNumber": 33,
+        "orderNumber": 40,
+        "period": 2,
+        "clock": "PT05M00S",
+        "actionType": "Timeout",
+        "subType": "Official",
+        "timeActual": "2024-01-01T00:10:00Z",
+    }
+
+    row = cdn_to_stats_row(action, GAME_ID)
+
+    assert row["NEUTRALDESCRIPTION"] == ""
+    assert row["WCTIMESTRING"] == "2024-01-01T00:10:00Z"
