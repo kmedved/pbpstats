@@ -1,5 +1,6 @@
 import json
 import os
+from collections import Counter
 from typing import Any, Dict, List, Tuple
 
 import requests
@@ -100,6 +101,8 @@ _HEADER_DEFAULTS: Dict[str, Any] = {
     "VIDEO_AVAILABLE_FLAG": 0,
 }
 
+SUPPORTED_EVENT_TYPES = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 13}
+
 
 class StatsNbaPbpWebLoader(StatsNbaWebLoader):
     """
@@ -152,9 +155,17 @@ class StatsNbaPbpWebLoader(StatsNbaWebLoader):
         data = get_pbp_actions(self.game_id, session=self._session)
         game = data.get("game") or {}
         actions = game.get("actions") or []
+        # Drop CDN-only meta/attribute actions before converting to stats rows.
+        actions = [action for action in actions if self._include_cdn_action(action)]
         actions.sort(key=self._action_sort_key)
         deduped = self._dedupe_actions(actions)
         rows = [cdn_to_stats_row(action, self.game_id) for action in deduped]
+        if os.getenv("PBPSTATS_DEBUG_EVENT_TYPES"):
+            counts = Counter(row.get("EVENTMSGTYPE") for row in rows)
+            print("EVENTMSGTYPE distribution:", dict(counts))
+        rows = [
+            row for row in rows if row.get("EVENTMSGTYPE") in SUPPORTED_EVENT_TYPES
+        ]
         self.source_data = self._build_stats_payload(rows)
         self._save_data_to_file()
         return self.source_data
@@ -174,6 +185,25 @@ class StatsNbaPbpWebLoader(StatsNbaWebLoader):
         except ValueError:
             use_cdn = use_cdn_env.strip().lower() in ("true", "yes", "on")
         return use_cdn
+
+    @staticmethod
+    def _include_cdn_action(action: Dict[str, Any]) -> bool:
+        """
+        Drop actions represented as attributes in pbpstats:
+          - 'steal' -> Turnover.stealPersonId
+          - 'block' -> FieldGoal.blockPersonId
+        And actions with no Enhanced class:
+          - 'instantreplay', 'replay', 'stoppage', 'game'
+        """
+        t = (action.get("actionType") or "").lower()
+        return t not in {
+            "steal",
+            "block",
+            "stoppage",
+            "instantreplay",
+            "replay",
+            "game",
+        }
 
     @staticmethod
     def _action_sort_key(action: Dict[str, Any]) -> Tuple[int, int]:

@@ -55,6 +55,14 @@ def map_eventmsgtype(action: Dict[str, Any]) -> Optional[int]:
     shot_result = (action.get("shotResult") or "").lower()
     if t in ("2pt", "3pt"):
         return 1 if shot_result == "made" else 2
+    # Map period/game early so we can avoid warn-once noise for these meta actions.
+    if t in ("period", "game"):
+        st = (action.get("subType") or "").lower()
+        if st == "start":
+            return 12
+        if st == "end":
+            return 13
+        return None
     if t == "heave":
         return 1 if shot_result == "made" else 2
     mapping = {
@@ -70,7 +78,9 @@ def map_eventmsgtype(action: Dict[str, Any]) -> Optional[int]:
     }
     if t in mapping:
         return mapping[t]
-    # Unknown event type; warn once with empty subtype/desc context
+    # Do not warn for types we handle elsewhere or intentionally filter upstream
+    # (period/game handled above; others filtered in web loader). Unknown types
+    # still warn once with empty subtype/desc context.
     try:
         _warn_once((t, "", ""))
     except NameError:
@@ -241,6 +251,9 @@ def map_eventmsgactiontype(
         result = TOV_MAP.get(st) or TOV_MAP.get(desc)
         if result is not None:
             return result
+    elif evt_type in (4, 8, 9, 10):
+        # Rebounds, substitutions, timeouts, jump balls do not require subcodes.
+        return 0
     elif evt_type == 6:
         result = FOUL_MAP.get(st) or FOUL_MAP.get(desc)
         if result is not None:
@@ -250,6 +263,7 @@ def map_eventmsgactiontype(
         if result is not None:
             return result
     if t in ("period", "game"):
+        # Start/end already mapped to EVENTMSGTYPE 12/13; subtype defaults to 0.
         return 0
     if evt_type is not None:
         _warn_once((t, st, desc))
