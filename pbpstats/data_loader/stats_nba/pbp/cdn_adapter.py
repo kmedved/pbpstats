@@ -64,7 +64,14 @@ def map_eventmsgtype(action: Dict[str, Any]) -> Optional[int]:
         "jumpball": 10,
         "instantreplay": 18,
     }
-    return mapping.get(t)
+    if t in mapping:
+        return mapping[t]
+    # Unknown event type; warn once with empty subtype/desc context
+    try:
+        _warn_once((t, "", ""))
+    except NameError:
+        pass  # _warn_once exists in this module; safe guard for import order
+    return None
 
 
 FT_MAP = {"1of1": 12, "1of2": 10, "2of2": 11, "1of3": 13, "2of3": 14, "3of3": 15}
@@ -188,14 +195,16 @@ def cdn_to_stats_row(action: Dict[str, Any], game_id: str) -> Dict[str, Any]:
         elif st == "end":
             evt_type = 13
 
+    evtmsgactiontype = map_eventmsgactiontype(action, evt_type)
+
     row: Dict[str, Any] = {
         "GAME_ID": game_id,
         "EVENTNUM": action.get("actionNumber") or action.get("orderNumber"),
         "PERIOD": action.get("period"),
         "PCTIMESTRING": iso_to_pctimestring(action.get("clock")),
         "WCTIMESTRING": action.get("timeActual") or None,
-        "EVENTMSGTYPE": evt_type,
-        "EVENTMSGACTIONTYPE": map_eventmsgactiontype(action, evt_type),
+        "EVENTMSGTYPE": evt_type or 0,
+        "EVENTMSGACTIONTYPE": evtmsgactiontype or 0,
         "NEUTRALDESCRIPTION": action.get("description") or "",
     }
 
@@ -227,6 +236,11 @@ def cdn_to_stats_row(action: Dict[str, Any], game_id: str) -> Dict[str, Any]:
         if action.get("foulDrawnPersonId") is not None:
             row["PLAYER2_ID"] = action["foulDrawnPersonId"]
     elif t == "jumpball":
+        # Capture winner/loser/recovered players to mirror stats v2 fields
+        if action.get("jumpBallWonPersonId") is not None:
+            row["PLAYER1_ID"] = action["jumpBallWonPersonId"]
+        if action.get("jumpBallLostPersonId") is not None:
+            row["PLAYER2_ID"] = action["jumpBallLostPersonId"]
         if action.get("jumpBallRecoverdPersonId") is not None:
             row["PLAYER3_ID"] = action["jumpBallRecoverdPersonId"]
 

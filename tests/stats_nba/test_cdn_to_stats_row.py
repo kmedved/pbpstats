@@ -125,6 +125,8 @@ def test_jumpball_recovered_sets_player3():
         "period": 1,
         "clock": "PT12M00S",
         "actionType": "JumpBall",
+        "jumpBallWonPersonId": 111,
+        "jumpBallLostPersonId": 222,
         "jumpBallRecoverdPersonId": 333,
         "timeActual": "2024-01-01T00:06:30Z",
     }
@@ -132,6 +134,8 @@ def test_jumpball_recovered_sets_player3():
     row = cdn_to_stats_row(action, GAME_ID)
 
     assert row["EVENTMSGTYPE"] == 10
+    assert row["PLAYER1_ID"] == 111
+    assert row["PLAYER2_ID"] == 222
     assert row["PLAYER3_ID"] == 333
 
 
@@ -179,3 +183,19 @@ def test_missing_description_defaults_to_empty_string():
 
     assert row["NEUTRALDESCRIPTION"] == ""
     assert row["WCTIMESTRING"] == "2024-01-01T00:10:00Z"
+
+
+def test_unknown_event_types_map_to_zero_codes():
+    action = {
+        "actionNumber": 77,
+        "orderNumber": 90,
+        "period": 2,
+        "clock": "PT04M59S",
+        "actionType": "Stoppage",
+        "timeActual": "2024-01-01T00:11:00Z",
+    }
+
+    row = cdn_to_stats_row(action, GAME_ID)
+
+    assert row["EVENTMSGTYPE"] == 0
+    assert row["EVENTMSGACTIONTYPE"] == 0

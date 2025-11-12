@@ -110,6 +110,40 @@ def test_cdn_loader_falls_back_to_legacy(monkeypatch):
     assert data is sentinel
 
 
+def test_cdn_loader_falls_back_on_request_exception(monkeypatch):
+    calls = []
+
+    def fake_get(game_id):
+        calls.append(game_id)
+        raise requests.ConnectionError("network error")
+
+    monkeypatch.setattr(
+        "pbpstats.data_loader.stats_nba.pbp.web.get_pbp_actions", fake_get
+    )
+
+    sentinel = {
+        "resultSets": [
+            {"headers": ["GAME_ID"], "rowSet": [["0027654321"]]},
+        ]
+    }
+
+    def fake_load_request_data(self):
+        self.source_data = sentinel
+        return sentinel
+
+    monkeypatch.setattr(
+        StatsNbaPbpWebLoader,
+        "_load_request_data",
+        fake_load_request_data,
+    )
+
+    loader = StatsNbaPbpWebLoader()
+    data = loader.load_data("0027654321")
+
+    assert calls == ["0027654321"]
+    assert data is sentinel
+
+
 def test_dedupe_prefers_latest_edited_action():
     actions = [
         {

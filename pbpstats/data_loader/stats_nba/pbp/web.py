@@ -114,7 +114,12 @@ class StatsNbaPbpWebLoader(StatsNbaWebLoader):
         if self._should_use_cdn():
             try:
                 return self._load_from_cdn()
-            except (requests.HTTPError, ValueError, KeyError):
+            except (
+                requests.HTTPError,
+                requests.RequestException,
+                ValueError,
+                KeyError,
+            ):
                 # Fallback to legacy stats endpoint if CDN is unavailable or malformed
                 pass
         return self._load_from_legacy()
