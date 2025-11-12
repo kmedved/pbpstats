@@ -112,8 +112,8 @@ class StatsNbaPbpWebLoader(StatsNbaWebLoader):
     """
 
     def __init__(self, file_directory=None):
-        super().__init__()
-        self.file_directory = file_directory
+        # Ensure base class sees the file_directory
+        super().__init__(file_directory)
         self._session = requests.Session()
 
     def load_data(self, game_id):
@@ -177,12 +177,15 @@ class StatsNbaPbpWebLoader(StatsNbaWebLoader):
 
     @staticmethod
     def _action_sort_key(action: Dict[str, Any]) -> Tuple[int, int]:
-        order = action.get("orderNumber")
-        event = action.get("actionNumber")
-        return (
-            order if isinstance(order, int) else order or event or 0,
-            event or 0,
-        )
+        def _to_int(value: Any) -> int:
+            try:
+                return int(value)
+            except Exception:
+                return 0
+
+        order = _to_int(action.get("orderNumber"))
+        event = _to_int(action.get("actionNumber"))
+        return (order, event)
 
     @staticmethod
     def _dedupe_actions(actions: List[Dict[str, Any]]) -> List[Dict[str, Any]]:

@@ -13,6 +13,9 @@ class StatsNbaWebLoader(StatsNbaLoaderBase):
     This class should not be instantiated directly.
     """
 
+    def __init__(self, file_directory=None):
+        self.file_directory = file_directory
+
     def _load_request_data(self):
         # If endpoint requires different headers they can be set in the web loader for the endpoint
         # Otherwise use the default headers
