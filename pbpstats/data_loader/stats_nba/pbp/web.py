@@ -297,6 +297,12 @@ class StatsNbaPbpWebLoader(StatsNbaWebLoader):
         base["subType"] = None
         base["subOutPersonId"] = out_ev.get("subOutPersonId") or out_ev.get("personId")
         base["subInPersonId"] = in_ev.get("subInPersonId") or in_ev.get("personId")
+        # Prefer whichever half carries the richer metadata for key stamps.
+        for key in ("teamId", "period", "clock", "timeActual"):
+            if base.get(key) is None:
+                base[key] = out_ev.get(key) if out_ev.get(key) is not None else in_ev.get(
+                    key
+                )
         description = (
             out_ev.get("description")
             or in_ev.get("description")

@@ -104,3 +104,46 @@ def test_unknown_actiontype_logs_once_and_returns_zero(caplog):
         assert map_eventmsgactiontype(action, 5) == 0
     assert len(caplog.records) == 1
     assert "Unmapped PBP subtype" in caplog.text
+
+
+def test_common_meta_families_do_not_emit_warnings(caplog):
+    cdn_adapter._seen_unknown.clear()
+    with caplog.at_level("WARNING"):
+        assert map_eventmsgactiontype(
+            {"actionType": "Rebound", "subType": "Defensive"}, None
+        ) == 0
+        assert map_eventmsgactiontype(
+            {"actionType": "Rebound", "subType": "Offensive"}, 4
+        ) == 0
+        assert (
+            map_eventmsgactiontype(
+                {"actionType": "Timeout", "subType": "Full"}, None
+            )
+            == 0
+        )
+        assert (
+            map_eventmsgactiontype(
+                {
+                    "actionType": "JumpBall",
+                    "descriptor": "StartPeriod",
+                    "subType": "Recovered",
+                },
+                None,
+            )
+            == 0
+        )
+        assert (
+            map_eventmsgactiontype({"actionType": "Substitution", "subType": "Out"}, 8)
+            == 0
+        )
+        assert (
+            map_eventmsgactiontype({"actionType": "Substitution", "subType": "In"}, None)
+            == 0
+        )
+        assert (
+            map_eventmsgactiontype(
+                {"actionType": "Stoppage", "descriptor": "Out of Bounds"}, None
+            )
+            == 0
+        )
+    assert len(caplog.records) == 0

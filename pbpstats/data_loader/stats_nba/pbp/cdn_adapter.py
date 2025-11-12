@@ -263,10 +263,19 @@ def map_eventmsgactiontype(
         result = VIOL_MAP.get(st) or VIOL_MAP.get(desc)
         if result is not None:
             return result
-    if t in ("period", "game"):
-        # Start/end already mapped to EVENTMSGTYPE 12/13; subtype defaults to 0.
+    # Event families that have no action subcodes in stats v2 feeds.
+    if t in (
+        "period",
+        "game",
+        "substitution",
+        "timeout",
+        "jumpball",
+        "rebound",
+        "stoppage",
+    ):
         return 0
     if evt_type is not None:
+        # True unknown combinations (rare) – warn once for visibility.
         _warn_once((t, st, desc))
         return 0
     _warn_once((t, st, desc))
