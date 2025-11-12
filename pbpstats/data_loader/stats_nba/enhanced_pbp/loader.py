@@ -18,6 +18,7 @@ The following code will load pbp data for game id "0021900001" from a file locat
 """
 import json
 import os
+from typing import Optional
 
 from pbpstats.data_loader.data_nba.pbp.loader import DataNbaPbpLoader
 from pbpstats.data_loader.data_nba.pbp.web import DataNbaPbpWebLoader
@@ -25,6 +26,7 @@ from pbpstats.data_loader.nba_enhanced_pbp_loader import NbaEnhancedPbpLoader
 from pbpstats.data_loader.stats_nba.pbp.loader import StatsNbaPbpLoader
 from pbpstats.data_loader.stats_nba.shots.loader import StatsNbaShotsLoader
 from pbpstats.resources.enhanced_pbp import FieldGoal
+from pbpstats.resources.enhanced_pbp.lineup_reconciler import StatsLineupReconciler
 from pbpstats.resources.enhanced_pbp.rebound import EventOrderError
 from pbpstats.resources.enhanced_pbp.stats_nba.enhanced_pbp_factory import (
     StatsNbaEnhancedPbpFactory,
@@ -64,6 +66,10 @@ class StatsNbaEnhancedPbpLoader(StatsNbaPbpLoader, NbaEnhancedPbpLoader):
         self._add_extra_attrs_to_all_events()
         self._check_rebound_event_order(6)
         self._add_shot_x_y_coords()
+
+    def _add_extra_attrs_to_all_events(self):
+        super()._add_extra_attrs_to_all_events()
+        self._maybe_apply_stats_lineups()
 
     def _add_shot_x_y_coords(self):
         shots_loader = StatsNbaShotsLoader(self.game_id, self.shots_source_loader)
@@ -295,3 +301,51 @@ class StatsNbaEnhancedPbpLoader(StatsNbaPbpLoader, NbaEnhancedPbpLoader):
             file_path = f"{self.file_directory}/pbp/stats_{self.game_id}.json"
             with open(file_path, "w") as outfile:
                 json.dump(self.source_data, outfile)
+
+    # ------------------------------------------------------------------ #
+    # Optional stats.nba.com lineup reconciliation
+    # ------------------------------------------------------------------ #
+
+    def _maybe_apply_stats_lineups(self):
+        if not self._should_use_stats_lineups():
+            return
+        try:
+            reconciler = StatsLineupReconciler(
+                self.game_id,
+                season=self.season,
+                season_type=self.season_type,
+                league_id=self._league_id_value(),
+            )
+            reconciler.apply(self.items)
+        except Exception:
+            if self._stats_lineups_debug_enabled():
+                raise
+
+    def _should_use_stats_lineups(self) -> bool:
+        env_value = os.getenv("PBPSTATS_USE_STATS_LINEUPS")
+        return self._env_truthy(env_value)
+
+    def _stats_lineups_debug_enabled(self) -> bool:
+        return self._env_truthy(os.getenv("PBPSTATS_DEBUG_STATS_LINEUPS"))
+
+    @staticmethod
+    def _env_truthy(value: Optional[str]) -> bool:
+        if value is None:
+            return False
+        value = value.strip().lower()
+        if value in {"1", "true", "yes", "on"}:
+            return True
+        if value in {"0", "false", "no", "off"}:
+            return False
+        try:
+            return int(value) != 0
+        except ValueError:
+            return False
+
+    def _league_id_value(self) -> str:
+        league_string = self.league
+        if league_string == "wnba":
+            return "10"
+        if league_string == "gleague":
+            return "20"
+        return "00"

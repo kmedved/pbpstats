@@ -1,7 +1,7 @@
 import json
 import os
-from collections import Counter
-from typing import Any, Dict, List, Tuple
+from collections import Counter, deque
+from typing import Any, Deque, Dict, List, Tuple
 
 import requests
 
@@ -157,6 +157,7 @@ class StatsNbaPbpWebLoader(StatsNbaWebLoader):
         actions = game.get("actions") or []
         # Drop CDN-only meta/attribute actions before converting to stats rows.
         actions = [action for action in actions if self._include_cdn_action(action)]
+        actions = self._coalesce_substitution_pairs(actions)
         actions.sort(key=self._action_sort_key)
         deduped = self._dedupe_actions(actions)
         rows = [cdn_to_stats_row(action, self.game_id) for action in deduped]
@@ -204,6 +205,94 @@ class StatsNbaPbpWebLoader(StatsNbaWebLoader):
             "replay",
             "game",
         }
+
+    @staticmethod
+    def _sub_key(action: Dict[str, Any]) -> Tuple[Any, Any, Any, Any]:
+        return (
+            action.get("timeActual"),
+            action.get("period"),
+            action.get("clock"),
+            action.get("teamId"),
+        )
+
+    def _coalesce_substitution_pairs(
+        self, actions: List[Dict[str, Any]]
+    ) -> List[Dict[str, Any]]:
+        """
+        Merge consecutive substitution rows (subType 'out'/'in') that share the same
+        (timeActual, period, clock, teamId) into paired substitutions that contain
+        both outgoing/incoming players. We drop unpaired leftovers to avoid emitting
+        half-substitutions that Enhanced cannot model.
+        """
+        result: List[Dict[str, Any]] = []
+        i = 0
+        n = len(actions)
+        while i < n:
+            action = actions[i]
+            if (action.get("actionType") or "").lower() != "substitution":
+                result.append(action)
+                i += 1
+                continue
+
+            key = self._sub_key(action)
+            cluster: List[Dict[str, Any]] = []
+            j = i
+            while j < n:
+                candidate = actions[j]
+                if (candidate.get("actionType") or "").lower() != "substitution":
+                    break
+                if self._sub_key(candidate) != key:
+                    break
+                cluster.append(candidate)
+                j += 1
+
+            pending_outs: Deque[Dict[str, Any]] = deque()
+            pending_ins: Deque[Dict[str, Any]] = deque()
+            pairs: List[Tuple[Dict[str, Any], Dict[str, Any]]] = []
+            for event in cluster:
+                subtype = (event.get("subType") or "").lower()
+                if subtype == "out":
+                    pending_outs.append(event)
+                elif subtype == "in":
+                    pending_ins.append(event)
+                while pending_outs and pending_ins:
+                    pairs.append((pending_outs.popleft(), pending_ins.popleft()))
+
+            for out_ev, in_ev in pairs:
+                template = out_ev or in_ev or action
+                base = dict(template)
+                base["actionType"] = "substitution"
+                base["subType"] = None
+                base["subOutPersonId"] = out_ev.get("subOutPersonId") or out_ev.get(
+                    "personId"
+                )
+                base["subInPersonId"] = in_ev.get("subInPersonId") or in_ev.get(
+                    "personId"
+                )
+                order_candidates = [
+                    value
+                    for value in (
+                        out_ev.get("orderNumber"),
+                        in_ev.get("orderNumber"),
+                    )
+                    if value is not None
+                ]
+                if order_candidates:
+                    base["orderNumber"] = min(order_candidates)
+                action_candidates = [
+                    value
+                    for value in (
+                        out_ev.get("actionNumber"),
+                        in_ev.get("actionNumber"),
+                    )
+                    if value is not None
+                ]
+                if action_candidates:
+                    base["actionNumber"] = min(action_candidates)
+                result.append(base)
+
+            i = j
+        return result
 
     @staticmethod
     def _action_sort_key(action: Dict[str, Any]) -> Tuple[int, int]:

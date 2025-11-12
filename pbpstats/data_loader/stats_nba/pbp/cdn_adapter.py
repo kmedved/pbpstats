@@ -336,6 +336,18 @@ def cdn_to_stats_row(action: Dict[str, Any], game_id: str) -> Dict[str, Any]:
             recovered = action.get("jumpBallRecoveredPersonId")
         if recovered is not None:
             row["PLAYER3_ID"] = recovered
+    elif t == "substitution":
+        # PLAYER1_ID -> outgoing, PLAYER2_ID -> incoming to match stats v2 convention
+        out_pid = action.get("subOutPersonId")
+        in_pid = action.get("subInPersonId")
+        if out_pid is None and st == "out":
+            out_pid = action.get("personId")
+        if in_pid is None and st == "in":
+            in_pid = action.get("personId")
+        if out_pid is not None:
+            row["PLAYER1_ID"] = out_pid
+        if in_pid is not None:
+            row["PLAYER2_ID"] = in_pid
 
     extras = (
         "x",

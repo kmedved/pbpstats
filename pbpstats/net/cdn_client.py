@@ -40,7 +40,9 @@ def get_pbp_actions(
     url = CDN_PBP_URL.format(game_id=game_id)
     headers = {
         "User-Agent": "pbpstats/cdn-client",
+        "Accept": "application/json, text/plain, */*",
         "Accept-Encoding": "gzip, deflate",
+        "Referer": "https://www.nba.com",
     }
     last_error: Optional[Exception] = None
     for attempt in range(MAX_RETRIES):
