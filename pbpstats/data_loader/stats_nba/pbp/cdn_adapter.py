@@ -272,11 +272,13 @@ def map_eventmsgactiontype(
         "jumpball",
         "rebound",
         "stoppage",
+        "instantreplay",
+        "replay",
     ):
         return 0
+    # Recognized event family but no subtype mapping: return 0 without warning.
+    # We'll still warn below when we fail to derive an event type altogether.
     if evt_type is not None:
-        # True unknown combinations (rare) – warn once for visibility.
-        _warn_once((t, st, desc))
         return 0
     _warn_once((t, st, desc))
     return None

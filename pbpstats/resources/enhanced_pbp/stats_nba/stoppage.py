@@ -34,4 +34,5 @@ class StatsStoppage(StatsEnhancedPbpItem):
         prev_event = getattr(self, "previous_event", None)
         if prev_event is not None:
             return prev_event.get_offense_team_id()
-        return getattr(self, "team_id", None)
+        possession_hint = getattr(self, "possession_team_id", None)
+        return possession_hint or getattr(self, "team_id", None)

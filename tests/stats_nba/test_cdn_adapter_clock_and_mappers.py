@@ -95,13 +95,13 @@ def test_violation_subtypes_use_defined_codes():
     assert map_eventmsgactiontype(desc_action, 7) == VIOL_MAP["jumpballviolation"]
 
 
-def test_unknown_actiontype_logs_once_and_returns_zero(caplog):
+def test_unknown_eventtype_logs_once_and_returns_none(caplog):
     cdn_adapter._seen_unknown.clear()
     with caplog.at_level("WARNING"):
-        action = {"actionType": "Turnover", "subType": "Mystery"}
-        assert map_eventmsgactiontype(action, 5) == 0
+        action = {"actionType": "MysteryEvent"}
+        assert map_eventmsgactiontype(action, None) is None
         # second call should not duplicate warning
-        assert map_eventmsgactiontype(action, 5) == 0
+        assert map_eventmsgactiontype(action, None) is None
     assert len(caplog.records) == 1
     assert "Unmapped PBP subtype" in caplog.text
 
@@ -146,4 +146,12 @@ def test_common_meta_families_do_not_emit_warnings(caplog):
             )
             == 0
         )
+    assert len(caplog.records) == 0
+
+
+def test_instantreplay_does_not_warn(caplog):
+    cdn_adapter._seen_unknown.clear()
+    with caplog.at_level("WARNING"):
+        assert map_eventmsgactiontype({"actionType": "InstantReplay"}, 18) == 0
+        assert map_eventmsgactiontype({"actionType": "Replay"}, 18) == 0
     assert len(caplog.records) == 0
