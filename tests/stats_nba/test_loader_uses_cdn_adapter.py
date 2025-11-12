@@ -3,6 +3,9 @@ import requests
 
 from pbpstats.data_loader.stats_nba.pbp.loader import StatsNbaPbpLoader
 from pbpstats.data_loader.stats_nba.pbp.web import StatsNbaPbpWebLoader
+from pbpstats.resources.enhanced_pbp.stats_nba.enhanced_pbp_factory import (
+    StatsNbaEnhancedPbpFactory,
+)
 
 
 def test_stats_pbp_web_loader_uses_cdn_adapter(monkeypatch):
@@ -49,7 +52,7 @@ def test_stats_pbp_web_loader_uses_cdn_adapter(monkeypatch):
         },
     ]
 
-    def fake_get(game_id):
+    def fake_get(game_id, session=None):
         calls.append(game_id)
         return {"meta": {}, "game": {"gameId": game_id, "actions": actions}}
 
@@ -79,7 +82,7 @@ def test_cdn_loader_falls_back_to_legacy(monkeypatch):
     response = requests.Response()
     response.status_code = 503
 
-    def fake_get(game_id):
+    def fake_get(game_id, session=None):
         calls.append(game_id)
         raise requests.HTTPError(response=response)
 
@@ -113,7 +116,7 @@ def test_cdn_loader_falls_back_to_legacy(monkeypatch):
 def test_cdn_loader_falls_back_on_request_exception(monkeypatch):
     calls = []
 
-    def fake_get(game_id):
+    def fake_get(game_id, session=None):
         calls.append(game_id)
         raise requests.ConnectionError("network error")
 
@@ -202,3 +205,168 @@ def test_build_stats_payload_rows_align_with_headers():
     pct_index = headers.index("PCTIMESTRING")
     assert row_set[0][wc_index] == "2024-01-01T00:00:00Z"
     assert row_set[0][pct_index] == "12:00"
+
+
+def test_coalescer_preserves_already_paired_rows():
+    loader = StatsNbaPbpWebLoader()
+    paired = {
+        "actionType": "Substitution",
+        "orderNumber": 10,
+        "actionNumber": 20,
+        "period": 1,
+        "clock": "PT10M00S",
+        "teamId": 1610612737,
+        "subOutPersonId": 100,
+        "subInPersonId": 200,
+    }
+
+    coalesced = loader._coalesce_substitution_pairs([paired])
+
+    assert len(coalesced) == 1
+    assert coalesced[0]["subOutPersonId"] == 100
+    assert coalesced[0]["subInPersonId"] == 200
+
+
+def test_coalescer_keeps_unmatched_half_subs():
+    loader = StatsNbaPbpWebLoader()
+    half = {
+        "actionType": "Substitution",
+        "subType": "out",
+        "orderNumber": 11,
+        "actionNumber": 30,
+        "period": 1,
+        "clock": "PT09M30S",
+        "teamId": 1610612737,
+        "personId": 101,
+    }
+
+    coalesced = loader._coalesce_substitution_pairs([half])
+
+    assert len(coalesced) == 1
+    assert coalesced[0]["subType"] == "out"
+    assert coalesced[0]["personId"] == 101
+
+
+def test_coalescer_pairs_when_timeactual_is_missing():
+    loader = StatsNbaPbpWebLoader()
+    out_event = {
+        "actionType": "Substitution",
+        "subType": "out",
+        "orderNumber": 12,
+        "actionNumber": 40,
+        "period": 1,
+        "clock": "PT08M00S",
+        "teamId": 1610612737,
+        "personId": 201,
+        "subOutPersonId": 201,
+        "timeActual": None,
+    }
+    in_event = {
+        "actionType": "Substitution",
+        "subType": "in",
+        "orderNumber": 13,
+        "actionNumber": 41,
+        "period": 1,
+        "clock": "PT08M00S",
+        "teamId": 1610612737,
+        "personId": 202,
+        "subInPersonId": 202,
+        "timeActual": "2024-01-01T00:03:00Z",
+    }
+
+    coalesced = loader._coalesce_substitution_pairs([out_event, in_event])
+
+    assert len(coalesced) == 1
+    merged = coalesced[0]
+    assert merged["subOutPersonId"] == 201
+    assert merged["subInPersonId"] == 202
+    assert merged["orderNumber"] == 12
+    assert merged["actionNumber"] == 40
+
+
+def test_loader_filters_supplemental_actions(monkeypatch):
+    loader = StatsNbaPbpWebLoader()
+    loader.game_id = "0020000001"
+
+    actions = [
+        {
+            "actionNumber": 1,
+            "orderNumber": 1,
+            "period": 1,
+            "clock": "PT12M00S",
+            "actionType": "Period",
+            "subType": "start",
+            "timeActual": "2024-01-01T00:00:00Z",
+        },
+        {
+            "actionNumber": 2,
+            "orderNumber": 2,
+            "period": 1,
+            "clock": "PT11M59S",
+            "actionType": "Steal",
+            "teamId": 1610612737,
+        },
+        {
+            "actionNumber": 3,
+            "orderNumber": 3,
+            "period": 1,
+            "clock": "PT11M58S",
+            "actionType": "Block",
+            "teamId": 1610612737,
+        },
+        {
+            "actionNumber": 4,
+            "orderNumber": 4,
+            "period": 1,
+            "clock": "PT11M57S",
+            "actionType": "Stoppage",
+            "description": "Delay of game",
+            "teamId": 1610612737,
+        },
+        {
+            "actionNumber": 5,
+            "orderNumber": 5,
+            "period": 1,
+            "clock": "PT11M50S",
+            "actionType": "2pt",
+            "subType": "Layup",
+            "shotResult": "Made",
+            "teamId": 1610612737,
+            "personId": 123,
+            "scoreHome": 2,
+            "scoreAway": 0,
+        },
+    ]
+
+    def fake_get(game_id, session=None):
+        return {"meta": {}, "game": {"actions": actions}}
+
+    monkeypatch.setattr(
+        "pbpstats.data_loader.stats_nba.pbp.web.get_pbp_actions", fake_get
+    )
+
+    payload = loader._load_from_cdn()
+    headers = payload["resultSets"][0]["headers"]
+    rows = payload["resultSets"][0]["rowSet"]
+    evt_index = headers.index("EVENTMSGTYPE")
+
+    assert len(rows) == 3  # period start, stoppage, field goal make
+    assert all(row[evt_index] != 0 for row in rows)
+    assert any(row[evt_index] == 20 for row in rows)
+
+
+def test_factory_creates_stoppage_events():
+    factory = StatsNbaEnhancedPbpFactory()
+    event_cls = factory.get_event_class(20)
+    event = {
+        "EVENTMSGTYPE": 20,
+        "EVENTNUM": 99,
+        "PERIOD": 1,
+        "PCTIMESTRING": "10:00",
+        "NEUTRALDESCRIPTION": "Stoppage",
+    }
+
+    instance = event_cls(event, 1)
+
+    assert instance.event_type == 20
+    assert instance.event_stats == []

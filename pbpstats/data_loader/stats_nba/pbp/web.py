@@ -101,7 +101,7 @@ _HEADER_DEFAULTS: Dict[str, Any] = {
     "VIDEO_AVAILABLE_FLAG": 0,
 }
 
-SUPPORTED_EVENT_TYPES = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 13}
+SUPPORTED_EVENT_TYPES = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 13, 20}
 
 
 class StatsNbaPbpWebLoader(StatsNbaWebLoader):
@@ -190,26 +190,29 @@ class StatsNbaPbpWebLoader(StatsNbaWebLoader):
     @staticmethod
     def _include_cdn_action(action: Dict[str, Any]) -> bool:
         """
-        Drop actions represented as attributes in pbpstats:
-          - 'steal' -> Turnover.stealPersonId
-          - 'block' -> FieldGoal.blockPersonId
-        And actions with no Enhanced class:
-          - 'instantreplay', 'replay', 'stoppage', 'game'
+        Drop supplemental CDN-only metadata rows that don't translate to Stats v2
+        events:
+          - 'steal' and 'block' already exist as attributes on turnovers/field goals
+          - 'game' and 'edit' are administrative markers
+          - 'stoppage_meta' is an attributes-only duplicate when a true stoppage exists
         """
         t = (action.get("actionType") or "").lower()
         return t not in {
             "steal",
             "block",
-            "stoppage",
-            "instantreplay",
-            "replay",
             "game",
+            "edit",
+            "stoppage_meta",
         }
 
     @staticmethod
-    def _sub_key(action: Dict[str, Any]) -> Tuple[Any, Any, Any, Any]:
+    def _sub_key(action: Dict[str, Any]) -> Tuple[Any, Any, Any]:
+        """
+        Group potential substitution pairs by period/clock/team.
+        Some feeds omit ``timeActual`` on one half of the pair, so we intentionally
+        ignore it here to improve hit rates.
+        """
         return (
-            action.get("timeActual"),
             action.get("period"),
             action.get("clock"),
             action.get("teamId"),
@@ -220,9 +223,10 @@ class StatsNbaPbpWebLoader(StatsNbaWebLoader):
     ) -> List[Dict[str, Any]]:
         """
         Merge consecutive substitution rows (subType 'out'/'in') that share the same
-        (timeActual, period, clock, teamId) into paired substitutions that contain
-        both outgoing/incoming players. We drop unpaired leftovers to avoid emitting
-        half-substitutions that Enhanced cannot model.
+        (period, clock, teamId) into paired substitutions that contain both
+        outgoing/incoming players. Already paired rows are preserved verbatim and
+        unmatched halves are passed through so downstream lineup logic can still see
+        those anchors.
         """
         result: List[Dict[str, Any]] = []
         i = 0
@@ -248,51 +252,79 @@ class StatsNbaPbpWebLoader(StatsNbaWebLoader):
 
             pending_outs: Deque[Dict[str, Any]] = deque()
             pending_ins: Deque[Dict[str, Any]] = deque()
-            pairs: List[Tuple[Dict[str, Any], Dict[str, Any]]] = []
+            merged_cluster: List[Dict[str, Any]] = []
             for event in cluster:
+                already_paired = event.get("subOutPersonId") and event.get(
+                    "subInPersonId"
+                )
+                if already_paired:
+                    merged_cluster.append(event)
+                    continue
                 subtype = (event.get("subType") or "").lower()
                 if subtype == "out":
                     pending_outs.append(event)
                 elif subtype == "in":
                     pending_ins.append(event)
+                else:
+                    merged_cluster.append(event)
                 while pending_outs and pending_ins:
-                    pairs.append((pending_outs.popleft(), pending_ins.popleft()))
+                    merged_cluster.append(
+                        self._merge_sub_events(
+                            pending_outs.popleft(), pending_ins.popleft()
+                        )
+                    )
 
-            for out_ev, in_ev in pairs:
-                template = out_ev or in_ev or action
-                base = dict(template)
-                base["actionType"] = "substitution"
-                base["subType"] = None
-                base["subOutPersonId"] = out_ev.get("subOutPersonId") or out_ev.get(
-                    "personId"
-                )
-                base["subInPersonId"] = in_ev.get("subInPersonId") or in_ev.get(
-                    "personId"
-                )
-                order_candidates = [
-                    value
-                    for value in (
-                        out_ev.get("orderNumber"),
-                        in_ev.get("orderNumber"),
-                    )
-                    if value is not None
-                ]
-                if order_candidates:
-                    base["orderNumber"] = min(order_candidates)
-                action_candidates = [
-                    value
-                    for value in (
-                        out_ev.get("actionNumber"),
-                        in_ev.get("actionNumber"),
-                    )
-                    if value is not None
-                ]
-                if action_candidates:
-                    base["actionNumber"] = min(action_candidates)
-                result.append(base)
+            if pending_outs:
+                merged_cluster.extend(list(pending_outs))
+            if pending_ins:
+                merged_cluster.extend(list(pending_ins))
+
+            result.extend(merged_cluster)
 
             i = j
         return result
+
+    @staticmethod
+    def _merge_sub_events(
+        out_ev: Dict[str, Any], in_ev: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """
+        Combine outgoing and incoming substitutions into a single CDN action.
+        """
+        template = out_ev or in_ev
+        base = dict(template)
+        base["actionType"] = "substitution"
+        base["subType"] = None
+        base["subOutPersonId"] = out_ev.get("subOutPersonId") or out_ev.get("personId")
+        base["subInPersonId"] = in_ev.get("subInPersonId") or in_ev.get("personId")
+        description = (
+            out_ev.get("description")
+            or in_ev.get("description")
+            or template.get("description")
+            or "Substitution"
+        )
+        base["description"] = description
+        order_candidates = [
+            value
+            for value in (
+                out_ev.get("orderNumber"),
+                in_ev.get("orderNumber"),
+            )
+            if value is not None
+        ]
+        if order_candidates:
+            base["orderNumber"] = min(order_candidates)
+        action_candidates = [
+            value
+            for value in (
+                out_ev.get("actionNumber"),
+                in_ev.get("actionNumber"),
+            )
+            if value is not None
+        ]
+        if action_candidates:
+            base["actionNumber"] = min(action_candidates)
+        return base
 
     @staticmethod
     def _action_sort_key(action: Dict[str, Any]) -> Tuple[int, int]:

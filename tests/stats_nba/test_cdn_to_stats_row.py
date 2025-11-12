@@ -202,7 +202,7 @@ def test_missing_description_defaults_to_empty_string():
     assert row["WCTIMESTRING"] == "2024-01-01T00:10:00Z"
 
 
-def test_unknown_event_types_map_to_zero_codes():
+def test_stoppage_actions_map_to_event_type_20():
     action = {
         "actionNumber": 77,
         "orderNumber": 90,
@@ -214,5 +214,5 @@ def test_unknown_event_types_map_to_zero_codes():
 
     row = cdn_to_stats_row(action, GAME_ID)
 
-    assert row["EVENTMSGTYPE"] == 0
+    assert row["EVENTMSGTYPE"] == 20
     assert row["EVENTMSGACTIONTYPE"] == 0

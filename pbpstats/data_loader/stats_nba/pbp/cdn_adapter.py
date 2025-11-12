@@ -75,6 +75,7 @@ def map_eventmsgtype(action: Dict[str, Any]) -> Optional[int]:
         "timeout": 9,
         "jumpball": 10,
         "instantreplay": 18,
+        "stoppage": 20,
     }
     if t in mapping:
         return mapping[t]
