@@ -58,7 +58,7 @@ class TestStatsPbpLoader:
         assert pbp_loader.items[0].data == self.expected_first_item_data
 
     @responses.activate
-    def test_web_loader_loads_data(self):
+    def test_web_loader_loads_data(self, monkeypatch):
         with open(f"{self.data_directory}/pbp/stats_{self.game_id}.json") as f:
             pbp_response = json.loads(f.read())
         base_url = "https://stats.nba.com/stats/playbyplayv2"
@@ -73,6 +73,9 @@ class TestStatsPbpLoader:
         pbp_url = furl(base_url).add(query_params).url
         responses.add(responses.GET, pbp_url, json=pbp_response, status=200)
 
+        monkeypatch.setattr(
+            StatsNbaPbpWebLoader, "_should_use_cdn", lambda self: False
+        )
         source_loader = StatsNbaPbpWebLoader(self.data_directory)
         pbp_loader = StatsNbaPbpLoader(self.game_id, source_loader)
         assert len(pbp_loader.items) == 540

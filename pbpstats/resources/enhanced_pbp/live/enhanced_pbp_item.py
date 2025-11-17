@@ -57,6 +57,7 @@ class LiveEnhancedPbpItem(EnhancedPbpItem):
         self.possession_changing_override = False
         self.non_possession_changing_override = False
         self.score = defaultdict(int)
+        self._set_possession_index(getattr(self, "offense_team_id", None))
 
     @property
     def data(self):

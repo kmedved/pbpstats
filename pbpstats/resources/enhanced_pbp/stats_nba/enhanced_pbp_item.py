@@ -5,7 +5,13 @@ from collections import defaultdict
 
 import requests
 
-from pbpstats import HEADERS, REQUEST_TIMEOUT
+from pbpstats import (
+    G_LEAGUE_GAME_ID_PREFIX,
+    HEADERS,
+    NBA_GAME_ID_PREFIX,
+    REQUEST_TIMEOUT,
+    WNBA_GAME_ID_PREFIX,
+)
 from pbpstats.resources.enhanced_pbp import (
     FieldGoal,
     Foul,
@@ -31,6 +37,15 @@ KEY_ATTR_MAPPER = {
     "PLAYER3_ID": "player3_id",
     "VIDEO_AVAILABLE_FLAG": "video_available",
 }
+
+DEFAULT_REGULATION_PERIOD_SECONDS = 12 * 60
+OVERTIME_PERIOD_SECONDS = 5 * 60
+REGULATION_PERIOD_SECONDS_BY_PREFIX = {
+    NBA_GAME_ID_PREFIX: 12 * 60,
+    G_LEAGUE_GAME_ID_PREFIX: 12 * 60,
+    WNBA_GAME_ID_PREFIX: 10 * 60,
+}
+PUTBACK_TIME_WINDOW_SECONDS = 3
 
 
 class StatsEnhancedPbpItem(EnhancedPbpItem):
@@ -101,6 +116,7 @@ class StatsEnhancedPbpItem(EnhancedPbpItem):
         self.possession_changing_override = False
         self.non_possession_changing_override = False
         self.score = defaultdict(int)
+        self._set_possession_index(event.get("possession"))
 
     @property
     def data(self):
@@ -116,6 +132,88 @@ class StatsEnhancedPbpItem(EnhancedPbpItem):
         """
         split = self.clock.split(":")
         return float(split[0]) * 60 + float(split[1])
+
+    def _regulation_period_seconds(self):
+        """returns regulation period length in seconds based on league"""
+        game_id_prefix = str(getattr(self, "game_id", ""))[:2]
+        return REGULATION_PERIOD_SECONDS_BY_PREFIX.get(
+            game_id_prefix, DEFAULT_REGULATION_PERIOD_SECONDS
+        )
+
+    def _current_period_length_seconds(self):
+        """returns current period length in seconds"""
+        if self.period <= 4:
+            return self._regulation_period_seconds()
+        return OVERTIME_PERIOD_SECONDS
+
+    @property
+    def game_seconds_elapsed(self):
+        """returns total seconds elapsed from start of game as a ``float``"""
+        completed_periods = max(self.period - 1, 0)
+        regulation_seconds = self._regulation_period_seconds()
+        if completed_periods <= 4:
+            seconds_before_current = completed_periods * regulation_seconds
+        else:
+            overtime_periods = completed_periods - 4
+            seconds_before_current = 4 * regulation_seconds + (
+                overtime_periods * OVERTIME_PERIOD_SECONDS
+            )
+        elapsed_in_period = self._current_period_length_seconds() - self.seconds_remaining
+        if elapsed_in_period < 0:
+            elapsed_in_period = 0
+        return seconds_before_current + elapsed_in_period
+
+    @property
+    def event_length_seconds(self):
+        """returns seconds until the next logged event (0 if none)"""
+        next_event = getattr(self, "next_event", None)
+        if next_event is None:
+            return 0
+        length = next_event.game_seconds_elapsed - self.game_seconds_elapsed
+        return length if length >= 0 else 0
+
+    @property
+    def is_three(self):
+        """returns True if event is a made or missed 3 point attempt"""
+        return isinstance(self, FieldGoal) and self.shot_value == 3
+
+    @property
+    def is_block(self):
+        """returns True if field goal attempt was blocked"""
+        return isinstance(self, FieldGoal) and self.is_blocked
+
+    @property
+    def is_steal(self):
+        """returns True if turnover includes a credited steal"""
+        return isinstance(self, Turnover) and Turnover.is_steal.fget(self)
+
+    def _rebound_is_putback(self):
+        if not isinstance(self, Rebound):
+            return False
+        if not (self.is_real_rebound and self.oreb):
+            return False
+        next_event = self.next_event
+        while next_event is not None and next_event.period == self.period:
+            time_diff = next_event.game_seconds_elapsed - self.game_seconds_elapsed
+            if time_diff > PUTBACK_TIME_WINDOW_SECONDS:
+                return False
+            if isinstance(next_event, FieldGoal):
+                return next_event.team_id == self.team_id and time_diff <= PUTBACK_TIME_WINDOW_SECONDS
+            if isinstance(next_event, Rebound) and next_event.is_real_rebound:
+                return False
+            if isinstance(next_event, Turnover) and not next_event.is_no_turnover:
+                return False
+            if isinstance(next_event, StartOfPeriod):
+                return False
+            next_event = next_event.next_event
+        return False
+
+    @property
+    def is_putback(self):
+        """returns True if event is part of an offensive rebound putback sequence"""
+        if isinstance(self, FieldGoal):
+            return FieldGoal.is_putback.fget(self)
+        return self._rebound_is_putback()
 
     @property
     def video_url(self):
@@ -141,6 +239,9 @@ class StatsEnhancedPbpItem(EnhancedPbpItem):
         """
         returns team id for team on offense for event
         """
+        hint = self.possession_team_id
+        if hint:
+            return hint
         if isinstance(self, Foul) and (self.is_charge or self.is_offensive_foul):
             # offensive foul returns team id
             # this isn't separate method in Foul class because some fouls can be committed

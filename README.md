@@ -11,6 +11,11 @@ A package to scrape and parse NBA, WNBA and G-League play-by-play data.
 * All stats on pbpstats.com are derived from these stats
 * Fixes order of events for some common cases in which events are out of order
 
+## Optional lineup reconciliation
+Set `PBPSTATS_USE_STATS_LINEUPS=1` to opt into a stats.nba.com-powered lineup reconciler.  
+When enabled, pbpstats will fetch rotation data from the stats endpoints (the same ones that require the NBA Stats headers) and use it to validate on-court players each period.  
+Leave the variable unset to keep the default sub-driven behavior that's recommended for historical seasons.
+
 # Installation
 Tested on Python >=3.8
 ```
