@@ -130,6 +130,14 @@ OPP_3PM_STRING = "Opp3PMOnCourt"
 OPP_FTA_STRING = "OppFTAOnCourt"
 OPP_FTM_STRING = "OppFTMOnCourt"
 
+# Team On-Court Constants
+TEAM_FGA_STRING = "TeamFGAOnCourt"
+TEAM_FGM_STRING = "TeamFGMOnCourt"
+TEAM_3PA_STRING = "Team3PAOnCourt"
+TEAM_3PM_STRING = "Team3PMOnCourt"
+TEAM_FTA_STRING = "TeamFTAOnCourt"
+TEAM_FTM_STRING = "TeamFTMOnCourt"
+
 PERSONAL_FOUL_TYPE_STRING = "Personal Fouls"
 SHOOTING_FOUL_TYPE_STRING = "Shooting Fouls"
 LOOSE_BALL_FOUL_TYPE_STRING = "Loose Ball Fouls"
@@ -380,4 +388,11 @@ KEYS_OFF_BY_FACTOR_OF_5_WHEN_AGGREGATING_FOR_TEAM_AND_LINEUPS = [
     OPP_3PM_STRING,
     OPP_FTA_STRING,
     OPP_FTM_STRING,
+    # Team on-court stats should not be over-counted when aggregating
+    TEAM_FGA_STRING,
+    TEAM_FGM_STRING,
+    TEAM_3PA_STRING,
+    TEAM_3PM_STRING,
+    TEAM_FTA_STRING,
+    TEAM_FTM_STRING,
 ]

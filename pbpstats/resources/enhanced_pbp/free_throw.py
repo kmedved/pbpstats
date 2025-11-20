@@ -388,6 +388,29 @@ class FreeThrow(metaclass=abc.ABCMeta):
         team_ids = list(self.current_players.keys())
         opponent_team_candidates = [tid for tid in team_ids if tid != self.team_id]
         opponent_team_id = opponent_team_candidates[0] if opponent_team_candidates else None
+
+        # Calculate On-Court TEAM stats (For the offense)
+        if self.team_id in self.event_for_efficiency_stats.current_players:
+            for teammate_id in self.event_for_efficiency_stats.current_players[self.team_id]:
+                stats.append(
+                    {
+                        "player_id": teammate_id,
+                        "team_id": self.team_id,
+                        "stat_key": pbpstats.TEAM_FTA_STRING,
+                        "stat_value": 1,
+                    }
+                )
+
+                if self.is_made:
+                    stats.append(
+                        {
+                            "player_id": teammate_id,
+                            "team_id": self.team_id,
+                            "stat_key": pbpstats.TEAM_FTM_STRING,
+                            "stat_value": 1,
+                        }
+                    )
+
         if opponent_team_id is None:
             return self.base_stats + stats
         if opponent_team_id not in self.current_players:

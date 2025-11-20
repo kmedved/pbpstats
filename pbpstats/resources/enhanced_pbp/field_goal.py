@@ -481,6 +481,48 @@ class FieldGoal(object):
 
         is_three = self.shot_value == 3
 
+        # Calculate On-Court TEAM stats (For the offense)
+        if self.team_id in self.current_players:
+            for teammate_id in self.current_players[self.team_id]:
+                stats.append(
+                    {
+                        "player_id": teammate_id,
+                        "team_id": self.team_id,
+                        "stat_key": pbpstats.TEAM_FGA_STRING,
+                        "stat_value": 1,
+                    }
+                )
+
+                if self.is_made:
+                    stats.append(
+                        {
+                            "player_id": teammate_id,
+                            "team_id": self.team_id,
+                            "stat_key": pbpstats.TEAM_FGM_STRING,
+                            "stat_value": 1,
+                        }
+                    )
+
+                if is_three:
+                    stats.append(
+                        {
+                            "player_id": teammate_id,
+                            "team_id": self.team_id,
+                            "stat_key": pbpstats.TEAM_3PA_STRING,
+                            "stat_value": 1,
+                        }
+                    )
+
+                    if self.is_made:
+                        stats.append(
+                            {
+                                "player_id": teammate_id,
+                                "team_id": self.team_id,
+                                "stat_key": pbpstats.TEAM_3PM_STRING,
+                                "stat_value": 1,
+                            }
+                        )
+
         if opponent_team_id is not None and opponent_team_id in self.current_players:
             for defender_id in self.current_players[opponent_team_id]:
                 stats.append(
