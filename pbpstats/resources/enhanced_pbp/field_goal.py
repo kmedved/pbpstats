@@ -433,12 +433,15 @@ class FieldGoal(object):
         bucket = self.darko_distance_bucket
         if bucket is not None:
             base_key = f"Darko_{bucket}"
-            if self.is_made:
-                key = f"{base_key}_Made"
+            made_key = f"{base_key}_Made"
+            att_key = f"{base_key}_Att"
 
-                # --- START ADDITION: Assisted/Unassisted Split ---
+            if self.is_made:
+                # Assisted / unassisted split for the scorer
                 assist_prefix = (
-                    pbpstats.ASSISTED_STRING if self.is_assisted else pbpstats.UNASSISTED_STRING
+                    pbpstats.ASSISTED_STRING
+                    if self.is_assisted
+                    else pbpstats.UNASSISTED_STRING
                 )
                 # e.g. AssistedDarko_0to3Ft or UnassistedDarko_0to3Ft
                 split_key = f"{assist_prefix}{base_key}"
@@ -450,16 +453,23 @@ class FieldGoal(object):
                         "stat_value": 1,
                     }
                 )
-                # --- END ADDITION ---
 
-            else:
-                key = f"{base_key}_Att"
+                # Made shot in this distance bucket
+                stats.append(
+                    {
+                        "player_id": self.player1_id,
+                        "team_id": self.team_id,
+                        "stat_key": made_key,
+                        "stat_value": 1,
+                    }
+                )
 
+            # Attempt in this distance bucket (always, made or missed)
             stats.append(
                 {
                     "player_id": self.player1_id,
                     "team_id": self.team_id,
-                    "stat_key": key,
+                    "stat_key": att_key,
                     "stat_value": 1,
                 }
             )
