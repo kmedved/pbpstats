@@ -236,12 +236,17 @@ class Rebound(object):
                             "stat_value": 1,
                         }
                         stats.append(on_floor_oreb_stat_item)
-                if isinstance(self.missed_shot, FieldGoal) and team_id == self.team_id:
-                    rebound_fga_key = (
-                        pbpstats.ON_FLOOR_OFFENSIVE_REBOUND_FGA_STRING
-                        if self.oreb
-                        else pbpstats.ON_FLOOR_DEFENSIVE_REBOUND_FGA_STRING
-                    )
+
+            # On-floor rebound *opportunity* FGAs (DARKO):
+            # every missed FG creates an offensive and defensive rebounding opportunity
+            if isinstance(self.missed_shot, FieldGoal):
+                shooting_team_id = self.missed_shot.team_id
+                for team_id, players in self.current_players.items():
+                    if team_id == shooting_team_id:
+                        rebound_fga_key = pbpstats.ON_FLOOR_OFFENSIVE_REBOUND_FGA_STRING
+                    else:
+                        rebound_fga_key = pbpstats.ON_FLOOR_DEFENSIVE_REBOUND_FGA_STRING
+
                     for player_id in players:
                         rebound_fga_stat_item = {
                             "player_id": player_id,
