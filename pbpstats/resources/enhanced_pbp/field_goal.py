@@ -794,6 +794,19 @@ class FieldGoal(object):
                     "stat_value": 1,
                 }
             )
+        # DARKO: team-on-court block count for all defenders on the floor
+        for team_id, players in self.current_players.items():
+            if team_id != opponent_team_id:
+                continue
+            for player_id in players:
+                stats.append(
+                    {
+                        "player_id": player_id,
+                        "team_id": team_id,
+                        "stat_key": pbpstats.TEAM_ON_COURT_BLOCK_STRING,
+                        "stat_value": 1,
+                    }
+                )
         return stats
 
     def _get_missed_stat_items(self, is_second_chance_event, is_penalty_event):
