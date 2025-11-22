@@ -237,6 +237,25 @@ class Rebound(object):
                         }
                         stats.append(on_floor_oreb_stat_item)
 
+            # On-floor rebound *opportunity* FGAs (DARKO):
+            # every missed FG creates an offensive and defensive rebounding opportunity
+            if isinstance(self.missed_shot, FieldGoal):
+                shooting_team_id = self.missed_shot.team_id
+                for team_id, players in self.current_players.items():
+                    if team_id == shooting_team_id:
+                        rebound_fga_key = pbpstats.ON_FLOOR_OFFENSIVE_REBOUND_FGA_STRING
+                    else:
+                        rebound_fga_key = pbpstats.ON_FLOOR_DEFENSIVE_REBOUND_FGA_STRING
+
+                    for player_id in players:
+                        rebound_fga_stat_item = {
+                            "player_id": player_id,
+                            "team_id": team_id,
+                            "stat_key": rebound_fga_key,
+                            "stat_value": 1,
+                        }
+                        stats.append(rebound_fga_stat_item)
+
             # player missed shot rebound stats
             shooter_player_id = self.missed_shot.player1_id
             missed_shot_rebounded_opportunity_key = (
@@ -278,14 +297,14 @@ class Rebound(object):
                     )
 
             team_ids = list(self.current_players.keys())
-            opponent_team_id = (
-                team_ids[0] if self.team_id == team_ids[1] else team_ids[1]
-            )
             lineups_ids = self.lineup_ids
             for stat in stats:
-                opponent_team_id = (
-                    team_ids[0] if stat["team_id"] == team_ids[1] else team_ids[1]
-                )
+                opponent_team_candidates = [tid for tid in team_ids if tid != stat["team_id"]]
+                if not opponent_team_candidates:
+                    continue
+                opponent_team_id = opponent_team_candidates[0]
+                if stat["team_id"] not in lineups_ids or opponent_team_id not in lineups_ids:
+                    continue
                 stat["lineup_id"] = lineups_ids[stat["team_id"]]
                 stat["opponent_team_id"] = opponent_team_id
                 stat["opponent_lineup_id"] = lineups_ids[opponent_team_id]

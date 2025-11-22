@@ -55,6 +55,17 @@ SHORT_MID_RANGE_CUTOFF = 14
 HEAVE_DISTANCE_CUTOFF = 40
 HEAVE_TIME_CUTOFF = 2
 
+# DARKO-specific shot distance buckets
+DARKO_0_3FT_CUTOFF = 3.0
+DARKO_4_9FT_CUTOFF = 9.0
+DARKO_10_17FT_CUTOFF = 17.0
+DARKO_18_23FT_CUTOFF = 23.0
+
+DARKO_0_3FT_STRING = "0to3Ft"
+DARKO_4_9FT_STRING = "4to9Ft"
+DARKO_10_17FT_STRING = "10to17Ft"
+DARKO_18_23FT_STRING = "18to23Ft"
+
 TEAM_STAT_PLAYER_ID = (
     "0"  # used as player id for team stats (ex team rebounds, shot clock violations)
 )
@@ -87,6 +98,8 @@ REBOUNDED_OPPORTUNITIES_STRING = (
     "ReboundedOpportunities"  # this is for getting oreb% on a player's missed shots
 )
 ON_FLOOR_OFFENSIVE_REBOUND_STRING = "OnFloorOffReb"  # used for calculating player usage
+ON_FLOOR_OFFENSIVE_REBOUND_FGA_STRING = "OnFloorOffRebFGA"
+ON_FLOOR_DEFENSIVE_REBOUND_FGA_STRING = "OnFloorDefRebFGA"
 BLOCK_STRING = "Block"
 SELF_REBOUND_STRING = "SelfOReb"
 
@@ -111,6 +124,19 @@ MADE_STRING = "Made"
 
 SHOT_VALUE_STRING = "ShotValue"
 OPPONENT_POINTS = "OpponentPoints"
+OPP_FGA_STRING = "OppFGAOnCourt"
+OPP_3PA_STRING = "Opp3PAOnCourt"
+OPP_3PM_STRING = "Opp3PMOnCourt"
+OPP_FTA_STRING = "OppFTAOnCourt"
+OPP_FTM_STRING = "OppFTMOnCourt"
+
+# Team On-Court Constants
+TEAM_FGA_STRING = "TeamFGAOnCourt"
+TEAM_FGM_STRING = "TeamFGMOnCourt"
+TEAM_3PA_STRING = "Team3PAOnCourt"
+TEAM_3PM_STRING = "Team3PMOnCourt"
+TEAM_FTA_STRING = "TeamFTAOnCourt"
+TEAM_FTM_STRING = "TeamFTMOnCourt"
 
 PERSONAL_FOUL_TYPE_STRING = "Personal Fouls"
 SHOOTING_FOUL_TYPE_STRING = "Shooting Fouls"
@@ -355,4 +381,18 @@ KEYS_OFF_BY_FACTOR_OF_5_WHEN_AGGREGATING_FOR_TEAM_AND_LINEUPS = [
     + BLOCKED_STRING
     + DEFENSIVE_ABBREVIATION_PREFIX
     + REBOUND_OPPORTUNITIES_STRING,
+    ON_FLOOR_OFFENSIVE_REBOUND_FGA_STRING,
+    ON_FLOOR_DEFENSIVE_REBOUND_FGA_STRING,
+    OPP_FGA_STRING,
+    OPP_3PA_STRING,
+    OPP_3PM_STRING,
+    OPP_FTA_STRING,
+    OPP_FTM_STRING,
+    # Team on-court stats should not be over-counted when aggregating
+    TEAM_FGA_STRING,
+    TEAM_FGM_STRING,
+    TEAM_3PA_STRING,
+    TEAM_3PM_STRING,
+    TEAM_FTA_STRING,
+    TEAM_FTM_STRING,
 ]
