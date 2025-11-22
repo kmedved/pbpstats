@@ -32,32 +32,6 @@ class EnhancedPbpItem(metaclass=abc.ABCMeta):
         """
         pass
 
-    def _set_possession_index(self, raw_value):
-        """Store raw CDN possession value for downstream helpers."""
-        if raw_value in (None, ""):
-            return
-        try:
-            value = int(raw_value)
-        except (TypeError, ValueError):
-            value = raw_value
-        self._possession_index = value
-
-    @property
-    def possession_index(self):
-        """Return the raw possession bucket/index supplied by the feed."""
-        return getattr(self, "_possession_index", None)
-
-    @property
-    def possession_team_id(self):
-        """Return the possession value as a team id when it looks like one."""
-        value = self.possession_index
-        if value in (None, 0):
-            return None
-        try:
-            return int(value)
-        except (TypeError, ValueError):
-            return None
-
     @abc.abstractproperty
     def seconds_remaining(self):
         """
@@ -106,9 +80,6 @@ class EnhancedPbpItem(metaclass=abc.ABCMeta):
         This gets overwritten in :obj:`~pbpstats.resources.enhanced_pbp.substitution.Substitution`
         since those are the only event types where players are not the same as the previous event
         """
-        override = getattr(self, "_current_players_override", None)
-        if override is not None:
-            return override
         return self.previous_event.current_players
 
     @property

@@ -6,7 +6,6 @@ from pbpstats.resources.enhanced_pbp.stats_nba.free_throw import StatsFreeThrow
 from pbpstats.resources.enhanced_pbp.stats_nba.jump_ball import StatsJumpBall
 from pbpstats.resources.enhanced_pbp.stats_nba.rebound import StatsRebound
 from pbpstats.resources.enhanced_pbp.stats_nba.replay import StatsReplay
-from pbpstats.resources.enhanced_pbp.stats_nba.stoppage import StatsStoppage
 from pbpstats.resources.enhanced_pbp.stats_nba.start_of_period import StatsStartOfPeriod
 from pbpstats.resources.enhanced_pbp.stats_nba.substitution import StatsSubstitution
 from pbpstats.resources.enhanced_pbp.stats_nba.timeout import StatsTimeout
@@ -22,7 +21,6 @@ __all__ = [
     "StatsJumpBall",
     "StatsRebound",
     "StatsReplay",
-    "StatsStoppage",
     "StatsStartOfPeriod",
     "StatsSubstitution",
     "StatsTimeout",

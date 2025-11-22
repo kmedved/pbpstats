@@ -13,5 +13,5 @@ class StatsNbaEnhancedPbpWebLoader(StatsNbaPbpWebLoader):
     """
 
     def __init__(self, file_directory=None):
-        super().__init__(file_directory)
+        self.file_directory = file_directory
         self.shots_source_loader = StatsNbaShotsWebLoader(file_directory)

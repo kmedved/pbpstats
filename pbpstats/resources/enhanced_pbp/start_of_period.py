@@ -64,9 +64,6 @@ class StartOfPeriod(metaclass=abc.ABCMeta):
         """
         returns period starters
         """
-        override = getattr(self, "_current_players_override", None)
-        if override is not None:
-            return override
         return self.period_starters
 
     @property

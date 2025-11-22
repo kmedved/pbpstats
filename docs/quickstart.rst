@@ -153,12 +153,6 @@ Note on Ids
 ===============
 Player and team Ids the same player and team ids used by stats.nba.com. Lineup ids are '-' separated player ids (with player ids sorted as strings).
 
-Optional stats lineup reconciliation
-====================================
-If you are working with modern seasons and want to double-check the on-court players against the NBA Stats feeds, set the ``PBPSTATS_USE_STATS_LINEUPS`` environment variable to ``1`` before instantiating a client.
-
-When enabled, pbpstats will query the stats.nba.com rotation service (which requires the usual Stats headers) for each game and reconcile the lineups per period. This can help in the rare cases where the underlying play-by-play feed drops a substitution, while leaving the default sub-driven behavior untouched when the flag is not set.
-
 Issues with raw play-by-play
 ============================
 If you need to fix event order in the play-by-play file you will need to open the pbp file for the game in your data directory
