@@ -37,6 +37,11 @@ class LiveFieldGoal(FieldGoal, LiveEnhancedPbpItem):
     @property
     def is_made(self):
         """
-        returns True if shot was made, False otherwise
+        returns True if shot was made, False otherwise.
+
+        Live 'heave' events (and potentially other edge cases) may not carry
+        a `shotResult` field in the raw JSON, in which case `shot_result`
+        is never set on the object. To avoid blowing up on those, treat a
+        missing shot_result as "not made".
         """
-        return self.shot_result == "Made"
+        return getattr(self, "shot_result", None) == "Made"
