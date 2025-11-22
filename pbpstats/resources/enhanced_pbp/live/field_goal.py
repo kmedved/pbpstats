@@ -1,23 +1,38 @@
+import pbpstats
 from pbpstats.resources.enhanced_pbp import FieldGoal
 from pbpstats.resources.enhanced_pbp.live.enhanced_pbp_item import LiveEnhancedPbpItem
 
 
 class LiveFieldGoal(FieldGoal, LiveEnhancedPbpItem):
     """
-    Class for field goal events
+    Class for field goal events from the live data feed.
     """
 
-    action_type = ["2pt", "3pt"]
+    action_type = ["2pt", "3pt", "heave"]
 
     def __init__(self, *args):
         super().__init__(*args)
 
+        if getattr(self, "action_type", None) == "heave":
+            # '0' is TEAM_STAT_PLAYER_ID in pbpstats.__init__
+            self.player1_id = int(pbpstats.TEAM_STAT_PLAYER_ID)
+
     @property
     def shot_value(self):
         """
-        returns 3 if shot is a 3 point attempt, 2 otherwise
+        Returns numeric shot value.
+
+        Prefer explicit shotValue from the feed when present, otherwise:
+        - Treat '3pt' and 'heave' as 3
+        - Everything else as 2
         """
-        return 3 if self.action_type == "3pt" else 2
+        if hasattr(self, "shotValue"):
+            try:
+                return int(self.shotValue)
+            except (TypeError, ValueError):
+                pass
+
+        return 3 if getattr(self, "action_type", None) in ("3pt", "heave") else 2
 
     @property
     def is_made(self):
