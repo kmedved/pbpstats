@@ -40,12 +40,19 @@ class LiveEnhancedPbpLoader(LivePbpLoader, NbaEnhancedPbpLoader):
         super().__init__(game_id, source_loader)
 
     def _make_pbp_items(self):
+        actions = self.source_data["game"]["actions"]
+        actions.sort(
+            key=lambda ev: (
+                ev.get("orderNumber", 0),
+                ev.get("actionNumber", 0),
+            )
+        )
         factory = LiveEnhancedPbpFactory()
         self.items = [
             factory.get_event_class(event["actionType"], event.get("subType", ""))(
                 event, self.game_id
             )
-            for event in self.data
+            for event in actions
         ]
         self._add_extra_attrs_to_all_events()
         self._change_team_id_on_drebs()
