@@ -13,6 +13,18 @@ class LiveStartOfPeriod(StartOfPeriod, LiveEnhancedPbpItem):
     def __init__(self, *args):
         super().__init__(*args)
 
+    def get_offense_team_id(self):
+        """
+        For live data, prefer the explicit "possession" field when present;
+        fall back to the generic :class:`~pbpstats.resources.enhanced_pbp.start_of_period.StartOfPeriod`
+        heuristic otherwise.
+        """
+        offense_team_id = getattr(self, "offense_team_id", 0)
+        if offense_team_id not in (None, 0):
+            return offense_team_id
+
+        return self.get_team_starting_with_ball()
+
     def get_period_starters(self, file_directory=None, ignore_missing_starters=False):
         """
         Gets player ids of players who started the period for each team
