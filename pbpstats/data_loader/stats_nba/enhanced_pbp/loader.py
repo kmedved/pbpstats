@@ -18,6 +18,12 @@ The following code will load pbp data for game id "0021900001" from a file locat
 """
 import json
 import os
+import logging
+import requests
+
+import pandas as pd
+
+from pbpstats import G_LEAGUE_STRING, HEADERS, NBA_STRING, REQUEST_TIMEOUT
 
 from pbpstats.data_loader.data_nba.pbp.loader import DataNbaPbpLoader
 from pbpstats.data_loader.data_nba.pbp.web import DataNbaPbpWebLoader
@@ -29,6 +35,8 @@ from pbpstats.resources.enhanced_pbp.rebound import EventOrderError
 from pbpstats.resources.enhanced_pbp.stats_nba.enhanced_pbp_factory import (
     StatsNbaEnhancedPbpFactory,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class StatsNbaEnhancedPbpLoader(StatsNbaPbpLoader, NbaEnhancedPbpLoader):
@@ -98,18 +106,33 @@ class StatsNbaEnhancedPbpLoader(StatsNbaPbpLoader, NbaEnhancedPbpLoader):
                 ]
                 self._add_extra_attrs_to_all_events()
                 attempts += 1
-        # Common check didn't fix things. Use data nba event order
+        # Common check didn't fix things. Try v3 event order, then data.nba as a fallback.
         try:
             for event in self.items:
                 if hasattr(event, "missed_shot"):
                     event.missed_shot
-        except EventOrderError as e:
-            self._use_data_nba_event_order()
+        except EventOrderError:
+            # 1) Try repairing using playbyplayv3
+            self._use_v3_event_order()
             self.items = [
                 self.factory.get_event_class(item["EVENTMSGTYPE"])(item, i)
                 for i, item in enumerate(self.data)
             ]
             self._add_extra_attrs_to_all_events()
+
+            # 2) Re-check rebounds after v3 repair
+            try:
+                for event in self.items:
+                    if hasattr(event, "missed_shot"):
+                        event.missed_shot
+            except EventOrderError:
+                # 3) As a last resort, keep the original data.nba.com fallback
+                self._use_data_nba_event_order()
+                self.items = [
+                    self.factory.get_event_class(item["EVENTMSGTYPE"])(item, i)
+                    for i, item in enumerate(self.data)
+                ]
+                self._add_extra_attrs_to_all_events()
 
     def _fix_order_when_technical_foul_before_period_start(self):
         """
@@ -167,6 +190,105 @@ class StatsNbaEnhancedPbpLoader(StatsNbaPbpLoader, NbaEnhancedPbpLoader):
 
         self.source_data["resultSets"][0]["rowSet"] = new_order_of_events
         self._save_data_to_file()
+
+    def _use_v3_event_order(self):
+        """
+        Reorders stats.nba events to match the chronological order from
+        the playbyplayv3 feed (stats.nba.com/stats/playbyplayv3).
+
+        This is a non-destructive repair step: if the request fails or
+        the schema is unexpected, it returns without modifying any state.
+        """
+        league_url_part = (
+            f"{G_LEAGUE_STRING}.{NBA_STRING}"
+            if self.league == G_LEAGUE_STRING
+            else self.league
+        )
+
+        url = f"https://stats.{league_url_part}.com/stats/playbyplayv3"
+        params = {
+            "GameID": self.game_id,
+            "StartPeriod": 1,
+            "EndPeriod": 10,
+        }
+
+        try:
+            response = requests.get(
+                url,
+                params=params,
+                headers=HEADERS,
+                timeout=REQUEST_TIMEOUT,
+            )
+            response.raise_for_status()
+            data = response.json()
+        except Exception as e:
+            # do no harm: if v3 is unavailable or errors, leave events as-is
+            logger.warning(
+                "playbyplayv3 request failed for game %s: %s",
+                getattr(self, "game_id", "unknown"),
+                e,
+            )
+            return
+
+        actions = data.get("game", {}).get("actions", [])
+        if not actions:
+            logger.debug(
+                "playbyplayv3 returned no actions for game %s; leaving order unchanged.",
+                getattr(self, "game_id", "unknown"),
+            )
+            return
+
+        df_v3 = pd.DataFrame(actions)
+        if "actionNumber" not in df_v3.columns or "actionId" not in df_v3.columns:
+            # schema unexpected – bail out
+            logger.warning(
+                "Unexpected playbyplayv3 schema for game %s (missing actionNumber/actionId); "
+                "leaving order unchanged.",
+                getattr(self, "game_id", "unknown"),
+            )
+            return
+
+        df_v3 = df_v3.copy()
+        df_v3["actionNumber"] = pd.to_numeric(df_v3["actionNumber"], errors="coerce")
+        df_v3 = df_v3.dropna(subset=["actionNumber"])
+        df_v3["actionNumber"] = df_v3["actionNumber"].astype(int)
+        df_v3 = df_v3.sort_values("actionId")
+
+        order_map = {}
+        next_idx = 0
+        for num in df_v3["actionNumber"]:
+            if num not in order_map:
+                order_map[num] = next_idx
+                next_idx += 1
+
+        headers = self.source_data["resultSets"][0]["headers"]
+        rows = self.source_data["resultSets"][0]["rowSet"]
+        try:
+            event_num_index = headers.index("EVENTNUM")
+        except ValueError:
+            # no EVENTNUM – can't remap safely
+            logger.warning(
+                "No EVENTNUM column for game %s; unable to apply v3 event order.",
+                getattr(self, "game_id", "unknown"),
+            )
+            return
+
+        max_idx = len(order_map) + 1000
+
+        def sort_key(row):
+            try:
+                ev_num = int(row[event_num_index])
+            except (TypeError, ValueError):
+                return max_idx
+            return order_map.get(ev_num, max_idx + ev_num)
+
+        new_rows = sorted(rows, key=sort_key)
+        self.source_data["resultSets"][0]["rowSet"] = new_rows
+        self._save_data_to_file()
+        logger.info(
+            "Applied playbyplayv3-based event reordering for game %s.",
+            getattr(self, "game_id", "unknown"),
+        )
 
     def _fix_common_event_order_error(self, exception):
         """
@@ -271,7 +393,11 @@ class StatsNbaEnhancedPbpLoader(StatsNbaPbpLoader, NbaEnhancedPbpLoader):
 
     def _use_data_nba_event_order(self):
         """
-        reorders all events to be the same order as data.nba.com pbp
+        Reorders all events to be the same order as data.nba.com pbp.
+
+        This is now used as a secondary fallback after trying the
+        playbyplayv3-based repair, so behavior for existing users
+        remains unchanged if data.nba.com is available.
         """
         # Order event numbers of events in data.nba.com pbp
         data_nba_pbp = DataNbaPbpLoader(self.game_id, DataNbaPbpWebLoader())
