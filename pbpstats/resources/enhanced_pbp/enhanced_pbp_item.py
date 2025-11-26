@@ -2,9 +2,12 @@
 ``EnhancedPbpItem`` is an abstract base class for all enhanced pbp event types
 """
 import abc
+import logging
 
 import pbpstats
 from pbpstats.resources.enhanced_pbp import FieldGoal, Foul, FreeThrow, Rebound
+
+logger = logging.getLogger(__name__)
 
 
 class EnhancedPbpItem(metaclass=abc.ABCMeta):
@@ -80,7 +83,27 @@ class EnhancedPbpItem(metaclass=abc.ABCMeta):
         This gets overwritten in :obj:`~pbpstats.resources.enhanced_pbp.substitution.Substitution`
         since those are the only event types where players are not the same as the previous event
         """
-        return self.previous_event.current_players
+        prev = getattr(self, "previous_event", None)
+        if prev is None:
+            # no context for lineups (start of game / broken pbp)
+            logger.debug(
+                "No previous_event for %r (game_id=%s); returning empty current_players.",
+                self,
+                getattr(self, "game_id", "unknown"),
+            )
+            return {}
+        try:
+            return prev.current_players
+        except Exception as e:
+            # KeyError / AttributeError in prior events -> treat as unknown lineup
+            logger.debug(
+                "Error walking current_players chain for %r (game_id=%s): %s; "
+                "returning empty current_players.",
+                self,
+                getattr(self, "game_id", "unknown"),
+                e,
+            )
+            return {}
 
     @property
     def score_margin(self):

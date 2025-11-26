@@ -90,14 +90,25 @@ class NbaEnhancedPbpLoader(object):
     def _set_period_start_items(self):
         """
         sets team starting period with the ball and period starters for each team
+
+        On some older / malformed games, start_period_indices can include
+        non-StartOfPeriod events (e.g. JumpBall at index 0). In those cases
+        we skip the entry instead of crashing.
         """
-        for i in self.start_period_indices:
-            team_id = self.items[i].get_team_starting_with_ball()
-            self.items[i].team_starting_with_ball = team_id
-            period_starters = self.items[i].get_period_starters(
+        from pbpstats.resources.enhanced_pbp import StartOfPeriod  # local import
+
+        for i in getattr(self, "start_period_indices", []):
+            event = self.items[i]
+            if not isinstance(event, StartOfPeriod):
+                # do no harm: only operate on true StartOfPeriod events
+                continue
+
+            team_id = event.get_team_starting_with_ball()
+            event.team_starting_with_ball = team_id
+            period_starters = event.get_period_starters(
                 file_directory=self.file_directory
             )
-            self.items[i].period_starters = period_starters
+            event.period_starters = period_starters
 
     def _load_possession_changing_event_overrides(self):
         """

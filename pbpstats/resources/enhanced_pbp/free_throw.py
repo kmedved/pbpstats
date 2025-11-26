@@ -1,7 +1,10 @@
 import abc
+import logging
 
 import pbpstats
 from pbpstats.resources.enhanced_pbp import Foul
+
+logger = logging.getLogger(__name__)
 
 
 class FreeThrow(metaclass=abc.ABCMeta):
@@ -277,6 +280,15 @@ class FreeThrow(metaclass=abc.ABCMeta):
             else:
                 return "1 Shot Away From Play"
         foul_event = self.foul_that_led_to_ft
+        if foul_event is None:
+            # degrade gracefully for broken pbp
+            logger.debug(
+                "free_throw_type: foul_that_led_to_ft is None for %r (game_id=%s); "
+                "returning 'Penalty'.",
+                self,
+                getattr(self, "game_id", "unknown"),
+            )
+            return "Penalty"
         if foul_event.is_shooting_foul or foul_event.is_shooting_block_foul:
             return f"{num_fts}pt Shooting Foul"
         elif foul_event.is_flagrant:
