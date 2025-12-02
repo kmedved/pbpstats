@@ -19,24 +19,33 @@ class StatsStartOfPeriod(StartOfPeriod, StatsEnhancedPbpItem):
 
     def get_period_starters(self, file_directory=None):
         """
-        Try:
-          1) PBP-based inference.
-          2) If that fails and a boxscore_source_loader is attached, use it locally.
-          3) Only if #2 is unavailable, fall back to the original stats.nba.com request.
+        Try, in order:
+          1) PBP-based inference (strict, including overrides).
+          2) Local boxscore-based starters (Period 1 via START_POSITION).
+          3) Offline best-effort PBP inference (ignore_missing_starters=True).
+          4) Legacy web fallback ONLY if no local boxscore loader was provided.
         """
+        # 1) Strict PBP-based inference
         try:
             return self._get_period_starters_from_period_events(file_directory)
         except InvalidNumberOfStartersException:
-            starters = self._get_period_starters_from_boxscore_loader()
-            if starters is not None:
-                return starters
+            pass
 
-            if getattr(self, "boxscore_source_loader", None) is not None:
-                raise InvalidNumberOfStartersException(
-                    f"Offline: Cannot determine starters for GameId: {self.game_id}, Period: {self.period}"
-                )
+        # 2) Local boxscore-based starters (Period 1)
+        starters = self._get_period_starters_from_boxscore_loader()
+        if starters is not None:
+            return starters
 
-            return self._get_starters_from_boxscore_request()
+        # 3) Offline best-effort PBP inference:
+        #    if we have a local boxscore loader, stay offline and don't crash.
+        if getattr(self, "boxscore_source_loader", None) is not None:
+            # ignore_missing_starters=True skips the strict 5-per-team assertion
+            return self._get_period_starters_from_period_events(
+                file_directory, ignore_missing_starters=True
+            )
+
+        # 4) Legacy behavior: only use web if no local loader exists at all.
+        return self._get_starters_from_boxscore_request()
 
     def _get_period_starters_from_boxscore_loader(self):
         """
