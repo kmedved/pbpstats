@@ -41,3 +41,46 @@ class StatsNbaPbpWebLoader(StatsNbaWebLoader):
             file_path = f"{self.file_directory}/pbp/stats_{self.game_id}.json"
             with open(file_path, "w") as outfile:
                 json.dump(self.source_data, outfile)
+
+
+class StatsNbaPbpV3WebLoader(StatsNbaWebLoader):
+    """
+    Helper loader for stats.nba.com playbyplayv3 endpoint.
+
+    This is used internally by StatsNbaEnhancedPbpLoader to reconcile
+    event ordering using actionId/actionNumber. It is deliberately
+    *not* registered as a top-level resource (no `resource` or
+    `parent_object` attributes), so DataLoaderFactory will ignore it.
+    """
+
+    def __init__(self, file_directory=None):
+        self.file_directory = file_directory
+
+    def load_data(self, game_id):
+        self.game_id = game_id
+        league_url_part = (
+            f"{G_LEAGUE_STRING}.{NBA_STRING}"
+            if self.league == G_LEAGUE_STRING
+            else self.league
+        )
+        # v3 endpoint
+        self.base_url = f"https://stats.{league_url_part}.com/stats/playbyplayv3"
+        self.parameters = {
+            "GameID": self.game_id,
+            "StartPeriod": 0,
+            "EndPeriod": 10,
+        }
+        return self._load_request_data()
+
+    def _save_data_to_file(self):
+        """
+        Optionally cache v3 responses if a file_directory was provided.
+        This mirrors the pattern of the v2 loader but writes under a
+        separate `pbp_v3` subdirectory.
+        """
+        if self.file_directory is not None and os.path.isdir(self.file_directory):
+            dir_path = os.path.join(self.file_directory, "pbp_v3")
+            os.makedirs(dir_path, exist_ok=True)
+            file_path = os.path.join(dir_path, f"stats_pbpv3_{self.game_id}.json")
+            with open(file_path, "w") as outfile:
+                json.dump(self.source_data, outfile)
