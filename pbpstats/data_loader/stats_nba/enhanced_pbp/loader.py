@@ -56,6 +56,7 @@ class StatsNbaEnhancedPbpLoader(StatsNbaPbpLoader, NbaEnhancedPbpLoader):
 
     def __init__(self, game_id, source_loader):
         self.shots_source_loader = source_loader.shots_source_loader
+        self.v3_source_loader = getattr(source_loader, "v3_source_loader", None)
         super().__init__(game_id, source_loader)
 
     def _make_pbp_items(self):
@@ -313,10 +314,13 @@ class StatsNbaEnhancedPbpLoader(StatsNbaPbpLoader, NbaEnhancedPbpLoader):
         If v3 data is unavailable or malformed, this method is a no-op.
         """
         try:
-            v3_loader = StatsNbaPbpV3WebLoader(self.file_directory)
-            v3_data = v3_loader.load_data(self.game_id)
+            if getattr(self, "v3_source_loader", None) is not None:
+                v3_data = self.v3_source_loader.load_data(self.game_id)
+            else:
+                v3_loader = StatsNbaPbpV3WebLoader(self.file_directory)
+                v3_data = v3_loader.load_data(self.game_id)
         except Exception:
-            # v3 request failed; nothing to do
+            # v3 request failed (or local loader errored); nothing to do
             return
 
         actions = v3_data.get("game", {}).get("actions", [])
