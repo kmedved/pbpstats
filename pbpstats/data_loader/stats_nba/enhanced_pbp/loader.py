@@ -57,6 +57,9 @@ class StatsNbaEnhancedPbpLoader(StatsNbaPbpLoader, NbaEnhancedPbpLoader):
     def __init__(self, game_id, source_loader):
         self.shots_source_loader = source_loader.shots_source_loader
         self.v3_source_loader = getattr(source_loader, "v3_source_loader", None)
+        self.boxscore_source_loader = getattr(
+            source_loader, "boxscore_source_loader", None
+        )
         super().__init__(game_id, source_loader)
 
     def _make_pbp_items(self):
@@ -66,6 +69,14 @@ class StatsNbaEnhancedPbpLoader(StatsNbaPbpLoader, NbaEnhancedPbpLoader):
             self.factory.get_event_class(item["EVENTMSGTYPE"])(item, i)
             for i, item in enumerate(self.data)
         ]
+
+        if getattr(self, "boxscore_source_loader", None) is not None:
+            from pbpstats.resources.enhanced_pbp import StartOfPeriod
+
+            for ev in self.items:
+                if isinstance(ev, StartOfPeriod):
+                    ev.boxscore_source_loader = self.boxscore_source_loader
+
         self._add_extra_attrs_to_all_events()
         self._check_rebound_event_order(6)
         self._add_shot_x_y_coords()
@@ -128,19 +139,6 @@ class StatsNbaEnhancedPbpLoader(StatsNbaPbpLoader, NbaEnhancedPbpLoader):
             pass
         except Exception:
             # v3 unavailable or malformed; fall through
-            pass
-
-        # Final fallback: use legacy data.nba.com event order, if available.
-        try:
-            self._use_data_nba_event_order()
-            self.items = [
-                self.factory.get_event_class(item["EVENTMSGTYPE"])(item, i)
-                for i, item in enumerate(self.data)
-            ]
-            self._add_extra_attrs_to_all_events()
-        except Exception:
-            # At this point, if there are still EventOrderError problems,
-            # they will surface when the caller accesses event.missed_shot.
             pass
 
     def _fix_order_when_technical_foul_before_period_start(self):

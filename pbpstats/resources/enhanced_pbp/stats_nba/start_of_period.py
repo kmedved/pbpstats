@@ -1,3 +1,4 @@
+from pbpstats.data_loader.stats_nba.boxscore.loader import StatsNbaBoxscoreLoader
 from pbpstats.resources.enhanced_pbp import (
     InvalidNumberOfStartersException,
     StartOfPeriod,
@@ -19,19 +20,59 @@ class StatsStartOfPeriod(StartOfPeriod, StatsEnhancedPbpItem):
 
     def get_period_starters(self, file_directory=None):
         """
-        Gets player ids of players who started the period for each team.
-        If players can't be determined from parsing pbp, will try to
-        find them by making API request to stats.nba.com boxscore filtered by time.
-
-        :param str file_directory: directory in which overrides subdirectory exists
-            containing period starter overrides when period starters can't be determined
-            from parsing pbp events
-        :returns: dict with list of player ids for each team
-            with players on the floor at start of period
-        :raises: :obj:`~pbpstats.resources.enhanced_pbp.start_of_period.InvalidNumberOfStartersException`:
-            If all 5 players that start the period for a team can't be determined.
+        Try:
+          1) PBP-based inference.
+          2) If that fails and a boxscore_source_loader is attached, use it locally.
+          3) Only if #2 is unavailable, fall back to the original stats.nba.com request.
         """
         try:
             return self._get_period_starters_from_period_events(file_directory)
         except InvalidNumberOfStartersException:
+            starters = self._get_period_starters_from_boxscore_loader()
+            if starters is not None:
+                return starters
+
+            if getattr(self, "boxscore_source_loader", None) is not None:
+                raise InvalidNumberOfStartersException(
+                    f"Offline: Cannot determine starters for GameId: {self.game_id}, Period: {self.period}"
+                )
+
             return self._get_starters_from_boxscore_request()
+
+    def _get_period_starters_from_boxscore_loader(self):
+        """
+        Use a locally-supplied boxscore loader (file/json/memory) to get
+        period starters, if available. Returns dict[team_id] -> [player_ids]
+        or None if it can't determine them.
+        """
+        loader_obj = getattr(self, "boxscore_source_loader", None)
+        if loader_obj is None:
+            return None
+
+        try:
+            boxscore_loader = StatsNbaBoxscoreLoader(self.game_id, loader_obj)
+        except Exception:
+            return None
+
+        players = [item.data for item in boxscore_loader.items if hasattr(item, "player_id")]
+
+        starters_by_team = {}
+
+        if self.period == 1:
+            for p in players:
+                team_id = p.get("team_id")
+                start_pos = p.get("start_position")
+                if not team_id:
+                    continue
+                if start_pos is None or str(start_pos).strip() == "":
+                    continue
+                starters_by_team.setdefault(team_id, []).append(p["player_id"])
+
+            if not starters_by_team:
+                return None
+            for team_id, starters in starters_by_team.items():
+                if len(starters) != 5:
+                    return None
+            return starters_by_team
+
+        return None
