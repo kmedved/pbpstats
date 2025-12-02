@@ -5,6 +5,7 @@ from collections import defaultdict
 from pbpstats import NBA_STRING
 from pbpstats.overrides import IntDecoder
 from pbpstats.resources.enhanced_pbp import FieldGoal, Foul, FreeThrow, StartOfPeriod
+from pbpstats.resources.enhanced_pbp.shot_clock import annotate_shot_clock
 
 
 class NbaEnhancedPbpLoader(object):
@@ -20,7 +21,8 @@ class NbaEnhancedPbpLoader(object):
 
     def _add_extra_attrs_to_all_events(self):
         """
-        adds fouls to give, player fouls, score, next event and previous event to each event
+        adds fouls to give, player fouls, score, next event, previous event and
+        approximate shot clock to each event
         """
         self.start_period_indices = []
         self._load_possession_changing_event_overrides()
@@ -87,6 +89,11 @@ class NbaEnhancedPbpLoader(object):
         # these need next and previous event to be added to all events
         self._set_period_start_items()
 
+        # annotate approximate shot clock for every enhanced pbp event.
+        # LiveEnhancedPbpLoader recomputes shot clock after normalizing DREBs.
+        if getattr(self, "data_provider", None) != "live":
+            self._annotate_shot_clock()
+
     def _set_period_start_items(self):
         """
         sets team starting period with the ball and period starters for each team
@@ -109,6 +116,28 @@ class NbaEnhancedPbpLoader(object):
                 file_directory=self.file_directory
             )
             event.period_starters = period_starters
+
+    def _annotate_shot_clock(self):
+        """
+        Compute and attach approximate shot clock values to each enhanced pbp event.
+
+        This wraps resources.enhanced_pbp.shot_clock.annotate_shot_clock so that the
+        logic is shared by stats_nba / data_nba / live data providers.
+        """
+        # Season is stored as e.g. "2019" or "2019-20"; we want the start year.
+        season_val = getattr(self, "season", None)
+        season_year = None
+        if isinstance(season_val, int):
+            season_year = season_val
+        elif isinstance(season_val, str):
+            try:
+                season_year = int(season_val.strip().split("-")[0])
+            except (ValueError, TypeError):
+                season_year = None
+
+        league = getattr(self, "league", NBA_STRING)
+
+        annotate_shot_clock(self.items, season_year=season_year, league=league)
 
     def _load_possession_changing_event_overrides(self):
         """

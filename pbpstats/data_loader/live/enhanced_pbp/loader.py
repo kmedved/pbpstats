@@ -56,6 +56,10 @@ class LiveEnhancedPbpLoader(LivePbpLoader, NbaEnhancedPbpLoader):
         ]
         self._add_extra_attrs_to_all_events()
         self._change_team_id_on_drebs()
+        # Recompute shot clock using corrected offense_team_id values on DREBs.
+        # This is a second pass over the events, but it keeps live shot clocks
+        # aligned with the post-adjustment possession data.
+        self._annotate_shot_clock()
 
     def _change_team_id_on_drebs(self):
         """

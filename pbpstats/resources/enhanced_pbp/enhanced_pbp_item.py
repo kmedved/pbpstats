@@ -43,6 +43,43 @@ class EnhancedPbpItem(metaclass=abc.ABCMeta):
         pass
 
     @property
+    def shot_clock(self):
+        """
+        Approximate shot clock (seconds remaining) at the start of this event,
+        or ``None`` if it has not been annotated.
+
+        Populated by NbaEnhancedPbpLoader via the shot_clock annotator.
+        """
+        return getattr(self, "_shot_clock", None)
+
+    @shot_clock.setter
+    def shot_clock(self, value):
+        self._shot_clock = value
+        # Also expose under a public name so event.data["shot_clock"] works
+        self.__dict__["shot_clock"] = value
+
+    @property
+    def shot_clock_bucket(self):
+        """
+        Coarse bucket of shot clock time:
+          - 'Early'    : 16+ seconds
+          - 'Middle'   : 8–15.9 seconds
+          - 'Late'     : 4–7.9 seconds
+          - 'VeryLate' : 0–3.9 seconds
+          - None       : shot clock not available
+        """
+        sc = self.shot_clock
+        if sc is None:
+            return None
+        if sc >= 16:
+            return "Early"
+        if sc >= 8:
+            return "Middle"
+        if sc >= 4:
+            return "Late"
+        return "VeryLate"
+
+    @property
     def base_stats(self):
         """
         returns list of dicts with all seconds played and possession count stats for event
