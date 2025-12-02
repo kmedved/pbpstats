@@ -215,9 +215,32 @@ class StatsNbaEnhancedPbpLoader(StatsNbaPbpLoader, NbaEnhancedPbpLoader):
         rows = self.source_data["resultSets"][0]["rowSet"]
         event_num_index = headers.index("EVENTNUM")
         event_type_index = headers.index("EVENTMSGTYPE")
+        # Additional indices for rebound fix patterns
+        try:
+            period_index = headers.index("PERIOD")
+        except ValueError:
+            period_index = None
+
+        try:
+            pctimestring_index = headers.index("PCTIMESTRING")
+        except ValueError:
+            pctimestring_index = None
+
+        try:
+            player1_id_index = headers.index("PLAYER1_ID")
+        except ValueError:
+            player1_id_index = None
+
+        handled = False
+        issue_event_index = None
         for i, row in enumerate(rows):
             if row[event_num_index] == int(event_num):
                 issue_event_index = i
+
+        if issue_event_index is None:
+            # Fall back to saving without changes if the event wasn't found
+            self._save_data_to_file()
+            return
 
         if rows[issue_event_index][event_type_index] in [8, 9]:
             # these are subs/timeouts that are in between missed ft and rebound
@@ -239,6 +262,7 @@ class StatsNbaEnhancedPbpLoader(StatsNbaPbpLoader, NbaEnhancedPbpLoader):
                     new_rows.append(row)
 
             self.source_data["resultSets"][0]["rowSet"] = new_rows
+            handled = True
         elif (
             rows[issue_event_index][event_type_index] == 18
             and rows[issue_event_index + 1][event_type_index] == 4
@@ -254,7 +278,7 @@ class StatsNbaEnhancedPbpLoader(StatsNbaPbpLoader, NbaEnhancedPbpLoader):
             self.source_data["resultSets"][0]["rowSet"][
                 issue_event_index
             ] = rebound_event
-
+            handled = True
         elif (
             rows[issue_event_index + 1][event_type_index] == 4
             and rows[issue_event_index + 1][event_num_index] == int(event_num) - 1
@@ -268,6 +292,7 @@ class StatsNbaEnhancedPbpLoader(StatsNbaPbpLoader, NbaEnhancedPbpLoader):
             self.source_data["resultSets"][0]["rowSet"][
                 issue_event_index + 1
             ] = shot_event
+            handled = True
         elif (
             rows[issue_event_index + 1][event_type_index] == 4
             and rows[issue_event_index + 1][event_num_index] == int(event_num) + 2
@@ -281,6 +306,7 @@ class StatsNbaEnhancedPbpLoader(StatsNbaPbpLoader, NbaEnhancedPbpLoader):
             self.source_data["resultSets"][0]["rowSet"][
                 issue_event_index - 1
             ] = rebound_event
+            handled = True
         elif (
             rows[issue_event_index + 1][event_type_index] == 4
             and rows[issue_event_index + 1][event_num_index] == int(event_num) - 2
@@ -298,6 +324,81 @@ class StatsNbaEnhancedPbpLoader(StatsNbaPbpLoader, NbaEnhancedPbpLoader):
             self.source_data["resultSets"][0]["rowSet"][
                 issue_event_index - 1
             ] = first_rebound
+            handled = True
+
+        if not handled:
+            # === NEW PATTERN: duplicate adjacent rebounds - delete team rebound ===
+            if (
+                issue_event_index is not None
+                and issue_event_index + 1 < len(rows)
+                and rows[issue_event_index][event_type_index] == 4
+                and rows[issue_event_index + 1][event_type_index] == 4
+                and player1_id_index is not None
+            ):
+                first = rows[issue_event_index]
+                second = rows[issue_event_index + 1]
+                first_pid = first[player1_id_index] or 0
+                second_pid = second[player1_id_index] or 0
+
+                # Treat PLAYER1_ID >= 1610000000 or 0 as "team"/placeholder rebound
+                first_is_team = first_pid == 0 or first_pid >= 1610000000
+                second_is_team = second_pid == 0 or second_pid >= 1610000000
+
+                # Prefer to delete a team rebound if paired with a player rebound
+                if first_is_team and not second_is_team:
+                    del rows[issue_event_index]
+                elif second_is_team and not first_is_team:
+                    del rows[issue_event_index + 1]
+                else:
+                    # If both look like players or both look like teams, fall back
+                    # to deleting the later one to keep earlier ordering stable.
+                    del rows[issue_event_index + 1]
+
+                self.source_data["resultSets"][0]["rowSet"] = rows
+                self._save_data_to_file()
+                return
+
+            # === NEW PATTERN: rebound at same clock as later shot/FT - move rebound ===
+            if (
+                issue_event_index is not None
+                and rows[issue_event_index][event_type_index] == 4
+                and period_index is not None
+                and pctimestring_index is not None
+            ):
+                period = rows[issue_event_index][period_index]
+                clock = rows[issue_event_index][pctimestring_index]
+
+                # Scan a few events ahead in same period and same clock
+                j = issue_event_index + 1
+                max_j = min(issue_event_index + 5, len(rows))
+                target_index = None
+
+                while j < max_j:
+                    row_j = rows[j]
+                    # Stop if period changes
+                    if row_j[period_index] != period:
+                        break
+                    # Stop if clock changes
+                    if row_j[pctimestring_index] != clock:
+                        break
+                    # If we find a MISS (2) or FT (3) at the same time, that's our target
+                    if row_j[event_type_index] in (2, 3):
+                        target_index = j
+                        break
+                    j += 1
+
+                if target_index is not None:
+                    # Move the rebound to immediately after the shot/FT
+                    rebound_row = rows.pop(issue_event_index)
+                    # Note: if target_index > issue_event_index, indices shift down by 1
+                    insert_at = target_index
+                    if target_index > issue_event_index:
+                        insert_at = target_index - 1
+                    rows.insert(insert_at + 1, rebound_row)
+
+                    self.source_data["resultSets"][0]["rowSet"] = rows
+                    self._save_data_to_file()
+                    return
 
         self._save_data_to_file()
 
