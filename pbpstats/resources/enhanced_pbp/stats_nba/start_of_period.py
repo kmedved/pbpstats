@@ -1,4 +1,3 @@
-from pbpstats.data_loader.stats_nba.boxscore.loader import StatsNbaBoxscoreLoader
 from pbpstats.resources.enhanced_pbp import (
     InvalidNumberOfStartersException,
     StartOfPeriod,
@@ -48,6 +47,8 @@ class StatsStartOfPeriod(StartOfPeriod, StatsEnhancedPbpItem):
         loader_obj = getattr(self, "boxscore_source_loader", None)
         if loader_obj is None:
             return None
+
+        from pbpstats.data_loader.stats_nba.boxscore.loader import StatsNbaBoxscoreLoader
 
         try:
             boxscore_loader = StatsNbaBoxscoreLoader(self.game_id, loader_obj)
