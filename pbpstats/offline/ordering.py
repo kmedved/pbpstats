@@ -5,6 +5,21 @@ import pandas as pd
 FetchPbpV3Fn = Callable[[str], pd.DataFrame]
 
 
+def _ensure_eventnum_int(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Ensure EVENTNUM is an int column.
+
+    - Coerce to numeric with errors='coerce'
+    - Drop rows where EVENTNUM can't be parsed
+    - Cast to int
+    """
+    result = df.copy()
+    result["EVENTNUM"] = pd.to_numeric(result["EVENTNUM"], errors="coerce")
+    result = result.dropna(subset=["EVENTNUM"])
+    result["EVENTNUM"] = result["EVENTNUM"].astype(int)
+    return result
+
+
 def create_raw_dicts_from_df(sorted_df: pd.DataFrame) -> List[dict]:
     """
     Convert a PBP DataFrame into a list of stats.nba-style event dicts.
@@ -41,11 +56,15 @@ def dedupe_with_v3(
     v3 is treated as authoritative for which EVENTNUM values are "real".
     """
     df = game_df.copy()
+
+    # Always normalize EVENTNUM to int before we do anything with it
+    df = _ensure_eventnum_int(df)
+
     if fetch_pbp_v3_fn is None:
         return df.drop_duplicates(subset=["GAME_ID", "EVENTNUM"], keep="first")
 
     df_v3 = fetch_pbp_v3_fn(game_id)
-    if df_v3.empty or "actionNumber" not in df_v3.columns:
+    if df_v3 is None or df_v3.empty or "actionNumber" not in df_v3.columns:
         return df.drop_duplicates(subset=["GAME_ID", "EVENTNUM"], keep="first")
 
     df_v3 = df_v3.copy()
@@ -73,6 +92,10 @@ def patch_start_of_periods(
     df = game_df.copy()
     if "EVENTMSGTYPE" not in df.columns or "PERIOD" not in df.columns:
         return df
+
+    # At this point, dedupe_with_v3 should already have normalized EVENTNUM,
+    # but calling it again is cheap and keeps patch_start_of_periods robust
+    df = _ensure_eventnum_int(df)
 
     # Existing start-of-period markers
     existing_periods = set(
@@ -124,7 +147,7 @@ def patch_start_of_periods(
 
     # Use v3 period/start markers if available
     df_v3 = fetch_pbp_v3_fn(game_id)
-    if df_v3.empty or "actionType" not in df_v3.columns or "subType" not in df_v3.columns:
+    if df_v3 is None or df_v3.empty or "actionType" not in df_v3.columns or "subType" not in df_v3.columns:
         return df
 
     mask = (
@@ -199,7 +222,7 @@ def reorder_with_v3(
     - Sort events by that canonical index, then by EVENTNUM.
     """
     df_v3 = fetch_pbp_v3_fn(game_id)
-    if df_v3.empty or "actionNumber" not in df_v3.columns or "actionId" not in df_v3.columns:
+    if df_v3 is None or df_v3.empty or "actionNumber" not in df_v3.columns or "actionId" not in df_v3.columns:
         raise RuntimeError(f"No v3 data for {game_id}")
 
     df_v3 = df_v3.copy()
@@ -215,10 +238,7 @@ def reorder_with_v3(
             order_map[num] = canonical_idx
             canonical_idx += 1
 
-    result = game_df.copy()
-    result["EVENTNUM"] = pd.to_numeric(result["EVENTNUM"], errors="coerce")
-    result = result.dropna(subset=["EVENTNUM"])
-    result["EVENTNUM"] = result["EVENTNUM"].astype(int)
+    result = _ensure_eventnum_int(game_df)
 
     max_idx = len(order_map) + 1000
     result["__v3_order"] = result["EVENTNUM"].map(order_map).fillna(max_idx).astype(int)

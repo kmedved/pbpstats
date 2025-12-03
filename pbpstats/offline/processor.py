@@ -16,6 +16,7 @@ from pbpstats.offline.ordering import (
     dedupe_with_v3,
     patch_start_of_periods,
     reorder_with_v3,
+    _ensure_eventnum_int,
 )
 
 FetchPbpV3Fn = Callable[[str], pd.DataFrame]
@@ -341,9 +342,9 @@ def get_possessions_from_df(
         try:
             df_ordered = reorder_with_v3(df, game_id, fetch_pbp_v3_fn)
         except Exception:
-            df_ordered = df.sort_values("EVENTNUM")
+            df_ordered = _ensure_eventnum_int(df).sort_values(["PERIOD", "EVENTNUM"])
     else:
-        df_ordered = df.sort_values("EVENTNUM")
+        df_ordered = _ensure_eventnum_int(df).sort_values(["PERIOD", "EVENTNUM"])
 
     # As a last fallback, preserve original order if needed
     if df_ordered.empty:
