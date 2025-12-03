@@ -26,6 +26,17 @@ FetchPbpV3Fn = Callable[[str], pd.DataFrame]
 REBOUND_STRICT_MODE: bool = True
 
 
+def set_rebound_strict_mode(strict: bool = True) -> None:
+    """
+    Toggle strict mode for rebound event-order repair.
+
+    strict=True: only TEAM/0 rebounds may be auto-deleted.
+    strict=False: PLAYER rebounds may also be auto-deleted as a last resort.
+    """
+    global REBOUND_STRICT_MODE
+    REBOUND_STRICT_MODE = strict
+
+
 class PbpProcessor(NbaEnhancedPbpLoader, NbaPossessionLoader):
     """
     Offline processor that:
