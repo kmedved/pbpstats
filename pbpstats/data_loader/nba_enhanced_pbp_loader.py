@@ -116,11 +116,14 @@ class NbaEnhancedPbpLoader(object):
                     break
             if previous_period_end_event is not None:
                 prev_players = getattr(previous_period_end_event, "current_players", None)
-                event.previous_period_end_lineups = (
-                    {team_id: list(players) for team_id, players in prev_players.items()}
-                    if isinstance(prev_players, dict)
-                    else None
-                )
+                if isinstance(prev_players, dict):
+                    snap = {}
+                    for team_id, players in prev_players.items():
+                        if isinstance(players, (list, tuple, set)):
+                            snap[team_id] = list(players)
+                    event.previous_period_end_lineups = snap or None
+                else:
+                    event.previous_period_end_lineups = None
                 event.previous_period_end_period = getattr(
                     previous_period_end_event, "period", None
                 )
