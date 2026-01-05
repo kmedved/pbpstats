@@ -324,7 +324,7 @@ class StartOfPeriod(metaclass=abc.ABCMeta):
                 continue
             cur_set = set(cur)
             prev_set = set(prev_players)
-            if cur and not cur_set.issubset(prev_set):
+            if not cur_set.issubset(prev_set):
                 continue
             missing = [player for player in prev_players if player not in cur_set]
             need = 5 - len(cur)

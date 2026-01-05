@@ -44,7 +44,7 @@ def test_fill_missing_starters_from_previous_period_end_skips_non_subset():
     assert result[TEAM_A] == [1, 2, 3, 99]
 
 
-def test_fill_missing_starters_from_previous_period_end_fills_missing_team():
+def test_fill_missing_starters_skips_when_team_not_present():
     start = DummyStart()
     start.previous_period_end_event = DummyPrevEnd()
     starters_by_team = {}
