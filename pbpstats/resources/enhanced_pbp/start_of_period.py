@@ -305,13 +305,11 @@ class StartOfPeriod(metaclass=abc.ABCMeta):
                     )
 
     def _fill_missing_starters_from_previous_period_end(self, starters_by_team):
-        prev_end = getattr(self, "previous_period_end_event", None)
-        if prev_end is None:
-            return starters_by_team
-        if getattr(prev_end, "period", None) != self.period - 1:
-            return starters_by_team
-        prev_lineups = getattr(prev_end, "current_players", None)
+        prev_lineups = getattr(self, "previous_period_end_lineups", None)
         if not isinstance(prev_lineups, dict):
+            return starters_by_team
+        prev_period = getattr(self, "previous_period_end_period", None)
+        if prev_period != self.period - 1:
             return starters_by_team
 
         for team_id, prev_players in prev_lineups.items():
