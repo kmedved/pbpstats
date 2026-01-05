@@ -109,6 +109,27 @@ class NbaEnhancedPbpLoader(object):
             if not isinstance(event, StartOfPeriod):
                 # do no harm: only operate on true StartOfPeriod events
                 continue
+            previous_period_end_event = None
+            for j in range(i - 1, -1, -1):
+                if getattr(self.items[j], "period", None) == event.period - 1:
+                    previous_period_end_event = self.items[j]
+                    break
+            if previous_period_end_event is not None:
+                prev_players = getattr(previous_period_end_event, "current_players", None)
+                if isinstance(prev_players, dict):
+                    snap = {}
+                    for team_id, players in prev_players.items():
+                        if isinstance(players, (list, tuple, set)):
+                            snap[team_id] = list(players)
+                    event.previous_period_end_lineups = snap or None
+                else:
+                    event.previous_period_end_lineups = None
+                event.previous_period_end_period = getattr(
+                    previous_period_end_event, "period", None
+                )
+            else:
+                event.previous_period_end_lineups = None
+                event.previous_period_end_period = None
 
             team_id = event.get_team_starting_with_ball()
             event.team_starting_with_ball = team_id

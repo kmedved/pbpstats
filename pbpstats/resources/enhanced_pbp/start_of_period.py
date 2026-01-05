@@ -304,12 +304,46 @@ class StartOfPeriod(metaclass=abc.ABCMeta):
                         f"GameId: {game_id}, Period: {self.period}, TeamId: {team_id}, Players: {starters}"
                     )
 
+    def _fill_missing_starters_from_previous_period_end(self, starters_by_team):
+        prev_lineups = getattr(self, "previous_period_end_lineups", None)
+        if not isinstance(prev_lineups, dict):
+            return starters_by_team
+        prev_period = getattr(self, "previous_period_end_period", None)
+        if prev_period != self.period - 1:
+            return starters_by_team
+
+        for team_id, prev_players in prev_lineups.items():
+            if not isinstance(prev_players, list) or len(prev_players) != 5:
+                continue
+            cur = starters_by_team.get(team_id, [])
+            if not cur:
+                continue
+            if len(cur) >= 5:
+                continue
+            cur_set = set(cur)
+            prev_set = set(prev_players)
+            if not cur_set.issubset(prev_set):
+                continue
+            missing = [player for player in prev_players if player not in cur_set]
+            need = 5 - len(cur)
+            if need <= 0:
+                continue
+            filled = cur + missing[:need]
+            seen = set()
+            starters_by_team[team_id] = [
+                player for player in filled if not (player in seen or seen.add(player))
+            ]
+        return starters_by_team
+
     def _get_period_starters_from_period_events(
         self, file_directory, ignore_missing_starters=False
     ):
         starters, player_team_map = self._get_players_who_started_period_with_team_map()
 
         starters_by_team = self._split_up_starters_by_team(starters, player_team_map)
+        starters_by_team = self._fill_missing_starters_from_previous_period_end(
+            starters_by_team
+        )
         if not ignore_missing_starters:
             self._check_both_teams_have_5_starters(starters_by_team, file_directory)
 
