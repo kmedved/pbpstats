@@ -304,13 +304,74 @@ class StartOfPeriod(metaclass=abc.ABCMeta):
                         f"GameId: {game_id}, Period: {self.period}, TeamId: {team_id}, Players: {starters}"
                     )
 
+    def _get_period_start_substitutions(self):
+        """
+        Get players substituted in/out at the exact start of this period.
+
+        This is needed to correctly handle period-start lineup swaps when
+        filling missing starters from the previous period's ending lineup.
+
+        Returns:
+            dict: {team_id: {"in": set of player_ids, "out": set of player_ids}}
+        """
+        result = {}
+
+        start_seconds = self.seconds_remaining
+
+        event = self.next_event
+        while event is not None:
+            if getattr(event, "period", None) != self.period:
+                break
+
+            event_seconds = getattr(event, "seconds_remaining", None)
+            if event_seconds is not None and event_seconds < start_seconds:
+                break
+
+            if isinstance(event, Substitution):
+                team_id = getattr(event, "team_id", None)
+                if team_id is not None:
+                    if team_id not in result:
+                        result[team_id] = {"in": set(), "out": set()}
+
+                    sub_type = getattr(event, "sub_type", None)
+                    player_id = getattr(event, "player1_id", None)
+                    if sub_type == "in" and player_id is not None:
+                        result[team_id]["in"].add(player_id)
+                    elif sub_type == "out" and player_id is not None:
+                        result[team_id]["out"].add(player_id)
+                    else:
+                        incoming = getattr(event, "incoming_player_id", None)
+                        outgoing = getattr(event, "outgoing_player_id", None)
+                        if incoming is not None:
+                            result[team_id]["in"].add(incoming)
+                        if outgoing is not None:
+                            result[team_id]["out"].add(outgoing)
+
+            event = event.next_event
+
+        return result
+
     def _fill_missing_starters_from_previous_period_end(self, starters_by_team):
+        """
+        Fill in missing period starters using the previous period's ending lineup.
+
+        This handles the case where a player who started the period wasn't detected
+        because they had no events (e.g., they were immediately subbed out or had
+        no stats recorded).
+
+        The method accounts for period-start substitutions: if a player was subbed
+        OUT at period start, they shouldn't be added as a missing starter (they
+        were replaced). If a player was subbed IN at period start, they shouldn't
+        cause the subset check to fail (they're a valid new addition).
+        """
         prev_lineups = getattr(self, "previous_period_end_lineups", None)
         if not isinstance(prev_lineups, dict):
             return starters_by_team
         prev_period = getattr(self, "previous_period_end_period", None)
         if prev_period != self.period - 1:
             return starters_by_team
+
+        period_start_subs = self._get_period_start_substitutions()
 
         for team_id, prev_players in prev_lineups.items():
             if not isinstance(prev_players, list) or len(prev_players) != 5:
@@ -320,11 +381,22 @@ class StartOfPeriod(metaclass=abc.ABCMeta):
                 continue
             if len(cur) >= 5:
                 continue
+
             cur_set = set(cur)
             prev_set = set(prev_players)
-            if not cur_set.issubset(prev_set):
+            team_subs = period_start_subs.get(team_id, {"in": set(), "out": set()})
+            subbed_in_at_start = team_subs["in"]
+            subbed_out_at_start = team_subs["out"]
+
+            implied_carryover = (cur_set - subbed_in_at_start) | subbed_out_at_start
+
+            if not implied_carryover.issubset(prev_set):
                 continue
-            missing = [player for player in prev_players if player not in cur_set]
+            missing = [
+                player
+                for player in prev_players
+                if player not in cur_set and player not in subbed_out_at_start
+            ]
             need = 5 - len(cur)
             if need <= 0:
                 continue
