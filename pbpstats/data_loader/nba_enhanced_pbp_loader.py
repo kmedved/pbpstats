@@ -114,6 +114,16 @@ class NbaEnhancedPbpLoader(object):
                 if getattr(self.items[j], "period", None) == event.period - 1:
                     previous_period_end_event = self.items[j]
                     break
+
+            # Find the first event of this period (may be before StartOfPeriod marker
+            # due to period-start substitutions appearing first in live data)
+            first_period_event_idx = i
+            for j in range(i - 1, -1, -1):
+                if getattr(self.items[j], "period", None) == event.period:
+                    first_period_event_idx = j
+                else:
+                    break
+            event.first_period_event = self.items[first_period_event_idx]
             if previous_period_end_event is not None:
                 prev_players = getattr(previous_period_end_event, "current_players", None)
                 if isinstance(prev_players, dict):
