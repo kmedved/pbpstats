@@ -311,41 +311,58 @@ class StartOfPeriod(metaclass=abc.ABCMeta):
         This is needed to correctly handle period-start lineup swaps when
         filling missing starters from the previous period's ending lineup.
 
+        Note: In live data, substitution events at period start may appear
+        BEFORE the StartOfPeriod event in the event list. We scan forward
+        from the first event of this period to catch all period-start subs.
+
         Returns:
             dict: {team_id: {"in": set of player_ids, "out": set of player_ids}}
         """
         result = {}
 
-        start_seconds = self.seconds_remaining
+        if self.period <= 4:
+            if self.league == WNBA_STRING:
+                start_seconds = 600.0
+            else:
+                start_seconds = 720.0
+        else:
+            start_seconds = 300.0
 
-        event = self.next_event
+        # Scan from first event of this period (may be before StartOfPeriod marker)
+        first_event = getattr(self, "first_period_event", None)
+        event = first_event if first_event is not None else self.next_event
+
         while event is not None:
             if getattr(event, "period", None) != self.period:
                 break
 
             event_seconds = getattr(event, "seconds_remaining", None)
-            if event_seconds is not None and event_seconds < start_seconds:
+            if event_seconds is None:
+                event = event.next_event
+                continue
+
+            # Stop if we've moved past period start time
+            if event_seconds < start_seconds - 0.001:
                 break
 
+            # Skip events not at exact period start time
+            if abs(event_seconds - start_seconds) > 0.001:
+                event = event.next_event
+                continue
+
+            # Process substitution events at period start
             if isinstance(event, Substitution):
                 team_id = getattr(event, "team_id", None)
                 if team_id is not None:
                     if team_id not in result:
                         result[team_id] = {"in": set(), "out": set()}
 
-                    sub_type = getattr(event, "sub_type", None)
-                    player_id = getattr(event, "player1_id", None)
-                    if sub_type == "in" and player_id is not None:
-                        result[team_id]["in"].add(player_id)
-                    elif sub_type == "out" and player_id is not None:
-                        result[team_id]["out"].add(player_id)
-                    else:
-                        incoming = getattr(event, "incoming_player_id", None)
-                        outgoing = getattr(event, "outgoing_player_id", None)
-                        if incoming is not None:
-                            result[team_id]["in"].add(incoming)
-                        if outgoing is not None:
-                            result[team_id]["out"].add(outgoing)
+                    incoming = getattr(event, "incoming_player_id", None)
+                    outgoing = getattr(event, "outgoing_player_id", None)
+                    if incoming is not None:
+                        result[team_id]["in"].add(incoming)
+                    if outgoing is not None:
+                        result[team_id]["out"].add(outgoing)
 
             event = event.next_event
 
