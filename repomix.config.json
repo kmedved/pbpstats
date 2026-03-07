@@ -1,0 +1,12 @@
+{
+  "output": {
+    "style": "markdown",
+    "removeComments": false
+  },
+  "include": [
+    "pbpstats/**/*.py",
+    "tests/**/*.py",
+    "README.md",
+    "pyproject.toml"
+  ]
+}

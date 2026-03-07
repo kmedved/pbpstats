@@ -1,0 +1,895 @@
+{
+  "arch_version": "1.3.11",
+  "behavior_snapshot": {
+    "archetype": {
+      "primary": "Library / SDK",
+      "secondary": [
+        "Data / Workflow / Pipeline"
+      ],
+      "topology": "single package / single app"
+    },
+    "enhanced_pbp_factory_dispatch": {
+      "data_nba": [
+        {
+          "class": "DataFieldGoal",
+          "key": "1"
+        },
+        {
+          "class": "DataJumpBall",
+          "key": "10"
+        },
+        {
+          "class": "DataEjection",
+          "key": "11"
+        },
+        {
+          "class": "DataStartOfPeriod",
+          "key": "12"
+        },
+        {
+          "class": "DataEndOfPeriod",
+          "key": "13"
+        },
+        {
+          "class": "DataReplay",
+          "key": "18"
+        },
+        {
+          "class": "DataFieldGoal",
+          "key": "2"
+        },
+        {
+          "class": "DataFreeThrow",
+          "key": "3"
+        },
+        {
+          "class": "DataRebound",
+          "key": "4"
+        },
+        {
+          "class": "DataTurnover",
+          "key": "5"
+        },
+        {
+          "class": "DataFoul",
+          "key": "6"
+        },
+        {
+          "class": "DataViolation",
+          "key": "7"
+        },
+        {
+          "class": "DataSubstitution",
+          "key": "8"
+        },
+        {
+          "class": "DataTimeout",
+          "key": "9"
+        }
+      ],
+      "live": [
+        {
+          "class": "LiveFieldGoal",
+          "key": "2pt"
+        },
+        {
+          "class": "LiveFieldGoal",
+          "key": "3pt"
+        },
+        {
+          "class": "LiveEjection",
+          "key": "ejection"
+        },
+        {
+          "class": "LiveFoul",
+          "key": "foul"
+        },
+        {
+          "class": "LiveFreeThrow",
+          "key": "freethrow"
+        },
+        {
+          "class": "LiveGameEnd",
+          "key": "gameend"
+        },
+        {
+          "class": "LiveFieldGoal",
+          "key": "heave"
+        },
+        {
+          "class": "LiveJumpBall",
+          "key": "jumpball"
+        },
+        {
+          "class": "LiveEndOfPeriod",
+          "key": "periodend"
+        },
+        {
+          "class": "LiveStartOfPeriod",
+          "key": "periodstart"
+        },
+        {
+          "class": "LiveRebound",
+          "key": "rebound"
+        },
+        {
+          "class": "LiveReplay",
+          "key": "replay"
+        },
+        {
+          "class": "LiveSubstitution",
+          "key": "substitution"
+        },
+        {
+          "class": "LiveTimeout",
+          "key": "timeout"
+        },
+        {
+          "class": "LiveTurnover",
+          "key": "turnover"
+        },
+        {
+          "class": "LiveViolation",
+          "key": "violation"
+        }
+      ],
+      "stats_nba": [
+        {
+          "class": "StatsFieldGoal",
+          "key": "1"
+        },
+        {
+          "class": "StatsJumpBall",
+          "key": "10"
+        },
+        {
+          "class": "StatsEjection",
+          "key": "11"
+        },
+        {
+          "class": "StatsStartOfPeriod",
+          "key": "12"
+        },
+        {
+          "class": "StatsEndOfPeriod",
+          "key": "13"
+        },
+        {
+          "class": "StatsReplay",
+          "key": "18"
+        },
+        {
+          "class": "StatsFieldGoal",
+          "key": "2"
+        },
+        {
+          "class": "StatsFreeThrow",
+          "key": "3"
+        },
+        {
+          "class": "StatsRebound",
+          "key": "4"
+        },
+        {
+          "class": "StatsTurnover",
+          "key": "5"
+        },
+        {
+          "class": "StatsFoul",
+          "key": "6"
+        },
+        {
+          "class": "StatsViolation",
+          "key": "7"
+        },
+        {
+          "class": "StatsSubstitution",
+          "key": "8"
+        },
+        {
+          "class": "StatsTimeout",
+          "key": "9"
+        }
+      ]
+    },
+    "offline_pipeline": [
+      "_ensure_eventnum_int",
+      "dedupe_with_v3",
+      "patch_start_of_periods",
+      "reorder_with_v3",
+      "create_raw_dicts_from_df",
+      "PbpProcessor",
+      "Possessions"
+    ],
+    "override_files": [
+      "overrides/bad_pbp_possessions.json",
+      "overrides/missing_period_starters.json",
+      "overrides/non_possession_changing_event_overrides.json",
+      "overrides/possession_change_event_overrides.json"
+    ],
+    "parent_object_routes": {
+      "Day": [
+        "Games (stats_nba)"
+      ],
+      "Game": [
+        "Boxscore (data_nba)",
+        "Boxscore (live)",
+        "Boxscore (stats_nba)",
+        "EnhancedPbp (data_nba)",
+        "EnhancedPbp (live)",
+        "EnhancedPbp (stats_nba)",
+        "Pbp (data_nba)",
+        "Pbp (live)",
+        "Pbp (stats_nba)",
+        "Possessions (data_nba)",
+        "Possessions (live)",
+        "Possessions (stats_nba)",
+        "Shots (stats_nba)"
+      ],
+      "Season": [
+        "Games (data_nba)",
+        "Games (live)",
+        "Games (stats_nba)"
+      ]
+    },
+    "resource_provider_routes": {
+      "Boxscore": {
+        "data_nba": [
+          {
+            "file_source": "DataNbaBoxscoreFileLoader",
+            "loader": "DataNbaBoxscoreLoader",
+            "parent_object": "Game",
+            "web_source": "DataNbaBoxscoreWebLoader"
+          }
+        ],
+        "live": [
+          {
+            "file_source": "LiveBoxscoreFileLoader",
+            "loader": "LiveBoxscoreLoader",
+            "parent_object": "Game",
+            "web_source": "LiveBoxscoreWebLoader"
+          }
+        ],
+        "stats_nba": [
+          {
+            "file_source": "StatsNbaBoxscoreFileLoader",
+            "loader": "StatsNbaBoxscoreLoader",
+            "parent_object": "Game",
+            "web_source": "StatsNbaBoxscoreWebLoader"
+          }
+        ]
+      },
+      "EnhancedPbp": {
+        "data_nba": [
+          {
+            "file_source": "DataNbaEnhancedPbpFileLoader",
+            "loader": "DataNbaEnhancedPbpLoader",
+            "parent_object": "Game",
+            "web_source": "DataNbaEnhancedPbpWebLoader"
+          }
+        ],
+        "live": [
+          {
+            "file_source": "LiveEnhancedPbpFileLoader",
+            "loader": "LiveEnhancedPbpLoader",
+            "parent_object": "Game",
+            "web_source": "LiveEnhancedPbpWebLoader"
+          }
+        ],
+        "stats_nba": [
+          {
+            "file_source": "StatsNbaEnhancedPbpFileLoader",
+            "loader": "StatsNbaEnhancedPbpLoader",
+            "parent_object": "Game",
+            "web_source": "StatsNbaEnhancedPbpWebLoader"
+          }
+        ]
+      },
+      "Games": {
+        "data_nba": [
+          {
+            "file_source": "DataNbaScheduleFileLoader",
+            "loader": "DataNbaScheduleLoader",
+            "parent_object": "Season",
+            "web_source": "DataNbaScheduleWebLoader"
+          }
+        ],
+        "live": [
+          {
+            "file_source": "LiveScheduleFileLoader",
+            "loader": "LiveScheduleLoader",
+            "parent_object": "Season",
+            "web_source": "LiveScheduleWebLoader"
+          }
+        ],
+        "stats_nba": [
+          {
+            "file_source": "StatsNbaLeagueGameLogFileLoader",
+            "loader": "StatsNbaLeagueGameLogLoader",
+            "parent_object": "Season",
+            "web_source": "StatsNbaLeagueGameLogWebLoader"
+          },
+          {
+            "file_source": "StatsNbaScoreboardFileLoader",
+            "loader": "StatsNbaScoreboardLoader",
+            "parent_object": "Day",
+            "web_source": "StatsNbaScoreboardWebLoader"
+          }
+        ]
+      },
+      "Pbp": {
+        "data_nba": [
+          {
+            "file_source": "DataNbaPbpFileLoader",
+            "loader": "DataNbaPbpLoader",
+            "parent_object": "Game",
+            "web_source": "DataNbaPbpWebLoader"
+          }
+        ],
+        "live": [
+          {
+            "file_source": "LivePbpFileLoader",
+            "loader": "LivePbpLoader",
+            "parent_object": "Game",
+            "web_source": "LivePbpWebLoader"
+          }
+        ],
+        "stats_nba": [
+          {
+            "file_source": "StatsNbaPbpFileLoader",
+            "loader": "StatsNbaPbpLoader",
+            "parent_object": "Game",
+            "web_source": "StatsNbaPbpWebLoader"
+          }
+        ]
+      },
+      "Possessions": {
+        "data_nba": [
+          {
+            "file_source": "DataNbaPossessionFileLoader",
+            "loader": "DataNbaPossessionLoader",
+            "parent_object": "Game",
+            "web_source": "DataNbaPossessionWebLoader"
+          }
+        ],
+        "live": [
+          {
+            "file_source": "LivePossessionFileLoader",
+            "loader": "LivePossessionLoader",
+            "parent_object": "Game",
+            "web_source": "LivePossessionWebLoader"
+          }
+        ],
+        "stats_nba": [
+          {
+            "file_source": "StatsNbaPossessionFileLoader",
+            "loader": "StatsNbaPossessionLoader",
+            "parent_object": "Game",
+            "web_source": "StatsNbaPossessionWebLoader"
+          }
+        ]
+      },
+      "Shots": {
+        "stats_nba": [
+          {
+            "file_source": "StatsNbaShotsFileLoader",
+            "loader": "StatsNbaShotsLoader",
+            "parent_object": "Game",
+            "web_source": "StatsNbaShotsWebLoader"
+          }
+        ]
+      }
+    },
+    "supported_leagues": [
+      "nba",
+      "wnba",
+      "gleague"
+    ],
+    "supported_season_types": [
+      "Regular Season",
+      "Playoffs",
+      "PlayIn"
+    ],
+    "supported_sources": [
+      "file",
+      "web"
+    ]
+  },
+  "bundle_contract": {
+    "bundles": [
+      {
+        "name": "COMPRESSED_core.md",
+        "purpose": "package constants, client wiring, objects, overrides, and offline orchestration"
+      },
+      {
+        "name": "COMPRESSED_loaders.md",
+        "purpose": "data loader factory, provider-specific file/web loaders, and endpoint routing"
+      },
+      {
+        "name": "COMPRESSED_resources_core.md",
+        "purpose": "resource wrappers, possession containers, boxscore/game/pbp/shots models"
+      },
+      {
+        "name": "COMPRESSED_resources_events.md",
+        "purpose": "enhanced play-by-play event classes, factories, start-of-period logic, and shot clock rules"
+      },
+      {
+        "name": "COMPRESSED_tests.md",
+        "purpose": "fixture-backed behavioral coverage for loaders, possessions, shot clock, and event edge cases"
+      }
+    ],
+    "default_bundle": "COMPRESSED_core.md"
+  },
+  "file_inventory": [
+    ".github/workflows/ci.yaml",
+    ".gitignore",
+    ".repomixignore",
+    "AGENTS.md",
+    "LICENSE",
+    "README.md",
+    "docs/conf.py",
+    "docs/index.rst",
+    "docs/quickstart.rst",
+    "pbpstats/__init__.py",
+    "pbpstats/client.py",
+    "pbpstats/data_loader/__init__.py",
+    "pbpstats/data_loader/abs_data_loader.py",
+    "pbpstats/data_loader/data_nba/__init__.py",
+    "pbpstats/data_loader/data_nba/base.py",
+    "pbpstats/data_loader/data_nba/boxscore/__init__.py",
+    "pbpstats/data_loader/data_nba/boxscore/file.py",
+    "pbpstats/data_loader/data_nba/boxscore/loader.py",
+    "pbpstats/data_loader/data_nba/boxscore/web.py",
+    "pbpstats/data_loader/data_nba/enhanced_pbp/__init__.py",
+    "pbpstats/data_loader/data_nba/enhanced_pbp/file.py",
+    "pbpstats/data_loader/data_nba/enhanced_pbp/loader.py",
+    "pbpstats/data_loader/data_nba/enhanced_pbp/web.py",
+    "pbpstats/data_loader/data_nba/file_loader.py",
+    "pbpstats/data_loader/data_nba/pbp/__init__.py",
+    "pbpstats/data_loader/data_nba/pbp/file.py",
+    "pbpstats/data_loader/data_nba/pbp/loader.py",
+    "pbpstats/data_loader/data_nba/pbp/web.py",
+    "pbpstats/data_loader/data_nba/possessions/__init__.py",
+    "pbpstats/data_loader/data_nba/possessions/file.py",
+    "pbpstats/data_loader/data_nba/possessions/loader.py",
+    "pbpstats/data_loader/data_nba/possessions/web.py",
+    "pbpstats/data_loader/data_nba/schedule/__init__.py",
+    "pbpstats/data_loader/data_nba/schedule/file.py",
+    "pbpstats/data_loader/data_nba/schedule/loader.py",
+    "pbpstats/data_loader/data_nba/schedule/web.py",
+    "pbpstats/data_loader/data_nba/web_loader.py",
+    "pbpstats/data_loader/factory.py",
+    "pbpstats/data_loader/live/__init__.py",
+    "pbpstats/data_loader/live/base.py",
+    "pbpstats/data_loader/live/boxscore/__init__.py",
+    "pbpstats/data_loader/live/boxscore/file.py",
+    "pbpstats/data_loader/live/boxscore/loader.py",
+    "pbpstats/data_loader/live/boxscore/web.py",
+    "pbpstats/data_loader/live/enhanced_pbp/__init__.py",
+    "pbpstats/data_loader/live/enhanced_pbp/file.py",
+    "pbpstats/data_loader/live/enhanced_pbp/loader.py",
+    "pbpstats/data_loader/live/enhanced_pbp/web.py",
+    "pbpstats/data_loader/live/file_loader.py",
+    "pbpstats/data_loader/live/pbp/__init__.py",
+    "pbpstats/data_loader/live/pbp/file.py",
+    "pbpstats/data_loader/live/pbp/loader.py",
+    "pbpstats/data_loader/live/pbp/web.py",
+    "pbpstats/data_loader/live/possessions/__init__.py",
+    "pbpstats/data_loader/live/possessions/file.py",
+    "pbpstats/data_loader/live/possessions/loader.py",
+    "pbpstats/data_loader/live/possessions/web.py",
+    "pbpstats/data_loader/live/schedule/__init__.py",
+    "pbpstats/data_loader/live/schedule/file.py",
+    "pbpstats/data_loader/live/schedule/loader.py",
+    "pbpstats/data_loader/live/schedule/web.py",
+    "pbpstats/data_loader/live/web_loader.py",
+    "pbpstats/data_loader/nba_enhanced_pbp_loader.py",
+    "pbpstats/data_loader/nba_possession_loader.py",
+    "pbpstats/data_loader/stats_nba/__init__.py",
+    "pbpstats/data_loader/stats_nba/base.py",
+    "pbpstats/data_loader/stats_nba/boxscore/__init__.py",
+    "pbpstats/data_loader/stats_nba/boxscore/file.py",
+    "pbpstats/data_loader/stats_nba/boxscore/loader.py",
+    "pbpstats/data_loader/stats_nba/boxscore/web.py",
+    "pbpstats/data_loader/stats_nba/enhanced_pbp/__init__.py",
+    "pbpstats/data_loader/stats_nba/enhanced_pbp/file.py",
+    "pbpstats/data_loader/stats_nba/enhanced_pbp/loader.py",
+    "pbpstats/data_loader/stats_nba/enhanced_pbp/web.py",
+    "pbpstats/data_loader/stats_nba/file_loader.py",
+    "pbpstats/data_loader/stats_nba/json_loader.py",
+    "pbpstats/data_loader/stats_nba/league_game_log/__init__.py",
+    "pbpstats/data_loader/stats_nba/league_game_log/file.py",
+    "pbpstats/data_loader/stats_nba/league_game_log/loader.py",
+    "pbpstats/data_loader/stats_nba/league_game_log/web.py",
+    "pbpstats/data_loader/stats_nba/pbp/__init__.py",
+    "pbpstats/data_loader/stats_nba/pbp/file.py",
+    "pbpstats/data_loader/stats_nba/pbp/loader.py",
+    "pbpstats/data_loader/stats_nba/pbp/web.py",
+    "pbpstats/data_loader/stats_nba/possessions/__init__.py",
+    "pbpstats/data_loader/stats_nba/possessions/file.py",
+    "pbpstats/data_loader/stats_nba/possessions/loader.py",
+    "pbpstats/data_loader/stats_nba/possessions/web.py",
+    "pbpstats/data_loader/stats_nba/scoreboard/__init__.py",
+    "pbpstats/data_loader/stats_nba/scoreboard/file.py",
+    "pbpstats/data_loader/stats_nba/scoreboard/loader.py",
+    "pbpstats/data_loader/stats_nba/scoreboard/web.py",
+    "pbpstats/data_loader/stats_nba/shots/__init__.py",
+    "pbpstats/data_loader/stats_nba/shots/file.py",
+    "pbpstats/data_loader/stats_nba/shots/loader.py",
+    "pbpstats/data_loader/stats_nba/shots/local.py",
+    "pbpstats/data_loader/stats_nba/shots/web.py",
+    "pbpstats/data_loader/stats_nba/summary/__init__.py",
+    "pbpstats/data_loader/stats_nba/summary/file.py",
+    "pbpstats/data_loader/stats_nba/summary/loader.py",
+    "pbpstats/data_loader/stats_nba/summary/web.py",
+    "pbpstats/data_loader/stats_nba/web_loader.py",
+    "pbpstats/objects/__init__.py",
+    "pbpstats/objects/day.py",
+    "pbpstats/objects/game.py",
+    "pbpstats/objects/season.py",
+    "pbpstats/offline/__init__.py",
+    "pbpstats/offline/ordering.py",
+    "pbpstats/offline/processor.py",
+    "pbpstats/overrides.py",
+    "pbpstats/resources/__init__.py",
+    "pbpstats/resources/base.py",
+    "pbpstats/resources/boxscore/__init__.py",
+    "pbpstats/resources/boxscore/boxscore.py",
+    "pbpstats/resources/boxscore/data_nba_boxscore_item.py",
+    "pbpstats/resources/boxscore/live_boxscore_item.py",
+    "pbpstats/resources/boxscore/stats_nba_boxscore_item.py",
+    "pbpstats/resources/enhanced_pbp/__init__.py",
+    "pbpstats/resources/enhanced_pbp/data_nba/__init__.py",
+    "pbpstats/resources/enhanced_pbp/data_nba/ejection.py",
+    "pbpstats/resources/enhanced_pbp/data_nba/end_of_period.py",
+    "pbpstats/resources/enhanced_pbp/data_nba/enhanced_pbp_factory.py",
+    "pbpstats/resources/enhanced_pbp/data_nba/enhanced_pbp_item.py",
+    "pbpstats/resources/enhanced_pbp/data_nba/field_goal.py",
+    "pbpstats/resources/enhanced_pbp/data_nba/foul.py",
+    "pbpstats/resources/enhanced_pbp/data_nba/free_throw.py",
+    "pbpstats/resources/enhanced_pbp/data_nba/jump_ball.py",
+    "pbpstats/resources/enhanced_pbp/data_nba/rebound.py",
+    "pbpstats/resources/enhanced_pbp/data_nba/replay.py",
+    "pbpstats/resources/enhanced_pbp/data_nba/start_of_period.py",
+    "pbpstats/resources/enhanced_pbp/data_nba/substitution.py",
+    "pbpstats/resources/enhanced_pbp/data_nba/timeout.py",
+    "pbpstats/resources/enhanced_pbp/data_nba/turnover.py",
+    "pbpstats/resources/enhanced_pbp/data_nba/violation.py",
+    "pbpstats/resources/enhanced_pbp/ejection.py",
+    "pbpstats/resources/enhanced_pbp/end_of_period.py",
+    "pbpstats/resources/enhanced_pbp/enhanced_pbp.py",
+    "pbpstats/resources/enhanced_pbp/enhanced_pbp_item.py",
+    "pbpstats/resources/enhanced_pbp/field_goal.py",
+    "pbpstats/resources/enhanced_pbp/foul.py",
+    "pbpstats/resources/enhanced_pbp/free_throw.py",
+    "pbpstats/resources/enhanced_pbp/jump_ball.py",
+    "pbpstats/resources/enhanced_pbp/live/__init__.py",
+    "pbpstats/resources/enhanced_pbp/live/ejection.py",
+    "pbpstats/resources/enhanced_pbp/live/end_of_period.py",
+    "pbpstats/resources/enhanced_pbp/live/enhanced_pbp_factory.py",
+    "pbpstats/resources/enhanced_pbp/live/enhanced_pbp_item.py",
+    "pbpstats/resources/enhanced_pbp/live/field_goal.py",
+    "pbpstats/resources/enhanced_pbp/live/foul.py",
+    "pbpstats/resources/enhanced_pbp/live/free_throw.py",
+    "pbpstats/resources/enhanced_pbp/live/game_end.py",
+    "pbpstats/resources/enhanced_pbp/live/jump_ball.py",
+    "pbpstats/resources/enhanced_pbp/live/rebound.py",
+    "pbpstats/resources/enhanced_pbp/live/replay.py",
+    "pbpstats/resources/enhanced_pbp/live/start_of_period.py",
+    "pbpstats/resources/enhanced_pbp/live/substitution.py",
+    "pbpstats/resources/enhanced_pbp/live/timeout.py",
+    "pbpstats/resources/enhanced_pbp/live/turnover.py",
+    "pbpstats/resources/enhanced_pbp/live/violation.py",
+    "pbpstats/resources/enhanced_pbp/rebound.py",
+    "pbpstats/resources/enhanced_pbp/replay.py",
+    "pbpstats/resources/enhanced_pbp/shot_clock.py",
+    "pbpstats/resources/enhanced_pbp/start_of_period.py",
+    "pbpstats/resources/enhanced_pbp/stats_nba/__init__.py",
+    "pbpstats/resources/enhanced_pbp/stats_nba/ejection.py",
+    "pbpstats/resources/enhanced_pbp/stats_nba/end_of_period.py",
+    "pbpstats/resources/enhanced_pbp/stats_nba/enhanced_pbp_factory.py",
+    "pbpstats/resources/enhanced_pbp/stats_nba/enhanced_pbp_item.py",
+    "pbpstats/resources/enhanced_pbp/stats_nba/field_goal.py",
+    "pbpstats/resources/enhanced_pbp/stats_nba/foul.py",
+    "pbpstats/resources/enhanced_pbp/stats_nba/free_throw.py",
+    "pbpstats/resources/enhanced_pbp/stats_nba/jump_ball.py",
+    "pbpstats/resources/enhanced_pbp/stats_nba/rebound.py",
+    "pbpstats/resources/enhanced_pbp/stats_nba/replay.py",
+    "pbpstats/resources/enhanced_pbp/stats_nba/start_of_period.py",
+    "pbpstats/resources/enhanced_pbp/stats_nba/substitution.py",
+    "pbpstats/resources/enhanced_pbp/stats_nba/timeout.py",
+    "pbpstats/resources/enhanced_pbp/stats_nba/turnover.py",
+    "pbpstats/resources/enhanced_pbp/stats_nba/violation.py",
+    "pbpstats/resources/enhanced_pbp/substitution.py",
+    "pbpstats/resources/enhanced_pbp/timeout.py",
+    "pbpstats/resources/enhanced_pbp/turnover.py",
+    "pbpstats/resources/enhanced_pbp/violation.py",
+    "pbpstats/resources/games/__init__.py",
+    "pbpstats/resources/games/data_nba_game_item.py",
+    "pbpstats/resources/games/games.py",
+    "pbpstats/resources/games/live_game_item.py",
+    "pbpstats/resources/games/stats_nba_game_item.py",
+    "pbpstats/resources/pbp/__init__.py",
+    "pbpstats/resources/pbp/data_nba_pbp_item.py",
+    "pbpstats/resources/pbp/live_pbp_item.py",
+    "pbpstats/resources/pbp/pbp.py",
+    "pbpstats/resources/pbp/stats_nba_pbp_item.py",
+    "pbpstats/resources/possessions/__init__.py",
+    "pbpstats/resources/possessions/possession.py",
+    "pbpstats/resources/possessions/possessions.py",
+    "pbpstats/resources/shots/__init__.py",
+    "pbpstats/resources/shots/shots.py",
+    "pbpstats/resources/shots/stats_nba_shot.py",
+    "pyproject.toml",
+    "repomix.config.json",
+    "scripts/__init__.py",
+    "scripts/build_context_bundle.py",
+    "scripts/context_framework.py",
+    "scripts/generate_repo_architecture_sync.py",
+    "tests/conftest.py",
+    "tests/data_loaders/test_data_boxscore_loader.py",
+    "tests/data_loaders/test_data_enhanced_pbp_loader.py",
+    "tests/data_loaders/test_data_pbp_loader.py",
+    "tests/data_loaders/test_data_possessions_loader.py",
+    "tests/data_loaders/test_data_schedule_loader.py",
+    "tests/data_loaders/test_live_boxscore_loader.py",
+    "tests/data_loaders/test_live_possessions_loader.py",
+    "tests/data_loaders/test_live_schedule_loader.py",
+    "tests/data_loaders/test_stats_boxscore_loader.py",
+    "tests/data_loaders/test_stats_enhanced_pbp_loader.py",
+    "tests/data_loaders/test_stats_league_game_log_loader.py",
+    "tests/data_loaders/test_stats_pbp_loader.py",
+    "tests/data_loaders/test_stats_possessions_loader.py",
+    "tests/data_loaders/test_stats_scoreboard_loader.py",
+    "tests/data_loaders/test_stats_shots_loader.py",
+    "tests/data_loaders/test_stats_summary_loader.py",
+    "tests/objects/test_day.py",
+    "tests/objects/test_game.py",
+    "tests/objects/test_season.py",
+    "tests/resources/test_boxscore.py",
+    "tests/resources/test_field_goal.py",
+    "tests/resources/test_free_throw.py",
+    "tests/resources/test_full_game_possessions.py",
+    "tests/resources/test_jump_ball.py",
+    "tests/resources/test_live_game_end.py",
+    "tests/resources/test_possession_offense_team_id.py",
+    "tests/resources/test_shot_clock_annotation.py",
+    "tests/test_client.py",
+    "tests/test_context_framework.py",
+    "tests/test_period_starters_carryover.py",
+    "tests/test_shot_clock.py",
+    "tests/test_team_on_court_stats.py",
+    "tox.ini"
+  ],
+  "module_dependencies": {
+    "client": [
+      "data_loader.core",
+      "objects",
+      "resources.core"
+    ],
+    "data_loader.core": [
+      "data_loader.data_nba",
+      "data_loader.live",
+      "data_loader.stats_nba",
+      "package.constants",
+      "resources.enhanced_pbp"
+    ],
+    "data_loader.data_nba": [
+      "data_loader.core",
+      "package.constants",
+      "resources.core",
+      "resources.enhanced_pbp"
+    ],
+    "data_loader.live": [
+      "data_loader.core",
+      "package.constants",
+      "resources.core",
+      "resources.enhanced_pbp"
+    ],
+    "data_loader.stats_nba": [
+      "data_loader.core",
+      "data_loader.data_nba",
+      "package.constants",
+      "resources.core",
+      "resources.enhanced_pbp"
+    ],
+    "objects": [
+      "client"
+    ],
+    "offline": [
+      "data_loader.core",
+      "resources.core",
+      "resources.enhanced_pbp"
+    ],
+    "resources.core": [
+      "package.constants",
+      "resources.enhanced_pbp"
+    ],
+    "resources.enhanced_pbp": [
+      "data_loader.stats_nba",
+      "package.constants",
+      "resources.core"
+    ]
+  },
+  "public_contracts": {
+    "client": {
+      "Client": {
+        "settings_shape": {
+          "Boxscore": {
+            "data_providers": [
+              "data_nba",
+              "live",
+              "stats_nba"
+            ],
+            "required_keys": [
+              "source",
+              "data_provider"
+            ],
+            "sources": [
+              "file",
+              "web"
+            ]
+          },
+          "EnhancedPbp": {
+            "data_providers": [
+              "data_nba",
+              "live",
+              "stats_nba"
+            ],
+            "required_keys": [
+              "source",
+              "data_provider"
+            ],
+            "sources": [
+              "file",
+              "web"
+            ]
+          },
+          "Games": {
+            "data_providers": [
+              "data_nba",
+              "live",
+              "stats_nba"
+            ],
+            "required_keys": [
+              "source",
+              "data_provider"
+            ],
+            "sources": [
+              "file",
+              "web"
+            ]
+          },
+          "Pbp": {
+            "data_providers": [
+              "data_nba",
+              "live",
+              "stats_nba"
+            ],
+            "required_keys": [
+              "source",
+              "data_provider"
+            ],
+            "sources": [
+              "file",
+              "web"
+            ]
+          },
+          "Possessions": {
+            "data_providers": [
+              "data_nba",
+              "live",
+              "stats_nba"
+            ],
+            "required_keys": [
+              "source",
+              "data_provider"
+            ],
+            "sources": [
+              "file",
+              "web"
+            ]
+          },
+          "Shots": {
+            "data_providers": [
+              "stats_nba"
+            ],
+            "required_keys": [
+              "source",
+              "data_provider"
+            ],
+            "sources": [
+              "file",
+              "web"
+            ]
+          }
+        },
+        "signature": "(self, settings)"
+      }
+    },
+    "objects": {
+      "Day": {
+        "signature": "(self, date, league)"
+      },
+      "Game": {
+        "signature": "(self, game_id)"
+      },
+      "Season": {
+        "signature": "(self, league, season, season_type)"
+      }
+    },
+    "offline": {
+      "PbpProcessor": {
+        "properties": [],
+        "signature": "(self, game_id, raw_data_dicts, rebound_deletions_list=...)"
+      },
+      "get_possessions_from_df": {
+        "signature": "(game_df, fetch_pbp_v3_fn=..., rebound_deletions_list=...)"
+      },
+      "set_rebound_strict_mode": {
+        "signature": "(strict=...)"
+      }
+    },
+    "resources": {
+      "Boxscore": {
+        "properties": [
+          "data",
+          "player_items",
+          "player_name_map",
+          "player_team_map",
+          "team_items"
+        ],
+        "signature": "(self, items)"
+      },
+      "EnhancedPbp": {
+        "properties": [
+          "data",
+          "fgas",
+          "fgms",
+          "ftas",
+          "rebounds",
+          "turnovers"
+        ],
+        "signature": "(self, items)"
+      },
+      "Games": {
+        "properties": [
+          "data",
+          "final_games"
+        ],
+        "signature": "(self, items)"
+      },
+      "Pbp": {
+        "properties": [
+          "data"
+        ],
+        "signature": "(self, items)"
+      },
+      "Possessions": {
+        "properties": [
+          "data",
+          "lineup_opponent_stats",
+          "lineup_stats",
+          "opponent_stats",
+          "player_stats",
+          "team_stats"
+        ],
+        "signature": "(self, items)"
+      },
+      "Shots": {
+        "properties": [
+          "data"
+        ],
+        "signature": "(self, items)"
+      }
+    }
+  },
+  "repo_archetype": {
+    "primary": "Library / SDK",
+    "secondary": [
+      "Data / Workflow / Pipeline"
+    ],
+    "topology": "single package / single app",
+    "version_policy": "Policy B: only shipped/runtime behavior changes bump version."
+  }
+}
