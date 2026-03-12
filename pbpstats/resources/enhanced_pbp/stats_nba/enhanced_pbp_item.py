@@ -2,16 +2,11 @@
 ``StatsEnhancedPbpItem`` is the base class for all stats.nba.com enhanced pbp event types
 """
 from collections import defaultdict
+import logging
 
 import requests
 
-from pbpstats import (
-    G_LEAGUE_GAME_ID_PREFIX,
-    HEADERS,
-    NBA_GAME_ID_PREFIX,
-    REQUEST_TIMEOUT,
-    WNBA_GAME_ID_PREFIX,
-)
+from pbpstats import HEADERS, REQUEST_TIMEOUT
 from pbpstats.resources.enhanced_pbp import (
     FieldGoal,
     Foul,
@@ -23,6 +18,8 @@ from pbpstats.resources.enhanced_pbp import (
     Violation,
 )
 from pbpstats.resources.enhanced_pbp.enhanced_pbp_item import EnhancedPbpItem
+
+logger = logging.getLogger(__name__)
 
 KEY_ATTR_MAPPER = {
     "GAME_ID": "game_id",
@@ -37,15 +34,6 @@ KEY_ATTR_MAPPER = {
     "PLAYER3_ID": "player3_id",
     "VIDEO_AVAILABLE_FLAG": "video_available",
 }
-
-DEFAULT_REGULATION_PERIOD_SECONDS = 12 * 60
-OVERTIME_PERIOD_SECONDS = 5 * 60
-REGULATION_PERIOD_SECONDS_BY_PREFIX = {
-    NBA_GAME_ID_PREFIX: 12 * 60,
-    G_LEAGUE_GAME_ID_PREFIX: 12 * 60,
-    WNBA_GAME_ID_PREFIX: 10 * 60,
-}
-PUTBACK_TIME_WINDOW_SECONDS = 3
 
 
 class StatsEnhancedPbpItem(EnhancedPbpItem):
@@ -116,7 +104,6 @@ class StatsEnhancedPbpItem(EnhancedPbpItem):
         self.possession_changing_override = False
         self.non_possession_changing_override = False
         self.score = defaultdict(int)
-        self._set_possession_index(event.get("possession"))
 
     @property
     def data(self):
@@ -132,88 +119,6 @@ class StatsEnhancedPbpItem(EnhancedPbpItem):
         """
         split = self.clock.split(":")
         return float(split[0]) * 60 + float(split[1])
-
-    def _regulation_period_seconds(self):
-        """returns regulation period length in seconds based on league"""
-        game_id_prefix = str(getattr(self, "game_id", ""))[:2]
-        return REGULATION_PERIOD_SECONDS_BY_PREFIX.get(
-            game_id_prefix, DEFAULT_REGULATION_PERIOD_SECONDS
-        )
-
-    def _current_period_length_seconds(self):
-        """returns current period length in seconds"""
-        if self.period <= 4:
-            return self._regulation_period_seconds()
-        return OVERTIME_PERIOD_SECONDS
-
-    @property
-    def game_seconds_elapsed(self):
-        """returns total seconds elapsed from start of game as a ``float``"""
-        completed_periods = max(self.period - 1, 0)
-        regulation_seconds = self._regulation_period_seconds()
-        if completed_periods <= 4:
-            seconds_before_current = completed_periods * regulation_seconds
-        else:
-            overtime_periods = completed_periods - 4
-            seconds_before_current = 4 * regulation_seconds + (
-                overtime_periods * OVERTIME_PERIOD_SECONDS
-            )
-        elapsed_in_period = self._current_period_length_seconds() - self.seconds_remaining
-        if elapsed_in_period < 0:
-            elapsed_in_period = 0
-        return seconds_before_current + elapsed_in_period
-
-    @property
-    def event_length_seconds(self):
-        """returns seconds until the next logged event (0 if none)"""
-        next_event = getattr(self, "next_event", None)
-        if next_event is None:
-            return 0
-        length = next_event.game_seconds_elapsed - self.game_seconds_elapsed
-        return length if length >= 0 else 0
-
-    @property
-    def is_three(self):
-        """returns True if event is a made or missed 3 point attempt"""
-        return isinstance(self, FieldGoal) and self.shot_value == 3
-
-    @property
-    def is_block(self):
-        """returns True if field goal attempt was blocked"""
-        return isinstance(self, FieldGoal) and self.is_blocked
-
-    @property
-    def is_steal(self):
-        """returns True if turnover includes a credited steal"""
-        return isinstance(self, Turnover) and Turnover.is_steal.fget(self)
-
-    def _rebound_is_putback(self):
-        if not isinstance(self, Rebound):
-            return False
-        if not (self.is_real_rebound and self.oreb):
-            return False
-        next_event = self.next_event
-        while next_event is not None and next_event.period == self.period:
-            time_diff = next_event.game_seconds_elapsed - self.game_seconds_elapsed
-            if time_diff > PUTBACK_TIME_WINDOW_SECONDS:
-                return False
-            if isinstance(next_event, FieldGoal):
-                return next_event.team_id == self.team_id and time_diff <= PUTBACK_TIME_WINDOW_SECONDS
-            if isinstance(next_event, Rebound) and next_event.is_real_rebound:
-                return False
-            if isinstance(next_event, Turnover) and not next_event.is_no_turnover:
-                return False
-            if isinstance(next_event, StartOfPeriod):
-                return False
-            next_event = next_event.next_event
-        return False
-
-    @property
-    def is_putback(self):
-        """returns True if event is part of an offensive rebound putback sequence"""
-        if isinstance(self, FieldGoal):
-            return FieldGoal.is_putback.fget(self)
-        return self._rebound_is_putback()
 
     @property
     def video_url(self):
@@ -239,64 +144,119 @@ class StatsEnhancedPbpItem(EnhancedPbpItem):
         """
         returns team id for team on offense for event
         """
-        hint = self.possession_team_id
-        if hint:
-            return hint
-        if isinstance(self, Foul) and (self.is_charge or self.is_offensive_foul):
-            # offensive foul returns team id
-            # this isn't separate method in Foul class because some fouls can be committed
-            # on offense or defense (loose ball, flagrant, technical)
-            return self.team_id
-        event_to_check = self.previous_event
-        team_ids = list(self.current_players.keys())
-        while event_to_check is not None and not (
-            isinstance(event_to_check, (FieldGoal, JumpBall))
-            or (
-                isinstance(event_to_check, Turnover)
-                and not event_to_check.is_no_turnover
-            )
-            or (isinstance(event_to_check, Rebound) and event_to_check.is_real_rebound)
-            or (
-                isinstance(event_to_check, FreeThrow)
-                and not event_to_check.is_technical_ft
-            )
-        ):
-            event_to_check = event_to_check.previous_event
-        if event_to_check is None and self.next_event is not None:
-            # should only get here on first possession of period when first event is non-offensive foul,
-            # FieldGoal, FreeThrow, Rebound, Turnover, JumpBall
-            return self.next_event.get_offense_team_id()
-        if isinstance(event_to_check, Turnover) and not event_to_check.is_no_turnover:
-            return (
-                team_ids[0]
-                if team_ids[1] == event_to_check.get_offense_team_id()
-                else team_ids[1]
-            )
-        if isinstance(event_to_check, Rebound) and event_to_check.is_real_rebound:
-            if not event_to_check.oreb:
+        from pbpstats.resources.enhanced_pbp import (
+            FieldGoal,
+            FreeThrow,
+            Rebound,
+            Turnover,
+            Foul,
+            Violation,
+        )
+
+        try:
+            if isinstance(self, Foul) and (self.is_charge or self.is_offensive_foul):
+                # offensive foul returns team id
+                # this isn't separate method in Foul class because some fouls can be committed
+                # on offense or defense (loose ball, flagrant, technical)
+                return self.team_id
+            event_to_check = self.previous_event
+            team_ids = list(self.current_players.keys())
+
+            # guard against missing lineup context
+            if len(team_ids) < 2:
+                raise AttributeError(
+                    "Not enough teams in current_players to infer offense_team_id"
+                )
+            while event_to_check is not None and not (
+                isinstance(event_to_check, (FieldGoal, JumpBall))
+                or (
+                    isinstance(event_to_check, Turnover)
+                    and not event_to_check.is_no_turnover
+                )
+                or (
+                    isinstance(event_to_check, Rebound)
+                    and event_to_check.is_real_rebound
+                )
+                or (
+                    isinstance(event_to_check, FreeThrow)
+                    and not event_to_check.is_technical_ft
+                )
+            ):
+                event_to_check = event_to_check.previous_event
+            if event_to_check is None and self.next_event is not None:
+                # should only get here on first possession of period when first event is non-offensive foul,
+                # FieldGoal, FreeThrow, Rebound, Turnover, JumpBall
+                return self.next_event.get_offense_team_id()
+            if isinstance(event_to_check, Turnover) and not event_to_check.is_no_turnover:
                 return (
                     team_ids[0]
                     if team_ids[1] == event_to_check.get_offense_team_id()
                     else team_ids[1]
                 )
-            return event_to_check.get_offense_team_id()
-        if isinstance(event_to_check, (FieldGoal, FreeThrow)):
-            if event_to_check.is_possession_ending_event:
-                return (
-                    team_ids[0]
-                    if team_ids[1] == event_to_check.get_offense_team_id()
-                    else team_ids[1]
-                )
-            return event_to_check.get_offense_team_id()
-        if isinstance(event_to_check, JumpBall):
-            if event_to_check.count_as_possession:
-                team_ids = list(self.current_players.keys())
-                return (
-                    team_ids[0]
-                    if team_ids[1] == event_to_check.get_offense_team_id()
-                    else team_ids[1]
-                )
-            return event_to_check.get_offense_team_id()
+            if isinstance(event_to_check, Rebound) and event_to_check.is_real_rebound:
+                if not event_to_check.oreb:
+                    return (
+                        team_ids[0]
+                        if team_ids[1] == event_to_check.get_offense_team_id()
+                        else team_ids[1]
+                    )
+                return event_to_check.get_offense_team_id()
+            if isinstance(event_to_check, (FieldGoal, FreeThrow)):
+                if event_to_check.is_possession_ending_event:
+                    return (
+                        team_ids[0]
+                        if team_ids[1] == event_to_check.get_offense_team_id()
+                        else team_ids[1]
+                    )
+                return event_to_check.get_offense_team_id()
+            if isinstance(event_to_check, JumpBall):
+                if event_to_check.count_as_possession:
+                    team_ids = list(self.current_players.keys())
+                    if len(team_ids) < 2:
+                        raise AttributeError(
+                            "Not enough teams in current_players for JumpBall offense inference"
+                        )
+                    return (
+                        team_ids[0]
+                        if team_ids[1] == event_to_check.get_offense_team_id()
+                        else team_ids[1]
+                    )
+                return event_to_check.get_offense_team_id()
+        except (AttributeError, IndexError, KeyError) as e:
+            # Fallback logic for broken pbp / lineup chains
+            logger.debug(
+                "Falling back get_offense_team_id for %r (game_id=%s) due to: %s",
+                self,
+                getattr(self, "game_id", "unknown"),
+                e,
+            )
+
+            # 1) For shots / FTs / turnovers: offense is usually event.team_id
+            if isinstance(self, (FieldGoal, FreeThrow, Turnover)) and getattr(
+                self, "team_id", None
+            ):
+                return self.team_id
+
+            # 2) For rebounds: use the team that took the shot if available
+            if isinstance(self, Rebound):
+                try:
+                    missed = self.missed_shot
+                    if getattr(missed, "team_id", None):
+                        return missed.team_id
+                except Exception:
+                    pass
+
+            # 3) For fouls / violations: use foul/violation team if present
+            if isinstance(self, (Foul, Violation)) and getattr(self, "team_id", None):
+                return self.team_id
+
+            # 4) As a last resort, try the previous event's team_id
+            prev = getattr(self, "previous_event", None)
+            if prev is not None and getattr(prev, "team_id", None):
+                return prev.team_id
+
+            # 5) Absolute fallback: this event's team_id or 0
+            return getattr(self, "team_id", 0)
 
     @property
     def is_possession_ending_event(self):

@@ -10,6 +10,7 @@ from pbpstats.resources.enhanced_pbp import (
     FreeThrow,
     JumpBall,
     Rebound,
+    StartOfPeriod,
     Substitution,
     Timeout,
     Turnover,
@@ -106,11 +107,52 @@ class Possession(object):
             next_poss = next_poss.next_possession
         return team_ids
 
+    def _get_head_event_for_offense(self):
+        """
+        Returns the event that should define offense_team_id for this possession.
+
+        For live data, period-opening "startperiod" substitutions can carry over
+        the previous period's possession value, so we skip those and prefer:
+          1) an explicit StartOfPeriod event, or
+          2) the first non-"startperiod" substitution event.
+        Falls back to the first event if nothing else is found.
+        """
+        # 1) Prefer an explicit StartOfPeriod marker if present.
+        for event in self.events:
+            if isinstance(event, StartOfPeriod):
+                return event
+
+        # 2) Otherwise, skip "startperiod" substitutions when choosing the head.
+        for event in self.events:
+            if isinstance(event, Substitution):
+                qualifiers = getattr(event, "qualifiers", None)
+                # Live feed uses qualifiers=["startperiod"] on lineup bookkeeping subs.
+                if qualifiers and "startperiod" in qualifiers:
+                    continue
+            return event
+
+        # 3) Fallback: use the first event in the possession.
+        return self.events[0]
+
     @property
     def offense_team_id(self):
         """
         returns team id for team on offense on possession
+
+        For live data at period starts, the raw feed often has a series of
+        "startperiod" substitution events whose `possession` value still reflects
+        the *previous* period. The actual `StartOfPeriod` event and first real
+        play carry the correct `possession` / offense team.
+
+        To avoid mis-labeling the first possession of a period:
+          1. If this possession includes a StartOfPeriod event, use its
+             `get_offense_team_id()` (for live, this is backed by the raw
+             `possession` field).
+          2. Otherwise, skip "startperiod" substitutions when choosing the
+             anchor event, and use the first non-startperiod event.
+          3. Fall back to the original behavior for all other cases.
         """
+        # Special-case single jump ball possessions (existing logic)
         if len(self.events) == 1 and isinstance(self.events[0], JumpBall):
             # if possession only has one event and it is a jump ball, need to check
             # how previous possession ended to see which team actually started with the ball
@@ -141,7 +183,8 @@ class Possession(object):
                         else team_ids[1]
                     )
                 return prev_event.get_offense_team_id()
-        return self.events[0].get_offense_team_id()
+        head_event = self._get_head_event_for_offense()
+        return head_event.get_offense_team_id()
 
     @property
     def possession_has_timeout(self):

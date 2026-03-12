@@ -55,6 +55,10 @@ from pbpstats.data_loader.stats_nba.scoreboard.file import StatsNbaScoreboardFil
 from pbpstats.data_loader.stats_nba.scoreboard.loader import StatsNbaScoreboardLoader
 from pbpstats.data_loader.stats_nba.scoreboard.web import StatsNbaScoreboardWebLoader
 from pbpstats.data_loader.stats_nba.shots.file import StatsNbaShotsFileLoader
+from pbpstats.data_loader.stats_nba.shots.local import (
+    LocalShotsJsonLoader,
+    LocalShotsJsonLoaderStub,
+)
 from pbpstats.data_loader.stats_nba.shots.loader import StatsNbaShotsLoader
 from pbpstats.data_loader.stats_nba.shots.web import StatsNbaShotsWebLoader
 
@@ -107,6 +111,8 @@ __all__ = [
     "StatsNbaScoreboardFileLoader",
     "StatsNbaScoreboardLoader",
     "StatsNbaScoreboardWebLoader",
+    "LocalShotsJsonLoader",
+    "LocalShotsJsonLoaderStub",
     "StatsNbaShotsFileLoader",
     "StatsNbaShotsLoader",
     "StatsNbaShotsWebLoader",

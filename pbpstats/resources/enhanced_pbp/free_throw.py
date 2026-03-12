@@ -1,7 +1,10 @@
 import abc
+import logging
 
 import pbpstats
 from pbpstats.resources.enhanced_pbp import Foul
+
+logger = logging.getLogger(__name__)
 
 
 class FreeThrow(metaclass=abc.ABCMeta):
@@ -277,6 +280,15 @@ class FreeThrow(metaclass=abc.ABCMeta):
             else:
                 return "1 Shot Away From Play"
         foul_event = self.foul_that_led_to_ft
+        if foul_event is None:
+            # degrade gracefully for broken pbp
+            logger.debug(
+                "free_throw_type: foul_that_led_to_ft is None for %r (game_id=%s); "
+                "returning 'Penalty'.",
+                self,
+                getattr(self, "game_id", "unknown"),
+            )
+            return "Penalty"
         if foul_event.is_shooting_foul or foul_event.is_shooting_block_foul:
             return f"{num_fts}pt Shooting Foul"
         elif foul_event.is_flagrant:
@@ -345,9 +357,14 @@ class FreeThrow(metaclass=abc.ABCMeta):
                 players,
             ) in self.event_for_efficiency_stats.current_players.items():
                 multiplier = 1 if team_id == self.team_id else -1
+                opponent_team_candidates = [tid for tid in team_ids if tid != team_id]
                 opponent_team_id = (
-                    team_ids[0] if team_id == team_ids[1] else team_ids[1]
+                    opponent_team_candidates[0] if opponent_team_candidates else None
                 )
+                if opponent_team_id is None or opponent_team_id not in lineup_ids:
+                    continue
+                if team_id not in lineup_ids:
+                    continue
                 for player_id in players:
                     stat_item = {
                         "player_id": player_id,
@@ -379,12 +396,71 @@ class FreeThrow(metaclass=abc.ABCMeta):
                 is_second_chance_event, is_penalty_event
             )
 
-        opponent_team_id = team_ids[0] if self.team_id == team_ids[1] else team_ids[1]
+        # DARKO: on-court opponent FT splits from defenders' POV
+        team_ids = list(self.current_players.keys())
+        opponent_team_candidates = [tid for tid in team_ids if tid != self.team_id]
+        opponent_team_id = opponent_team_candidates[0] if opponent_team_candidates else None
+
+        # Calculate On-Court TEAM stats (For the offense)
+        if self.team_id in self.event_for_efficiency_stats.current_players:
+            for teammate_id in self.event_for_efficiency_stats.current_players[self.team_id]:
+                stats.append(
+                    {
+                        "player_id": teammate_id,
+                        "team_id": self.team_id,
+                        "stat_key": pbpstats.TEAM_FTA_STRING,
+                        "stat_value": 1,
+                    }
+                )
+
+                if self.is_made:
+                    stats.append(
+                        {
+                            "player_id": teammate_id,
+                            "team_id": self.team_id,
+                            "stat_key": pbpstats.TEAM_FTM_STRING,
+                            "stat_value": 1,
+                        }
+                    )
+
+        if opponent_team_id is None:
+            return self.base_stats + stats
+        if opponent_team_id not in self.current_players:
+            return self.base_stats + stats
+        if opponent_team_id not in self.event_for_efficiency_stats.current_players:
+            return self.base_stats + stats
+
+        for defender_id in self.event_for_efficiency_stats.current_players[
+            opponent_team_id
+        ]:
+            stats.append(
+                {
+                    "player_id": defender_id,
+                    "team_id": opponent_team_id,
+                    "stat_key": pbpstats.OPP_FTA_STRING,
+                    "stat_value": 1,
+                }
+            )
+            if self.is_made:
+                stats.append(
+                    {
+                        "player_id": defender_id,
+                        "team_id": opponent_team_id,
+                        "stat_key": pbpstats.OPP_FTM_STRING,
+                        "stat_value": 1,
+                    }
+                )
+
+        opponent_team_candidates = [tid for tid in team_ids if tid != self.team_id]
+        opponent_team_id = opponent_team_candidates[0] if opponent_team_candidates else None
         for stat in stats:
             if "lineup_id" not in stat.keys():
-                opponent_team_id = (
-                    team_ids[0] if stat["team_id"] == team_ids[1] else team_ids[1]
-                )
+                opponent_team_candidates = [tid for tid in team_ids if tid != stat["team_id"]]
+                if not opponent_team_candidates:
+                    continue
+                opponent_team_id = opponent_team_candidates[0]
+                if stat["team_id"] not in lineup_ids or opponent_team_id not in lineup_ids:
+                    continue
                 stat["lineup_id"] = lineup_ids[stat["team_id"]]
                 stat["opponent_team_id"] = opponent_team_id
                 stat["opponent_lineup_id"] = lineup_ids[opponent_team_id]

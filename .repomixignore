@@ -1,0 +1,6 @@
+context/COMPRESSED_*.md
+context/CONTEXT_BUDGET.md
+tests/data/**
+pbpstats/data_loader 2/**
+pbpstats/resources 2/**
+docs/pbpstats*.rst

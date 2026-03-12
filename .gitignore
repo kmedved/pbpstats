@@ -11,3 +11,5 @@ debug.py
 *.ipynb
 docs/_build
 poetry.lock
+context/COMPRESSED_*.md
+context/CONTEXT_BUDGET.*

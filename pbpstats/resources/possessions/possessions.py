@@ -3,9 +3,12 @@ The ``Possessions`` class has some basic properties for aggregating possession s
 """
 from itertools import groupby
 from operator import itemgetter
+import logging
 
 from pbpstats import KEYS_OFF_BY_FACTOR_OF_5_WHEN_AGGREGATING_FOR_TEAM_AND_LINEUPS
 from pbpstats.resources.base import Base
+
+logger = logging.getLogger(__name__)
 
 
 class Possessions(Base):
@@ -28,12 +31,36 @@ class Possessions(Base):
         return self.__dict__
 
     def _aggregate_event_stats(self, *args):
-        stats = [
-            event_stat
-            for item in self.items
-            for event in item.events
-            for event_stat in event.event_stats
-        ]
+        """
+        Aggregates event stats across possessions.
+
+        For well-formed games, this behaves exactly as before. For older /
+        malformed games, if event.event_stats raises an exception for a
+        specific event, that event is skipped instead of crashing the
+        entire aggregation.
+        """
+        stats = []
+        for item in self.items:
+            for event in item.events:
+                try:
+                    ev_stats = event.event_stats
+                except Exception as e:
+                    # do no harm: ignore events whose stats can't be computed
+                    logger.warning(
+                        "Skipping stats for event %r (game_id=%s) in Possessions "
+                        "aggregation due to error in event_stats: %s",
+                        event,
+                        getattr(event, "game_id", "unknown"),
+                        e,
+                    )
+                    continue
+                if not ev_stats:
+                    continue
+                stats.extend(ev_stats)
+
+        if not stats:
+            return []
+
         grouper = itemgetter(*args)
         results = []
         for key, grp in groupby(sorted(stats, key=grouper), grouper):

@@ -2,9 +2,12 @@
 ``EnhancedPbpItem`` is an abstract base class for all enhanced pbp event types
 """
 import abc
+import logging
 
 import pbpstats
 from pbpstats.resources.enhanced_pbp import FieldGoal, Foul, FreeThrow, Rebound
+
+logger = logging.getLogger(__name__)
 
 
 class EnhancedPbpItem(metaclass=abc.ABCMeta):
@@ -32,38 +35,49 @@ class EnhancedPbpItem(metaclass=abc.ABCMeta):
         """
         pass
 
-    def _set_possession_index(self, raw_value):
-        """Store raw CDN possession value for downstream helpers."""
-        if raw_value in (None, ""):
-            return
-        try:
-            value = int(raw_value)
-        except (TypeError, ValueError):
-            value = raw_value
-        self._possession_index = value
-
-    @property
-    def possession_index(self):
-        """Return the raw possession bucket/index supplied by the feed."""
-        return getattr(self, "_possession_index", None)
-
-    @property
-    def possession_team_id(self):
-        """Return the possession value as a team id when it looks like one."""
-        value = self.possession_index
-        if value in (None, 0):
-            return None
-        try:
-            return int(value)
-        except (TypeError, ValueError):
-            return None
-
     @abc.abstractproperty
     def seconds_remaining(self):
         """
         returns seconds remaining in period as a ``float``
         """
         pass
+
+    @property
+    def shot_clock(self):
+        """
+        Approximate shot clock (seconds remaining) at the start of this event,
+        or ``None`` if it has not been annotated.
+
+        Populated by NbaEnhancedPbpLoader via the shot_clock annotator.
+        """
+        return getattr(self, "_shot_clock", None)
+
+    @shot_clock.setter
+    def shot_clock(self, value):
+        self._shot_clock = value
+        # Also expose under a public name so event.data["shot_clock"] works
+        self.__dict__["shot_clock"] = value
+
+    @property
+    def shot_clock_bucket(self):
+        """
+        Coarse bucket of shot clock time:
+          - 'Early'    : 16+ seconds
+          - 'Middle'   : 8–15.9 seconds
+          - 'Late'     : 4–7.9 seconds
+          - 'VeryLate' : 0–3.9 seconds
+          - None       : shot clock not available
+        """
+        sc = self.shot_clock
+        if sc is None:
+            return None
+        if sc >= 16:
+            return "Early"
+        if sc >= 8:
+            return "Middle"
+        if sc >= 4:
+            return "Late"
+        return "VeryLate"
 
     @property
     def base_stats(self):
@@ -106,10 +120,27 @@ class EnhancedPbpItem(metaclass=abc.ABCMeta):
         This gets overwritten in :obj:`~pbpstats.resources.enhanced_pbp.substitution.Substitution`
         since those are the only event types where players are not the same as the previous event
         """
-        override = getattr(self, "_current_players_override", None)
-        if override is not None:
-            return override
-        return self.previous_event.current_players
+        prev = getattr(self, "previous_event", None)
+        if prev is None:
+            # no context for lineups (start of game / broken pbp)
+            logger.debug(
+                "No previous_event for %r (game_id=%s); returning empty current_players.",
+                self,
+                getattr(self, "game_id", "unknown"),
+            )
+            return {}
+        try:
+            return prev.current_players
+        except Exception as e:
+            # KeyError / AttributeError in prior events -> treat as unknown lineup
+            logger.debug(
+                "Error walking current_players chain for %r (game_id=%s): %s; "
+                "returning empty current_players.",
+                self,
+                getattr(self, "game_id", "unknown"),
+                e,
+            )
+            return {}
 
     @property
     def score_margin(self):

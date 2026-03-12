@@ -64,9 +64,6 @@ class StartOfPeriod(metaclass=abc.ABCMeta):
         """
         returns period starters
         """
-        override = getattr(self, "_current_players_override", None)
-        if override is not None:
-            return override
         return self.period_starters
 
     @property
@@ -307,12 +304,135 @@ class StartOfPeriod(metaclass=abc.ABCMeta):
                         f"GameId: {game_id}, Period: {self.period}, TeamId: {team_id}, Players: {starters}"
                     )
 
+    def _get_period_start_substitutions(self):
+        """
+        Get players substituted in/out at the exact start of this period.
+
+        This is needed to correctly handle period-start lineup swaps when
+        filling missing starters from the previous period's ending lineup.
+
+        Note: In live data, substitution events at period start may appear
+        BEFORE the StartOfPeriod event in the event list. We scan forward
+        from the first event of this period to catch all period-start subs.
+
+        Returns:
+            dict: {team_id: {"in": set of player_ids, "out": set of player_ids}}
+        """
+        result = {}
+
+        if self.period <= 4:
+            if self.league == WNBA_STRING:
+                start_seconds = 600.0
+            else:
+                start_seconds = 720.0
+        else:
+            start_seconds = 300.0
+
+        # Scan from first event of this period (may be before StartOfPeriod marker)
+        first_event = getattr(self, "first_period_event", None)
+        event = first_event if first_event is not None else self.next_event
+
+        while event is not None:
+            if getattr(event, "period", None) != self.period:
+                break
+
+            event_seconds = getattr(event, "seconds_remaining", None)
+            if event_seconds is None:
+                event = event.next_event
+                continue
+
+            # Stop if we've moved past period start time
+            if event_seconds < start_seconds - 0.001:
+                break
+
+            # Skip events not at exact period start time
+            if abs(event_seconds - start_seconds) > 0.001:
+                event = event.next_event
+                continue
+
+            # Process substitution events at period start
+            if isinstance(event, Substitution):
+                team_id = getattr(event, "team_id", None)
+                if team_id is not None:
+                    if team_id not in result:
+                        result[team_id] = {"in": set(), "out": set()}
+
+                    incoming = getattr(event, "incoming_player_id", None)
+                    outgoing = getattr(event, "outgoing_player_id", None)
+                    if incoming is not None:
+                        result[team_id]["in"].add(incoming)
+                    if outgoing is not None:
+                        result[team_id]["out"].add(outgoing)
+
+            event = event.next_event
+
+        return result
+
+    def _fill_missing_starters_from_previous_period_end(self, starters_by_team):
+        """
+        Fill in missing period starters using the previous period's ending lineup.
+
+        This handles the case where a player who started the period wasn't detected
+        because they had no events (e.g., they were immediately subbed out or had
+        no stats recorded).
+
+        The method accounts for period-start substitutions: if a player was subbed
+        OUT at period start, they shouldn't be added as a missing starter (they
+        were replaced). If a player was subbed IN at period start, they shouldn't
+        cause the subset check to fail (they're a valid new addition).
+        """
+        prev_lineups = getattr(self, "previous_period_end_lineups", None)
+        if not isinstance(prev_lineups, dict):
+            return starters_by_team
+        prev_period = getattr(self, "previous_period_end_period", None)
+        if prev_period != self.period - 1:
+            return starters_by_team
+
+        period_start_subs = self._get_period_start_substitutions()
+
+        for team_id, prev_players in prev_lineups.items():
+            if not isinstance(prev_players, list) or len(prev_players) != 5:
+                continue
+            cur = starters_by_team.get(team_id, [])
+            if not cur:
+                continue
+            if len(cur) >= 5:
+                continue
+
+            cur_set = set(cur)
+            prev_set = set(prev_players)
+            team_subs = period_start_subs.get(team_id, {"in": set(), "out": set()})
+            subbed_in_at_start = team_subs["in"]
+            subbed_out_at_start = team_subs["out"]
+
+            implied_carryover = (cur_set - subbed_in_at_start) | subbed_out_at_start
+
+            if not implied_carryover.issubset(prev_set):
+                continue
+            missing = [
+                player
+                for player in prev_players
+                if player not in cur_set and player not in subbed_out_at_start
+            ]
+            need = 5 - len(cur)
+            if need <= 0:
+                continue
+            filled = cur + missing[:need]
+            seen = set()
+            starters_by_team[team_id] = [
+                player for player in filled if not (player in seen or seen.add(player))
+            ]
+        return starters_by_team
+
     def _get_period_starters_from_period_events(
         self, file_directory, ignore_missing_starters=False
     ):
         starters, player_team_map = self._get_players_who_started_period_with_team_map()
 
         starters_by_team = self._split_up_starters_by_team(starters, player_team_map)
+        starters_by_team = self._fill_missing_starters_from_previous_period_end(
+            starters_by_team
+        )
         if not ignore_missing_starters:
             self._check_both_teams_have_5_starters(starters_by_team, file_directory)
 

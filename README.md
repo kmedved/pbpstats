@@ -11,11 +11,6 @@ A package to scrape and parse NBA, WNBA and G-League play-by-play data.
 * All stats on pbpstats.com are derived from these stats
 * Fixes order of events for some common cases in which events are out of order
 
-## Optional lineup reconciliation
-Set `PBPSTATS_USE_STATS_LINEUPS=1` to opt into a stats.nba.com-powered lineup reconciler.  
-When enabled, pbpstats will fetch rotation data from the stats endpoints (the same ones that require the NBA Stats headers) and use it to validate on-court players each period.  
-Leave the variable unset to keep the default sub-driven behavior that's recommended for historical seasons.
-
 # Installation
 Tested on Python >=3.8
 ```
@@ -24,6 +19,18 @@ pip install pbpstats
 
 # Resources
 [Documentation](https://pbpstats.readthedocs.io/en/latest/)
+
+# LLM Context
+LLM-facing context artifacts live in `context/`.
+
+- Start with `context/REPO_ARCHITECTURE.md`
+- For guided context, add one `context/COMPRESSED_*.md`
+- For oracle workflows, add `context/FILE_INDEX.md`
+- For implementation tasks, add raw source for the touched files
+
+Refresh checked-in context artifacts with `python scripts/generate_repo_architecture_sync.py`.
+Refresh local bundles with `python scripts/build_context_bundle.py`.
+Version policy: Policy B, so only shipped/runtime behavior changes require a version bump.
 
 # Local Development
 Using [poetry](https://python-poetry.org/) for package managment. Install it first if it is not install on your system.

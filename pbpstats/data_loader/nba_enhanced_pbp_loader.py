@@ -5,6 +5,7 @@ from collections import defaultdict
 from pbpstats import NBA_STRING
 from pbpstats.overrides import IntDecoder
 from pbpstats.resources.enhanced_pbp import FieldGoal, Foul, FreeThrow, StartOfPeriod
+from pbpstats.resources.enhanced_pbp.shot_clock import annotate_shot_clock
 
 
 class NbaEnhancedPbpLoader(object):
@@ -20,7 +21,8 @@ class NbaEnhancedPbpLoader(object):
 
     def _add_extra_attrs_to_all_events(self):
         """
-        adds fouls to give, player fouls, score, next event and previous event to each event
+        adds fouls to give, player fouls, score, next event, previous event and
+        approximate shot clock to each event
         """
         self.start_period_indices = []
         self._load_possession_changing_event_overrides()
@@ -87,17 +89,86 @@ class NbaEnhancedPbpLoader(object):
         # these need next and previous event to be added to all events
         self._set_period_start_items()
 
+        # annotate approximate shot clock for every enhanced pbp event.
+        # LiveEnhancedPbpLoader recomputes shot clock after normalizing DREBs.
+        if getattr(self, "data_provider", None) != "live":
+            self._annotate_shot_clock()
+
     def _set_period_start_items(self):
         """
         sets team starting period with the ball and period starters for each team
+
+        On some older / malformed games, start_period_indices can include
+        non-StartOfPeriod events (e.g. JumpBall at index 0). In those cases
+        we skip the entry instead of crashing.
         """
-        for i in self.start_period_indices:
-            team_id = self.items[i].get_team_starting_with_ball()
-            self.items[i].team_starting_with_ball = team_id
-            period_starters = self.items[i].get_period_starters(
+        from pbpstats.resources.enhanced_pbp import StartOfPeriod  # local import
+
+        for i in getattr(self, "start_period_indices", []):
+            event = self.items[i]
+            if not isinstance(event, StartOfPeriod):
+                # do no harm: only operate on true StartOfPeriod events
+                continue
+            previous_period_end_event = None
+            for j in range(i - 1, -1, -1):
+                if getattr(self.items[j], "period", None) == event.period - 1:
+                    previous_period_end_event = self.items[j]
+                    break
+
+            # Find the first event of this period (may be before StartOfPeriod marker
+            # due to period-start substitutions appearing first in live data)
+            first_period_event_idx = i
+            for j in range(i - 1, -1, -1):
+                if getattr(self.items[j], "period", None) == event.period:
+                    first_period_event_idx = j
+                else:
+                    break
+            event.first_period_event = self.items[first_period_event_idx]
+            if previous_period_end_event is not None:
+                prev_players = getattr(previous_period_end_event, "current_players", None)
+                if isinstance(prev_players, dict):
+                    snap = {}
+                    for team_id, players in prev_players.items():
+                        if isinstance(players, (list, tuple, set)):
+                            snap[team_id] = list(players)
+                    event.previous_period_end_lineups = snap or None
+                else:
+                    event.previous_period_end_lineups = None
+                event.previous_period_end_period = getattr(
+                    previous_period_end_event, "period", None
+                )
+            else:
+                event.previous_period_end_lineups = None
+                event.previous_period_end_period = None
+
+            team_id = event.get_team_starting_with_ball()
+            event.team_starting_with_ball = team_id
+            period_starters = event.get_period_starters(
                 file_directory=self.file_directory
             )
-            self.items[i].period_starters = period_starters
+            event.period_starters = period_starters
+
+    def _annotate_shot_clock(self):
+        """
+        Compute and attach approximate shot clock values to each enhanced pbp event.
+
+        This wraps resources.enhanced_pbp.shot_clock.annotate_shot_clock so that the
+        logic is shared by stats_nba / data_nba / live data providers.
+        """
+        # Season is stored as e.g. "2019" or "2019-20"; we want the start year.
+        season_val = getattr(self, "season", None)
+        season_year = None
+        if isinstance(season_val, int):
+            season_year = season_val
+        elif isinstance(season_val, str):
+            try:
+                season_year = int(season_val.strip().split("-")[0])
+            except (ValueError, TypeError):
+                season_year = None
+
+        league = getattr(self, "league", NBA_STRING)
+
+        annotate_shot_clock(self.items, season_year=season_year, league=league)
 
     def _load_possession_changing_event_overrides(self):
         """

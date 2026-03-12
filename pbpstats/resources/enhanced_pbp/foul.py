@@ -204,6 +204,17 @@ class Foul(object):
         returns list of dicts with all stats for event
         """
         stats = []
+
+        # DARKO: track technical fouls committed explicitly
+        if self.is_technical or self.is_double_technical:
+            stats.append(
+                {
+                    "player_id": self.player1_id,
+                    "team_id": self.team_id,
+                    "stat_key": pbpstats.TECHNICAL_FOULS_COMMITTED_STRING,
+                    "stat_value": 1,
+                }
+            )
         foul_type = self.foul_type_string
         is_penalty_event = self.is_penalty_event()
         if foul_type is not None:

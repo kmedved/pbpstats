@@ -58,7 +58,7 @@ class StatsNbaPossessionLoader(NbaPossessionLoader):
     parent_object = "Game"
 
     def __init__(self, game_id, source_loader):
-        self.file_directory = source_loader.file_directory
+        self.file_directory = getattr(source_loader, "file_directory", None)
         self.game_id = game_id
         pbp_events = StatsNbaEnhancedPbpLoader(
             game_id, source_loader.enhanced_pbp_source_loader

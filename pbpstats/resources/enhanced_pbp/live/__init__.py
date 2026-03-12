@@ -4,6 +4,7 @@ from pbpstats.resources.enhanced_pbp.live.field_goal import LiveFieldGoal
 from pbpstats.resources.enhanced_pbp.live.foul import LiveFoul
 from pbpstats.resources.enhanced_pbp.live.free_throw import LiveFreeThrow
 from pbpstats.resources.enhanced_pbp.live.jump_ball import LiveJumpBall
+from pbpstats.resources.enhanced_pbp.live.game_end import LiveGameEnd
 from pbpstats.resources.enhanced_pbp.live.rebound import LiveRebound
 from pbpstats.resources.enhanced_pbp.live.replay import LiveReplay
 from pbpstats.resources.enhanced_pbp.live.start_of_period import LiveStartOfPeriod
@@ -19,6 +20,7 @@ __all__ = [
     "LiveFoul",
     "LiveFreeThrow",
     "LiveJumpBall",
+    "LiveGameEnd",
     "LiveRebound",
     "LiveReplay",
     "LiveStartOfPeriod",
