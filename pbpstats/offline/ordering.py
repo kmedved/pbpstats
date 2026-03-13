@@ -1,4 +1,5 @@
-from typing import Callable, List, Dict
+from typing import Callable, Dict, List
+
 import numpy as np
 import pandas as pd
 
@@ -57,7 +58,7 @@ def dedupe_with_v3(
     """
     df = game_df.copy()
 
-    # Always normalize EVENTNUM to int before we do anything with it
+    # Always normalize EVENTNUM to int before we do anything with it.
     df = _ensure_eventnum_int(df)
 
     if fetch_pbp_v3_fn is None:
@@ -77,6 +78,64 @@ def dedupe_with_v3(
     return df
 
 
+def _build_start_of_period_row(
+    cols: List[str],
+    game_id: str,
+    period: int,
+    eventnum: int,
+) -> Dict[str, object]:
+    row: Dict[str, object] = {c: None for c in cols}
+
+    if "GAME_ID" in cols:
+        row["GAME_ID"] = game_id
+    if "EVENTNUM" in cols:
+        row["EVENTNUM"] = int(eventnum)
+    if "EVENTMSGTYPE" in cols:
+        row["EVENTMSGTYPE"] = 12
+    if "EVENTMSGACTIONTYPE" in cols:
+        row["EVENTMSGACTIONTYPE"] = 0
+    if "PERIOD" in cols:
+        row["PERIOD"] = period
+    if "PCTIMESTRING" in cols:
+        row["PCTIMESTRING"] = "12:00"
+
+    for fld in [
+        "PLAYER1_ID",
+        "PLAYER1_TEAM_ID",
+        "PLAYER2_ID",
+        "PLAYER2_TEAM_ID",
+        "PLAYER3_ID",
+        "PLAYER3_TEAM_ID",
+    ]:
+        if fld in cols:
+            row[fld] = 0
+
+    if "VIDEO_AVAILABLE_FLAG" in cols:
+        row["VIDEO_AVAILABLE_FLAG"] = 0
+
+    return row
+
+
+def _insert_row_before_period(
+    df: pd.DataFrame,
+    row: Dict[str, object],
+    period: int,
+) -> pd.DataFrame:
+    period_mask = df["PERIOD"] == period
+    if not period_mask.any():
+        return pd.concat([df, pd.DataFrame([row], columns=df.columns)], ignore_index=True)
+
+    insert_at = int(df.index[period_mask][0])
+    return pd.concat(
+        [
+            df.iloc[:insert_at],
+            pd.DataFrame([row], columns=df.columns),
+            df.iloc[insert_at:],
+        ],
+        ignore_index=True,
+    )
+
+
 def patch_start_of_periods(
     game_df: pd.DataFrame,
     game_id: str,
@@ -86,6 +145,9 @@ def patch_start_of_periods(
     Ensure there is at least one StartOfPeriod (EVENTMSGTYPE == 12) row for
     each period present in the game.
 
+    Preserve existing intra-period row order. Historical feeds often have valid
+    chronology encoded in raw row order even when EVENTNUM is non-monotonic.
+
     - For Period 1, synthesize a start-of-period row if missing.
     - For other periods, optionally use playbyplayv3 PERIOD/START markers.
     """
@@ -93,62 +155,32 @@ def patch_start_of_periods(
     if "EVENTMSGTYPE" not in df.columns or "PERIOD" not in df.columns:
         return df
 
-    # At this point, dedupe_with_v3 should already have normalized EVENTNUM,
-    # but calling it again is cheap and keeps patch_start_of_periods robust
     df = _ensure_eventnum_int(df)
+    cols = list(df.columns)
 
-    # Existing start-of-period markers
     existing_periods = set(
         df.loc[df["EVENTMSGTYPE"] == 12, "PERIOD"].dropna().astype(int).tolist()
     )
 
-    # Ensure Q1 start exists
     if 1 not in existing_periods and (df["PERIOD"] == 1).any():
-        cols = list(df.columns)
-        new_row: Dict[str, object] = {c: None for c in cols}
-
-        if "GAME_ID" in cols:
-            new_row["GAME_ID"] = game_id
-        if "EVENTNUM" in cols:
-            min_evnum_q1 = int(df.loc[df["PERIOD"] == 1, "EVENTNUM"].min())
-            new_row["EVENTNUM"] = min_evnum_q1 - 1
-        if "EVENTMSGTYPE" in cols:
-            new_row["EVENTMSGTYPE"] = 12
-        if "EVENTMSGACTIONTYPE" in cols:
-            new_row["EVENTMSGACTIONTYPE"] = 0
-        if "PERIOD" in cols:
-            new_row["PERIOD"] = 1
-        if "PCTIMESTRING" in cols:
-            new_row["PCTIMESTRING"] = "12:00"
-
-        for fld in [
-            "PLAYER1_ID",
-            "PLAYER1_TEAM_ID",
-            "PLAYER2_ID",
-            "PLAYER2_TEAM_ID",
-            "PLAYER3_ID",
-            "PLAYER3_TEAM_ID",
-        ]:
-            if fld in cols:
-                new_row[fld] = 0
-        if "VIDEO_AVAILABLE_FLAG" in cols:
-            new_row["VIDEO_AVAILABLE_FLAG"] = 0
-
-        df = pd.concat([pd.DataFrame([new_row]), df], ignore_index=True)
-        if "EVENTNUM" in cols:
-            df = df.sort_values(["PERIOD", "EVENTNUM"]).reset_index(drop=True)
+        min_evnum_q1 = int(df.loc[df["PERIOD"] == 1, "EVENTNUM"].min())
+        q1_row = _build_start_of_period_row(cols, game_id, 1, min_evnum_q1 - 1)
+        df = pd.concat([pd.DataFrame([q1_row], columns=cols), df], ignore_index=True)
         existing_periods.add(1)
 
     all_periods_in_game = set(df["PERIOD"].dropna().astype(int).unique())
     missing_periods = all_periods_in_game - existing_periods
-
     if not missing_periods or fetch_pbp_v3_fn is None:
-        return df
+        return df.reset_index(drop=True)
 
-    # Use v3 period/start markers if available
     df_v3 = fetch_pbp_v3_fn(game_id)
-    if df_v3 is None or df_v3.empty or "actionType" not in df_v3.columns or "subType" not in df_v3.columns:
-        return df
+    if (
+        df_v3 is None
+        or df_v3.empty
+        or "actionType" not in df_v3.columns
+        or "subType" not in df_v3.columns
+    ):
+        return df.reset_index(drop=True)
 
     mask = (
         df_v3["actionType"].astype(str).str.lower().eq("period")
@@ -156,58 +188,32 @@ def patch_start_of_periods(
     )
     starts = df_v3.loc[mask]
     if starts.empty:
-        return df
+        return df.reset_index(drop=True)
 
-    cols = list(df.columns)
-    new_rows = []
-
-    for _, r in starts.iterrows():
+    period_to_eventnum: Dict[int, int] = {}
+    for _, row in starts.iterrows():
         try:
-            period = int(r.get("period", 0) or 0)
+            period = int(row.get("period", 0) or 0)
         except (TypeError, ValueError):
             continue
-        if period <= 0 or period in existing_periods:
+        if period <= 0 or period in existing_periods or period in period_to_eventnum:
             continue
 
-        action_num = r.get("actionNumber")
         try:
-            eventnum = int(action_num)
+            period_to_eventnum[period] = int(row.get("actionNumber"))
         except (TypeError, ValueError):
             continue
 
-        row: Dict[str, object] = {c: None for c in cols}
-        if "GAME_ID" in cols:
-            row["GAME_ID"] = game_id
-        if "EVENTNUM" in cols:
-            row["EVENTNUM"] = eventnum
-        if "EVENTMSGTYPE" in cols:
-            row["EVENTMSGTYPE"] = 12
-        if "EVENTMSGACTIONTYPE" in cols:
-            row["EVENTMSGACTIONTYPE"] = 0
-        if "PERIOD" in cols:
-            row["PERIOD"] = period
-        if "PCTIMESTRING" in cols:
-            row["PCTIMESTRING"] = "12:00"
+    for period in sorted(period_to_eventnum):
+        start_row = _build_start_of_period_row(
+            cols,
+            game_id,
+            period,
+            period_to_eventnum[period],
+        )
+        df = _insert_row_before_period(df, start_row, period)
 
-        for fld in [
-            "PLAYER1_ID",
-            "PLAYER1_TEAM_ID",
-            "PLAYER2_ID",
-            "PLAYER2_TEAM_ID",
-            "PLAYER3_ID",
-            "PLAYER3_TEAM_ID",
-        ]:
-            if fld in cols:
-                row[fld] = 0
-
-        new_rows.append(row)
-        existing_periods.add(period)
-
-    if new_rows:
-        df_new = pd.DataFrame(new_rows, columns=cols)
-        df = pd.concat([df, df_new], ignore_index=True)
-
-    return df
+    return df.reset_index(drop=True)
 
 
 def reorder_with_v3(
@@ -216,37 +222,17 @@ def reorder_with_v3(
     fetch_pbp_v3_fn: FetchPbpV3Fn,
 ) -> pd.DataFrame:
     """
-    Reorder pbp rows using playbyplayv3 actionId order.
+    Preserve the existing row order after v3-backed dedupe/period patching.
 
-    - Build actionNumber -> canonical index mapping from v3.
-    - Sort events by that canonical index, then by EVENTNUM.
+    Historical offline feeds often encode the useful chronology in raw row order,
+    even when EVENTNUM/actionNumber disagree within same-clock clusters. Forcing a
+    numeric v3 reorder can turn workable sequences such as:
+
+      MISS -> REBOUND -> MADE TIP/PUTBACK
+      MISS FT1 -> REBOUND -> SUBS -> FT2
+
+    back into the broken event-number order and trigger thousands of fallback
+    rebound deletions. The offline path now treats v3 as a source for dedupe and
+    start-of-period markers, not as a chronology rewrite.
     """
-    df_v3 = fetch_pbp_v3_fn(game_id)
-    if df_v3 is None or df_v3.empty or "actionNumber" not in df_v3.columns or "actionId" not in df_v3.columns:
-        raise RuntimeError(f"No v3 data for {game_id}")
-
-    df_v3 = df_v3.copy()
-    df_v3["actionNumber"] = pd.to_numeric(df_v3["actionNumber"], errors="coerce")
-    df_v3 = df_v3.dropna(subset=["actionNumber"])
-    df_v3["actionNumber"] = df_v3["actionNumber"].astype(int)
-    df_v3 = df_v3.sort_values("actionId")
-
-    order_map: Dict[int, int] = {}
-    canonical_idx = 0
-    for num in df_v3["actionNumber"]:
-        if num not in order_map:
-            order_map[num] = canonical_idx
-            canonical_idx += 1
-
-    result = _ensure_eventnum_int(game_df)
-
-    max_idx = len(order_map) + 1000
-    result["__v3_order"] = result["EVENTNUM"].map(order_map).fillna(max_idx).astype(int)
-
-    # Keep StartOfPeriod(1) at the very beginning if present
-    if "EVENTMSGTYPE" in result.columns and "PERIOD" in result.columns:
-        q1_start_mask = (result["EVENTMSGTYPE"] == 12) & (result["PERIOD"] == 1)
-        result.loc[q1_start_mask, "__v3_order"] = -1
-
-    result = result.sort_values(["__v3_order", "EVENTNUM"]).drop(columns="__v3_order")
-    return result
+    return _ensure_eventnum_int(game_df).reset_index(drop=True)

@@ -19,7 +19,26 @@ class EventOrderError(Exception):
     stored on disk to fix this.
     """
 
-    pass
+    def __init__(
+        self,
+        message,
+        *,
+        rebound_event_num=None,
+        previous_event_num=None,
+        rebound_event=None,
+        previous_event=None,
+    ):
+        self.rebound_event = rebound_event
+        self.previous_event = previous_event
+        self.rebound_event_num = rebound_event_num
+        self.previous_event_num = previous_event_num
+
+        if self.rebound_event_num is None and rebound_event is not None:
+            self.rebound_event_num = getattr(rebound_event, "event_num", None)
+        if self.previous_event_num is None and previous_event is not None:
+            self.previous_event_num = getattr(previous_event, "event_num", None)
+
+        super().__init__(message)
 
 
 class Rebound(object):

@@ -25,6 +25,7 @@ FetchPbpV3Fn = Callable[[str], pd.DataFrame]
 # It will only auto-delete TEAM/zero rebounds and will re-raise when only player
 # rebounds are candidates.
 REBOUND_STRICT_MODE: bool = True
+MAX_REBOUND_REPAIR_RETRIES: int = 100
 
 
 def set_rebound_strict_mode(strict: bool = True) -> None:
@@ -56,22 +57,31 @@ class PbpProcessor(NbaEnhancedPbpLoader, NbaPossessionLoader):
         game_id: str,
         raw_data_dicts: List[dict],
         rebound_deletions_list: Optional[List[Dict]] = None,
+        boxscore_source_loader=None,
     ):
         self.game_id = str(game_id).zfill(10)
         self.league = "nba"
         self.file_directory = None
         self.data = raw_data_dicts
         self.factory = StatsNbaEnhancedPbpFactory()
+        self.boxscore_source_loader = boxscore_source_loader
         # Per-processor log of any fallback rebound deletions
         self._rebound_deletions_list = rebound_deletions_list
 
-        self._process_with_retries(max_retries=20)
+        self._process_with_retries(max_retries=MAX_REBOUND_REPAIR_RETRIES)
 
     def _build_items_from_data(self) -> None:
         self.items = [
             self.factory.get_event_class(item["EVENTMSGTYPE"])(item, i)
             for i, item in enumerate(self.data)
         ]
+
+        if self.boxscore_source_loader is not None:
+            from pbpstats.resources.enhanced_pbp import StartOfPeriod
+
+            for item in self.items:
+                if isinstance(item, StartOfPeriod):
+                    item.boxscore_source_loader = self.boxscore_source_loader
 
     def _process_with_retries(self, max_retries: int) -> None:
         attempts = 0
@@ -116,18 +126,37 @@ class PbpProcessor(NbaEnhancedPbpLoader, NbaPossessionLoader):
         script, including pattern-based fixes and a conservative fallback
         that may delete orphan TEAM rebounds when necessary.
         """
-        msg = str(exception)
-        try:
-            event_num = int(msg.split("EventNum: ")[-1].split(">")[0])
-        except Exception:
-            raise exception
-
         rows = self.data
-        issue_event_index: Optional[int] = None
-        for i, row in enumerate(rows):
-            if row.get("EVENTNUM") == event_num:
-                issue_event_index = i
-                break
+        previous_event_num = getattr(exception, "previous_event_num", None)
+        rebound_event_num = getattr(exception, "rebound_event_num", None)
+
+        def _find_index(event_num: Optional[int]) -> Optional[int]:
+            if event_num is None:
+                return None
+            for i, row in enumerate(rows):
+                if row.get("EVENTNUM") == event_num:
+                    return i
+            return None
+
+        issue_event_index = _find_index(previous_event_num)
+        rebound_event_index = _find_index(rebound_event_num)
+
+        if issue_event_index is None:
+            msg = str(exception)
+            try:
+                legacy_event_num = int(msg.split("EventNum: ")[-1].split(">")[0])
+            except Exception:
+                raise exception
+            issue_event_index = _find_index(legacy_event_num)
+
+        if issue_event_index is None and rebound_event_index is not None and rebound_event_index > 0:
+            issue_event_index = rebound_event_index - 1
+
+        if rebound_event_index is None and issue_event_index is not None:
+            candidate_index = issue_event_index + 1
+            if candidate_index < len(rows) and rows[candidate_index].get("EVENTMSGTYPE") == 4:
+                rebound_event_index = candidate_index
+
         if issue_event_index is None:
             raise exception
 
@@ -140,6 +169,142 @@ class PbpProcessor(NbaEnhancedPbpLoader, NbaPossessionLoader):
             if 0 <= idx < len(rows):
                 return rows[idx].get("EVENTNUM")
             return None
+
+        context_event_num = en(issue_event_index)
+
+        def text_value(idx: int, key: str) -> str:
+            if 0 <= idx < len(rows):
+                return str(rows[idx].get(key) or "")
+            return ""
+
+        def team_id(idx: int) -> Optional[int]:
+            if 0 <= idx < len(rows):
+                return rows[idx].get("PLAYER1_TEAM_ID")
+            return None
+
+        rebound_period = None
+        if rebound_event_index is not None and 0 <= rebound_event_index < len(rows):
+            rebound_period = rows[rebound_event_index].get("PERIOD")
+
+        def is_missed_shot_or_ft(idx: int) -> bool:
+            if not (0 <= idx < len(rows)):
+                return False
+            msg_type = et(idx)
+            if msg_type == 2:
+                return True
+            if msg_type != 3:
+                return False
+            desc = " ".join(
+                [
+                    text_value(idx, "HOMEDESCRIPTION"),
+                    text_value(idx, "VISITORDESCRIPTION"),
+                    text_value(idx, "NEUTRALDESCRIPTION"),
+                ]
+            ).lower()
+            return "miss" in desc
+
+        # --- PATTERN -1: Move an orphan rebound back to the nearest prior miss ---
+        # Only use this generic repair when the previous event is not itself a rebound.
+        # Rebound-after-rebound cases need more specific handling below; applying this
+        # rule there causes the two rebounds to toggle back and forth across retries.
+        if rebound_event_index is not None and et(issue_event_index) != 4:
+            search_start = rebound_event_index - 1
+            search_stop = max(-1, rebound_event_index - 8)
+            for candidate_idx in range(search_start, search_stop, -1):
+                if rebound_period is not None and rows[candidate_idx].get("PERIOD") != rebound_period:
+                    break
+                if is_missed_shot_or_ft(candidate_idx):
+                    rebound_row = rows.pop(rebound_event_index)
+                    rows.insert(candidate_idx + 1, rebound_row)
+                    self.data = rows
+                    return
+
+        # --- PATTERN -0.75: Start of period, rebound, made shot, then delayed miss ---
+        # Some historical feeds open a period with:
+        #   START -> REBOUND -> MADE -> MISS
+        # where the rebound/make really belong to the later missed shot.
+        if (
+            rebound_event_index is not None
+            and rebound_event_index == issue_event_index + 1
+            and et(issue_event_index) == 12
+        ):
+            for candidate_idx in range(rebound_event_index + 1, min(rebound_event_index + 4, len(rows))):
+                if rows[candidate_idx].get("PERIOD") != rebound_period:
+                    break
+                if is_missed_shot_or_ft(candidate_idx) and team_id(candidate_idx) == team_id(rebound_event_index):
+                    missed_shot = rows.pop(candidate_idx)
+                    rows.insert(issue_event_index + 1, missed_shot)
+                    self.data = rows
+                    return
+
+        # --- PATTERN -0.5: Two misses, rebound, rebound ---
+        # Historical 90s feeds sometimes tick the clock between a missed putback
+        # and the rebound that actually belongs to the first miss, so do not require
+        # the miss/rebound pair to share the exact same clock.
+        if (
+            rebound_event_index is not None
+            and rebound_event_index == issue_event_index + 1
+            and issue_event_index - 2 >= 0
+            and et(issue_event_index) == 4
+            and et(rebound_event_index) == 4
+            and et(issue_event_index - 1) == 2
+            and et(issue_event_index - 2) == 2
+            and team_id(issue_event_index - 2) == team_id(issue_event_index - 1)
+            and team_id(issue_event_index - 1) == team_id(issue_event_index)
+        ):
+            first_rebound = rows[issue_event_index]
+            missed_putback = rows[issue_event_index - 1]
+            rows[issue_event_index - 1], rows[issue_event_index] = first_rebound, missed_putback
+            self.data = rows
+            return
+
+        # --- PATTERN 0: Miss, made putback/layup, rebound ---
+        if (
+            rebound_event_index is not None
+            and rebound_event_index == issue_event_index + 1
+            and issue_event_index - 1 >= 0
+            and et(issue_event_index - 1) == 2
+            and et(issue_event_index) == 1
+            and et(rebound_event_index) == 4
+            and rows[issue_event_index].get("PCTIMESTRING") == rows[rebound_event_index].get("PCTIMESTRING")
+            and team_id(issue_event_index - 1) == team_id(issue_event_index)
+            and team_id(issue_event_index) == team_id(rebound_event_index)
+        ):
+            rebound_event = rows[rebound_event_index]
+            made_shot = rows[issue_event_index]
+            rows[issue_event_index], rows[rebound_event_index] = rebound_event, made_shot
+            self.data = rows
+            return
+
+        # --- PATTERN 0.9: Sub/timeout block, rebound, then delayed same-clock miss ---
+        # Some historical feeds log:
+        #   ... -> REBOUND -> SUB/TIMEOUT... -> REBOUND -> MISS
+        # where the trailing miss/rebound pair belongs before the dead-ball block.
+        if (
+            rebound_event_index is not None
+            and rebound_event_index == issue_event_index + 1
+            and et(issue_event_index) in (8, 9)
+        ):
+            block_start = issue_event_index
+            while block_start - 1 >= 0 and et(block_start - 1) in (8, 9):
+                block_start -= 1
+
+            rebound_clock = rows[rebound_event_index].get("PCTIMESTRING")
+            rebound_team = team_id(rebound_event_index)
+            search_limit = min(rebound_event_index + 4, len(rows))
+            for candidate_idx in range(rebound_event_index + 1, search_limit):
+                candidate_row = rows[candidate_idx]
+                if rebound_period is not None and candidate_row.get("PERIOD") != rebound_period:
+                    break
+                candidate_clock = candidate_row.get("PCTIMESTRING")
+                if candidate_clock != rebound_clock:
+                    break
+                if is_missed_shot_or_ft(candidate_idx) and team_id(candidate_idx) == rebound_team:
+                    delayed_miss = rows.pop(candidate_idx)
+                    rebound_row = rows.pop(rebound_event_index)
+                    rows[block_start:block_start] = [delayed_miss, rebound_row]
+                    self.data = rows
+                    return
 
         # --- PATTERN 1: Previous event is sub/timeout (type 8 or 9) ---
         if et(issue_event_index) in (8, 9):
@@ -154,7 +319,7 @@ class PbpProcessor(NbaEnhancedPbpLoader, NbaPossessionLoader):
                 for row in rows:
                     if row.get("EVENTNUM") == ft_event_num:
                         row_to_move = row
-                    elif row.get("EVENTNUM") == event_num:
+                    elif row.get("EVENTNUM") == context_event_num:
                         new_rows.append(row)
                         if row_to_move is not None:
                             new_rows.append(row_to_move)
@@ -181,7 +346,7 @@ class PbpProcessor(NbaEnhancedPbpLoader, NbaPossessionLoader):
         if (
             issue_event_index + 1 < len(rows)
             and et(issue_event_index + 1) == 4
-            and en(issue_event_index + 1) == event_num - 1
+            and en(issue_event_index + 1) == context_event_num - 1
         ):
             rebound_event = rows[issue_event_index + 1]
             shot_event = rows[issue_event_index]
@@ -198,8 +363,8 @@ class PbpProcessor(NbaEnhancedPbpLoader, NbaPossessionLoader):
             and issue_event_index + 1 < len(rows)
             and et(issue_event_index + 1) == 4
             and et(issue_event_index - 1) == 2
-            and en(issue_event_index + 1) == event_num + 2
-            and en(issue_event_index - 1) == event_num + 1
+            and en(issue_event_index + 1) == context_event_num + 2
+            and en(issue_event_index - 1) == context_event_num + 1
         ):
             rebound_event = rows[issue_event_index]
             shot_event = rows[issue_event_index - 1]
@@ -216,8 +381,8 @@ class PbpProcessor(NbaEnhancedPbpLoader, NbaPossessionLoader):
             and issue_event_index + 1 < len(rows)
             and et(issue_event_index + 1) == 4
             and et(issue_event_index - 1) == 2
-            and en(issue_event_index + 1) == event_num - 2
-            and en(issue_event_index - 1) == event_num - 1
+            and en(issue_event_index + 1) == context_event_num - 2
+            and en(issue_event_index - 1) == context_event_num - 1
         ):
             first_rebound = rows[issue_event_index + 1]
             second_rebound = rows[issue_event_index]
@@ -274,9 +439,9 @@ class PbpProcessor(NbaEnhancedPbpLoader, NbaPossessionLoader):
             deleted_row = rows[rebound_index]
             print(
                 f"[REBOUND FIX] Game {self.game_id}: deleting TEAM orphan rebound "
-                f"EVENTNUM {en(rebound_index)} after EVENTNUM {event_num}"
+                f"EVENTNUM {en(rebound_index)} after EVENTNUM {context_event_num}"
             )
-            _log_deletion(deleted_row, event_num)
+            _log_deletion(deleted_row, context_event_num)
             del rows[rebound_index]
             self.data = rows
             return
@@ -288,16 +453,16 @@ class PbpProcessor(NbaEnhancedPbpLoader, NbaPossessionLoader):
             if REBOUND_STRICT_MODE:
                 print(
                     f"[REBOUND FIX] Game {self.game_id}: refusing to auto-delete PLAYER rebound "
-                    f"EVENTNUM {en(rebound_index)} after EVENTNUM {event_num}; re-raising."
+                    f"EVENTNUM {en(rebound_index)} after EVENTNUM {context_event_num}; re-raising."
                 )
-                _log_deletion(deleted_row, event_num)
+                _log_deletion(deleted_row, context_event_num)
                 raise exception
             else:
                 print(
                     f"[REBOUND FIX] Game {self.game_id}: deleting PLAYER orphan rebound "
-                    f"EVENTNUM {en(rebound_index)} after EVENTNUM {event_num}"
+                    f"EVENTNUM {en(rebound_index)} after EVENTNUM {context_event_num}"
                 )
-                _log_deletion(deleted_row, event_num)
+                _log_deletion(deleted_row, context_event_num)
                 del rows[rebound_index]
                 self.data = rows
                 return
@@ -310,6 +475,7 @@ def get_possessions_from_df(
     game_df: pd.DataFrame,
     fetch_pbp_v3_fn: Optional[FetchPbpV3Fn] = None,
     rebound_deletions_list: Optional[List[Dict]] = None,
+    boxscore_source_loader=None,
 ) -> Possessions:
     """
     Build a pbpstats Possessions object from a single-game PBP DataFrame.
@@ -317,8 +483,9 @@ def get_possessions_from_df(
     - Optionally uses a fetch_pbp_v3_fn(game_id) -> DataFrame to:
         * filter EVENTNUMs to those present in v3,
         * add missing StartOfPeriod events,
-        * reorder rows by v3 actionId ordering.
+        * preserve the deduped raw row order without forcing a v3 numeric reorder.
 
+    - Optionally propagates a local stats.nba boxscore loader to StartOfPeriod events.
     - Always normalizes NaNs/ints and repairs rebound event ordering via PbpProcessor.
     """
     if game_df.empty:
@@ -337,19 +504,24 @@ def get_possessions_from_df(
     # Patch missing start-of-period markers
     df = patch_start_of_periods(df, game_id, fetch_pbp_v3_fn)
 
-    # Reorder using v3 if possible; otherwise fall back to EVENTNUM / index
+    # Preserve the post-dedupe row order; numeric re-sorts can break old-game chronology.
     if fetch_pbp_v3_fn is not None:
         try:
             df_ordered = reorder_with_v3(df, game_id, fetch_pbp_v3_fn)
         except Exception:
-            df_ordered = _ensure_eventnum_int(df).sort_values(["PERIOD", "EVENTNUM"])
+            df_ordered = _ensure_eventnum_int(df).reset_index(drop=True)
     else:
-        df_ordered = _ensure_eventnum_int(df).sort_values(["PERIOD", "EVENTNUM"])
+        df_ordered = _ensure_eventnum_int(df).reset_index(drop=True)
 
     # As a last fallback, preserve original order if needed
     if df_ordered.empty:
-        df_ordered = df.sort_index()
+        df_ordered = df.reset_index(drop=True)
 
     raw_dicts = create_raw_dicts_from_df(df_ordered)
-    processor = PbpProcessor(game_id, raw_dicts, rebound_deletions_list)
+    processor = PbpProcessor(
+        game_id,
+        raw_dicts,
+        rebound_deletions_list,
+        boxscore_source_loader=boxscore_source_loader,
+    )
     return Possessions(processor.possessions)

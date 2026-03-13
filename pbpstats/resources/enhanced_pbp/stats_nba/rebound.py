@@ -69,7 +69,9 @@ class StatsRebound(Rebound, StatsEnhancedPbpItem):
             if isinstance(prev_event, (FieldGoal, FreeThrow)):
                 return prev_event
         raise EventOrderError(
-            f"previous event: {self.previous_event} is not a missed free throw or field goal"
+            f"rebound event: {self} previous event: {self.previous_event} is not a missed free throw or field goal",
+            rebound_event=self,
+            previous_event=self.previous_event,
         )
 
     @property
