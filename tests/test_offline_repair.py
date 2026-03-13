@@ -387,6 +387,227 @@ def test_fix_event_order_reorders_previous_rebound_before_second_miss_when_clock
     assert [row["EVENTNUM"] for row in processor.data] == [138, 140, 139, 141]
 
 
+def test_fix_event_order_moves_earlier_rebound_back_ahead_of_shooting_foul_free_throw_block():
+    processor = object.__new__(PbpProcessor)
+    processor.game_id = "0029700652"
+    processor.data = [
+        _stats_fg(293, 2, "MISS McDyess 17' Jump Shot", team_id=1610612756, player_id=686, clock="1:32"),
+        {
+            "GAME_ID": "0029700652",
+            "EVENTNUM": 295,
+            "PERIOD": 3,
+            "PCTIMESTRING": "1:31",
+            "EVENTMSGACTIONTYPE": 2,
+            "EVENTMSGTYPE": 6,
+            "PLAYER1_ID": 754,
+            "PLAYER1_TEAM_ID": 1610612755,
+            "PLAYER2_ID": None,
+            "PLAYER2_TEAM_ID": None,
+            "PLAYER3_ID": None,
+            "PLAYER3_TEAM_ID": None,
+            "HOMEDESCRIPTION": "Jackson S.FOUL (P3.T2)",
+            "VISITORDESCRIPTION": "",
+            "NEUTRALDESCRIPTION": "",
+        },
+        _stats_fg(296, 3, "Robinson Free Throw 1 of 2 (9 PTS)", team_id=1610612756, player_id=361, action_type=11, clock="1:31"),
+        _stats_fg(297, 3, "MISS Robinson Free Throw 2 of 2", team_id=1610612756, player_id=361, action_type=12, clock="1:31"),
+        _stats_rebound(294, "Robinson REBOUND (Off:3 Def:2)", team_id=1610612756, player_id=361, clock="1:30"),
+        _stats_rebound(298, "Weatherspoon REBOUND (Off:2 Def:2)", team_id=1610612755, player_id=221, clock="1:29"),
+    ]
+    for row in processor.data:
+        row["PERIOD"] = 3
+    processor._rebound_deletions_list = []
+
+    error = EventOrderError(
+        "rebound event: <StatsRebound EventNum: 298> previous event: <StatsRebound EventNum: 294> is not a missed free throw or field goal",
+        rebound_event_num=298,
+        previous_event_num=294,
+    )
+
+    processor._fix_event_order(error)
+
+    assert [row["EVENTNUM"] for row in processor.data] == [293, 294, 295, 296, 297, 298]
+
+
+def test_fix_event_order_moves_delayed_defensive_rebound_pair_ahead_of_sub_timeout_block():
+    processor = object.__new__(PbpProcessor)
+    processor.game_id = "0049700045"
+    processor.data = [
+        _stats_fg(138, 2, "MISS Burrell 18' Jump Shot", team_id=1610612741, player_id=197, clock="9:11"),
+        _stats_rebound(139, "Rodman REBOUND (Off:5 Def:5)", team_id=1610612741, player_id=23, clock="9:08"),
+        {"GAME_ID": "0049700045", "EVENTNUM": 147, "PERIOD": 2, "PCTIMESTRING": "9:06", "EVENTMSGACTIONTYPE": 0, "EVENTMSGTYPE": 8, "PLAYER1_ID": 70, "PLAYER1_TEAM_ID": 1610612741, "PLAYER2_ID": None, "PLAYER2_TEAM_ID": None, "PLAYER3_ID": None, "PLAYER3_TEAM_ID": None, "HOMEDESCRIPTION": "SUB: Jordan FOR Kerr", "VISITORDESCRIPTION": "", "NEUTRALDESCRIPTION": ""},
+        {"GAME_ID": "0049700045", "EVENTNUM": 148, "PERIOD": 2, "PCTIMESTRING": "9:06", "EVENTMSGACTIONTYPE": 0, "EVENTMSGTYPE": 8, "PLAYER1_ID": 753, "PLAYER1_TEAM_ID": 1610612741, "PLAYER2_ID": None, "PLAYER2_TEAM_ID": None, "PLAYER3_ID": None, "PLAYER3_TEAM_ID": None, "HOMEDESCRIPTION": "SUB: Pippen FOR Brown", "VISITORDESCRIPTION": "", "NEUTRALDESCRIPTION": ""},
+        {"GAME_ID": "0049700045", "EVENTNUM": 145, "PERIOD": 2, "PCTIMESTRING": "9:06", "EVENTMSGACTIONTYPE": 1, "EVENTMSGTYPE": 9, "PLAYER1_ID": 0, "PLAYER1_TEAM_ID": 0, "PLAYER2_ID": None, "PLAYER2_TEAM_ID": None, "PLAYER3_ID": None, "PLAYER3_TEAM_ID": None, "HOMEDESCRIPTION": "Timeout: Regular", "VISITORDESCRIPTION": "", "NEUTRALDESCRIPTION": ""},
+        {"GAME_ID": "0049700045", "EVENTNUM": 142, "PERIOD": 2, "PCTIMESTRING": "9:06", "EVENTMSGACTIONTYPE": 2, "EVENTMSGTYPE": 9, "PLAYER1_ID": 1610612766, "PLAYER1_TEAM_ID": 0, "PLAYER2_ID": None, "PLAYER2_TEAM_ID": None, "PLAYER3_ID": None, "PLAYER3_TEAM_ID": None, "HOMEDESCRIPTION": "", "VISITORDESCRIPTION": "Hornets Timeout: Short (Reg.4 Short 1)", "NEUTRALDESCRIPTION": ""},
+        _stats_rebound(141, "Royal REBOUND (Off:0 Def:2)", team_id=1610612766, player_id=140, clock="9:06"),
+        _stats_fg(140, 2, "MISS Rodman  Layup", team_id=1610612741, player_id=23, action_type=5, clock="9:06"),
+    ]
+    for row in processor.data:
+        row["PERIOD"] = 2
+    processor._rebound_deletions_list = []
+
+    error = EventOrderError(
+        "rebound event: <StatsRebound EventNum: 141> previous event: <StatsTimeout EventNum: 142> is not a missed free throw or field goal",
+        rebound_event_num=141,
+        previous_event_num=142,
+    )
+
+    processor._fix_event_order(error)
+
+    assert [row["EVENTNUM"] for row in processor.data] == [138, 139, 140, 141, 147, 148, 145, 142]
+
+
+def test_fix_event_order_unwinds_stacked_same_clock_rebounds_before_opponent_rebound():
+    processor = object.__new__(PbpProcessor)
+    processor.game_id = "0049700045"
+    processor.data = [
+        _stats_fg(28, 2, "MISS Rodman  Layup", team_id=1610612741, player_id=23, action_type=5, clock="8:50"),
+        _stats_fg(43, 2, "MISS Rodman  Tip Shot", team_id=1610612741, player_id=23, action_type=4, clock="8:41"),
+        _stats_rebound(39, "Rodman REBOUND (Off:6 Def:9)", team_id=1610612741, player_id=23, clock="8:41"),
+        _stats_fg(29, 2, "MISS Rodman  Tip Shot", team_id=1610612741, player_id=23, action_type=4, clock="8:41"),
+        _stats_rebound(30, "Rodman REBOUND (Off:7 Def:9)", team_id=1610612741, player_id=23, clock="8:41"),
+        _stats_rebound(31, "Mason REBOUND (Off:4 Def:6)", team_id=1610612766, player_id=193, clock="8:37"),
+    ]
+    for row in processor.data:
+        row["PERIOD"] = 1
+    processor._rebound_deletions_list = []
+
+    error = EventOrderError(
+        "rebound event: <StatsRebound EventNum: 31> previous event: <StatsRebound EventNum: 30> is not a missed free throw or field goal",
+        rebound_event_num=31,
+        previous_event_num=30,
+    )
+
+    processor._fix_event_order(error)
+
+    assert [row["EVENTNUM"] for row in processor.data] == [28, 39, 43, 30, 29, 31]
+
+
+def test_fix_event_order_moves_shadowing_team_rebound_behind_future_miss_and_rebound():
+    processor = object.__new__(PbpProcessor)
+    processor.game_id = "0049600063"
+    processor.data = [
+        _stats_fg(142, 2, "MISS Willis 11' Jump Shot", team_id=1610612745, player_id=788, action_type=1, clock="8:21"),
+        _stats_fg(143, 2, "MISS Johnson  Tip Shot", team_id=1610612745, player_id=698, action_type=4, clock="8:19"),
+        _stats_rebound(147, "Rockets Rebound", team_id=0, player_id=1610612745, clock="8:17"),
+        _stats_rebound(144, "Johnson REBOUND (Off:1 Def:1)", team_id=1610612745, player_id=698, clock="8:19"),
+        _stats_fg(145, 2, "MISS Willis  Tip Shot", team_id=1610612745, player_id=788, action_type=4, clock="8:17"),
+        _stats_rebound(146, "Willis REBOUND (Off:2 Def:0)", team_id=1610612745, player_id=788, clock="8:17"),
+    ]
+    processor._rebound_deletions_list = []
+
+    error = EventOrderError(
+        "rebound event: <StatsRebound EventNum: 144> previous event: <StatsRebound EventNum: 147> is not a missed free throw or field goal",
+        rebound_event_num=144,
+        previous_event_num=147,
+    )
+
+    processor._fix_event_order(error)
+
+    assert [row["EVENTNUM"] for row in processor.data] == [142, 143, 144, 145, 146, 147]
+
+
+def test_fix_event_order_moves_shadowing_team_rebound_behind_future_missed_free_throw():
+    processor = object.__new__(PbpProcessor)
+    processor.game_id = "0049600063"
+    processor.data = [
+        _stats_fg(351, 2, "MISS Willis 12' Jump Shot", team_id=1610612745, player_id=788, action_type=1, clock="11:50"),
+        _stats_rebound(358, "SUPERSONICS Rebound", team_id=0, player_id=1610612760, clock="11:20"),
+        _stats_rebound(352, "Perkins REBOUND (Off:0 Def:1)", team_id=1610612760, player_id=64, clock="11:47"),
+        _stats_fg(353, 1, "Cummings 15' Jump Shot (2 PTS)", team_id=1610612760, player_id=187, action_type=1, clock="11:38"),
+        {
+            "GAME_ID": "0049600063",
+            "EVENTNUM": 359,
+            "PERIOD": 4,
+            "PCTIMESTRING": "11:20",
+            "EVENTMSGACTIONTYPE": 3,
+            "EVENTMSGTYPE": 6,
+            "PLAYER1_ID": 788,
+            "PLAYER1_TEAM_ID": 1610612745,
+            "PLAYER2_ID": None,
+            "PLAYER2_TEAM_ID": None,
+            "PLAYER3_ID": None,
+            "PLAYER3_TEAM_ID": None,
+            "HOMEDESCRIPTION": "",
+            "VISITORDESCRIPTION": "Willis L.B.FOUL (P1.PN)",
+            "NEUTRALDESCRIPTION": "",
+        },
+        {
+            "GAME_ID": "0049600063",
+            "EVENTNUM": 357,
+            "PERIOD": 4,
+            "PCTIMESTRING": "11:20",
+            "EVENTMSGACTIONTYPE": 10,
+            "EVENTMSGTYPE": 3,
+            "PLAYER1_ID": 165,
+            "PLAYER1_TEAM_ID": 1610612745,
+            "PLAYER2_ID": None,
+            "PLAYER2_TEAM_ID": None,
+            "PLAYER3_ID": None,
+            "PLAYER3_TEAM_ID": None,
+            "HOMEDESCRIPTION": "",
+            "VISITORDESCRIPTION": "MISS Olajuwon Free Throw 1 of 1",
+            "NEUTRALDESCRIPTION": "",
+        },
+    ]
+    for row in processor.data:
+        row["PERIOD"] = 4
+    processor._rebound_deletions_list = []
+
+    error = EventOrderError(
+        "rebound event: <StatsRebound EventNum: 352> previous event: <StatsRebound EventNum: 358> is not a missed free throw or field goal",
+        rebound_event_num=352,
+        previous_event_num=358,
+    )
+
+    processor._fix_event_order(error)
+
+    assert [row["EVENTNUM"] for row in processor.data] == [351, 352, 353, 359, 357, 358]
+
+
+def test_fix_event_order_moves_second_rebound_behind_delayed_same_clock_miss():
+    processor = object.__new__(PbpProcessor)
+    processor.game_id = "0029700846"
+    processor.data = [
+        _stats_fg(123, 2, "MISS Maxwell  Layup", team_id=1610612766, player_id=137, action_type=5, clock="8:57"),
+        _stats_rebound(126, "Reid REBOUND (Off:2 Def:1)", team_id=1610612766, player_id=462, clock="8:55"),
+        _stats_rebound(124, "Garnett REBOUND (Off:2 Def:4)", team_id=1610612750, player_id=708, clock="8:55"),
+        _stats_fg(127, 2, "MISS Reid  Tip Shot", team_id=1610612766, player_id=462, action_type=4, clock="8:55"),
+    ]
+    processor._rebound_deletions_list = []
+
+    error = EventOrderError(
+        "rebound event: <StatsRebound EventNum: 124> previous event: <StatsRebound EventNum: 126> is not a missed free throw or field goal",
+        rebound_event_num=124,
+        previous_event_num=126,
+    )
+
+    processor._fix_event_order(error)
+
+    assert [row["EVENTNUM"] for row in processor.data] == [123, 126, 127, 124]
+
+
+def test_fix_event_order_moves_team_rebound_behind_delayed_same_clock_putback_miss():
+    processor = object.__new__(PbpProcessor)
+    processor.game_id = "0029700846"
+    processor.data = [
+        _stats_fg(215, 2, "MISS Hammonds 5' Hook Shot", team_id=1610612750, player_id=67, action_type=3, clock="1:19"),
+        _stats_rebound(217, "Parks REBOUND (Off:1 Def:1)", team_id=1610612750, player_id=685, clock="1:17"),
+        _stats_rebound(216, "Timberwolves Rebound", team_id=0, player_id=1610612750, clock="1:17"),
+        _stats_fg(218, 2, "MISS Parks  Layup", team_id=1610612750, player_id=685, action_type=5, clock="1:17"),
+    ]
+    processor._rebound_deletions_list = []
+
+    error = EventOrderError(
+        "rebound event: <StatsRebound EventNum: 216> previous event: <StatsRebound EventNum: 217> is not a missed free throw or field goal",
+        rebound_event_num=216,
+        previous_event_num=217,
+    )
+
+    processor._fix_event_order(error)
+
+    assert [row["EVENTNUM"] for row in processor.data] == [215, 217, 218, 216]
+
 
 def test_fix_event_order_reorders_same_team_rebound_chain_when_clocks_differ():
     processor = object.__new__(PbpProcessor)
@@ -443,6 +664,32 @@ def test_fix_event_order_reorders_start_of_period_rebound_cluster_with_forward_m
     assert [row["EVENTNUM"] for row in processor.data] == [202, 207, 211, 209, 210]
 
 
+def test_fix_event_order_moves_start_of_period_rebound_to_later_eventnum_predecessor_miss():
+    processor = object.__new__(PbpProcessor)
+    processor.game_id = "0029600585"
+    processor.data = [
+        {"GAME_ID": "0029600585", "EVENTNUM": 192, "PERIOD": 3, "PCTIMESTRING": "12:00", "EVENTMSGACTIONTYPE": 0, "EVENTMSGTYPE": 12, "PLAYER1_ID": 0, "PLAYER1_TEAM_ID": 0, "PLAYER2_ID": 0, "PLAYER2_TEAM_ID": 0, "PLAYER3_ID": 0, "PLAYER3_TEAM_ID": 0, "HOMEDESCRIPTION": "", "VISITORDESCRIPTION": "Start of 3rd Period", "NEUTRALDESCRIPTION": ""},
+        _stats_rebound(202, "Mason REBOUND (Off:1 Def:7)", team_id=1610612766, player_id=193, clock="12:00"),
+        _stats_rebound(204, "Ewing REBOUND (Off:3 Def:4)", team_id=1610612752, player_id=121, clock="12:00"),
+        {"GAME_ID": "0029600585", "EVENTNUM": 193, "PERIOD": 3, "PCTIMESTRING": "11:48", "EVENTMSGACTIONTYPE": 1, "EVENTMSGTYPE": 6, "PLAYER1_ID": 913, "PLAYER1_TEAM_ID": 1610612752, "PLAYER2_ID": None, "PLAYER2_TEAM_ID": None, "PLAYER3_ID": None, "PLAYER3_TEAM_ID": None, "HOMEDESCRIPTION": "", "VISITORDESCRIPTION": "Johnson P.FOUL (P4.T1)", "NEUTRALDESCRIPTION": ""},
+        _stats_fg(201, 2, "MISS Johnson 3PT Jump Shot", team_id=1610612752, player_id=913, action_type=1, clock="10:54"),
+        _stats_fg(203, 2, "MISS Divac 21' Jump Shot", team_id=1610612766, player_id=124, action_type=1, clock="10:39"),
+    ]
+    for row in processor.data:
+        row["PERIOD"] = 3
+    processor._rebound_deletions_list = []
+
+    error = EventOrderError(
+        "rebound event: <StatsRebound EventNum: 202> previous event: <StatsStartOfPeriod EventNum: 192> is not a missed free throw or field goal",
+        rebound_event_num=202,
+        previous_event_num=192,
+    )
+
+    processor._fix_event_order(error)
+
+    assert [row["EVENTNUM"] for row in processor.data] == [192, 204, 193, 201, 202, 203]
+
+
 def test_fix_event_order_deletes_team_rebound_at_period_start_without_cross_period_move():
     processor = object.__new__(PbpProcessor)
     processor.game_id = "0029600085"
@@ -466,6 +713,32 @@ def test_fix_event_order_deletes_team_rebound_at_period_start_without_cross_peri
     processor._fix_event_order(error)
 
     assert [row["EVENTNUM"] for row in processor.data] == [230, 232, 233]
+
+
+def test_fix_event_order_moves_rebound_back_to_nearby_eventnum_predecessor_miss_across_free_throw_block():
+    processor = object.__new__(PbpProcessor)
+    processor.game_id = "0029600585"
+    processor.data = [
+        _stats_fg(208, 2, "MISS Divac Layup", team_id=1610612766, player_id=124, action_type=5, clock="9:25"),
+        {"GAME_ID": "0029600585", "EVENTNUM": 210, "PERIOD": 3, "PCTIMESTRING": "9:25", "EVENTMSGACTIONTYPE": 2, "EVENTMSGTYPE": 6, "PLAYER1_ID": 121, "PLAYER1_TEAM_ID": 1610612752, "PLAYER2_ID": None, "PLAYER2_TEAM_ID": None, "PLAYER3_ID": None, "PLAYER3_TEAM_ID": None, "HOMEDESCRIPTION": "", "VISITORDESCRIPTION": "Ewing S.FOUL (P2.T3)", "NEUTRALDESCRIPTION": ""},
+        _stats_fg(211, 3, "Divac Free Throw 1 of 2 (14 PTS)", team_id=1610612766, player_id=124, action_type=11, clock="9:25"),
+        _stats_fg(212, 3, "MISS Divac Free Throw 2 of 2", team_id=1610612766, player_id=124, action_type=12, clock="9:25"),
+        _stats_rebound(213, "Ewing REBOUND (Off:3 Def:5)", team_id=1610612752, player_id=121, clock="9:25"),
+        _stats_rebound(209, "Divac REBOUND (Off:2 Def:2)", team_id=1610612766, player_id=124, clock="9:23"),
+    ]
+    for row in processor.data:
+        row["PERIOD"] = 3
+    processor._rebound_deletions_list = []
+
+    error = EventOrderError(
+        "rebound event: <StatsRebound EventNum: 209> previous event: <StatsRebound EventNum: 213> is not a missed free throw or field goal",
+        rebound_event_num=209,
+        previous_event_num=213,
+    )
+
+    processor._fix_event_order(error)
+
+    assert [row["EVENTNUM"] for row in processor.data] == [208, 209, 210, 211, 212, 213]
 
 
 def test_processor_uses_expanded_retry_budget(monkeypatch):

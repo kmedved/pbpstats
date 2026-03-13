@@ -78,7 +78,7 @@ class StatsFoul(Foul, StatsEnhancedPbpItem):
 
     @property
     def is_personal_foul(self):
-        return self.event_action_type == 1
+        return self.event_action_type in [1, 7, 8]
 
     @property
     def is_shooting_foul(self):

@@ -207,7 +207,10 @@ class EnhancedPbpItem(metaclass=abc.ABCMeta):
         returns True if the team on offense is in the penalty, False otherwise
         """
         if hasattr(self, "fouls_to_give"):
-            team_ids = list(self.current_players.keys())
+            current_players = self.current_players
+            if len(current_players) < 2:
+                return False
+            team_ids = list(current_players.keys())
             offense_team_id = self.get_offense_team_id()
             defense_team_id = (
                 team_ids[0] if offense_team_id == team_ids[1] else team_ids[1]
@@ -276,12 +279,16 @@ class EnhancedPbpItem(metaclass=abc.ABCMeta):
         - penalty seconds played
         """
         stat_items = []
-        team_ids = list(self.current_players.keys())
+        current_players = self.current_players
+        previous_players = getattr(self.previous_event, "current_players", {})
+        if len(current_players) < 2 or len(previous_players) < 2:
+            return stat_items
+        team_ids = list(current_players.keys())
         offense_team_id = self.get_offense_team_id()
         is_penalty_event = self.is_penalty_event()
         is_second_chance_event = self.is_second_chance_event()
         if self.seconds_since_previous_event != 0:
-            for team_id, players in self.previous_event.current_players.items():
+            for team_id, players in previous_players.items():
                 seconds_stat_key = (
                     pbpstats.SECONDS_PLAYED_OFFENSE_STRING
                     if team_id == offense_team_id
@@ -332,7 +339,10 @@ class EnhancedPbpItem(metaclass=abc.ABCMeta):
         - penalty possessions played
         """
         stat_items = []
-        team_ids = list(self.current_players.keys())
+        current_players = self.current_players
+        if len(current_players) < 2:
+            return stat_items
+        team_ids = list(current_players.keys())
         offense_team_id = self.get_offense_team_id()
         is_penalty_event = self.is_penalty_event()
         is_second_chance_event = self.is_second_chance_event()

@@ -182,6 +182,29 @@ class PbpProcessor(NbaEnhancedPbpLoader, NbaPossessionLoader):
                 return rows[idx].get("PLAYER1_TEAM_ID")
             return None
 
+        def effective_team_id(idx: int) -> Optional[int]:
+            team = team_id(idx)
+            if team is not None and not pd.isna(team):
+                team = int(team)
+                if team > 0:
+                    return team
+            if 0 <= idx < len(rows):
+                player = rows[idx].get("PLAYER1_ID")
+                if player is not None and not pd.isna(player):
+                    player = int(player)
+                    if player >= 1610000000:
+                        return player
+            return None
+
+        def is_team_rebound(idx: int) -> bool:
+            if et(idx) != 4 or not (0 <= idx < len(rows)):
+                return False
+            player = rows[idx].get("PLAYER1_ID")
+            if player is None or pd.isna(player):
+                return True
+            player = int(player)
+            return player == 0 or player >= 1610000000
+
         rebound_period = None
         if rebound_event_index is not None and 0 <= rebound_event_index < len(rows):
             rebound_period = rows[rebound_event_index].get("PERIOD")
@@ -202,6 +225,39 @@ class PbpProcessor(NbaEnhancedPbpLoader, NbaPossessionLoader):
                 ]
             ).lower()
             return "miss" in desc
+
+        # --- PATTERN -0.95: Sub/timeout block, rebound, then delayed FG miss ---
+        # Some historical feeds log:
+        #   ... -> SUB/TIMEOUT... -> REBOUND -> MISS
+        # where a delayed field-goal miss really happened before the dead-ball block.
+        # Handle both offensive and defensive field-goal rebound variants before the
+        # generic "nearest prior miss" fallback can steal the wrong earlier miss.
+        # Do not use this for free throws; historical FT placeholder rebounds often
+        # sit between missed attempts and should keep the original order.
+        if (
+            rebound_event_index is not None
+            and rebound_event_index == issue_event_index + 1
+            and et(issue_event_index) in (8, 9)
+        ):
+            block_start = issue_event_index
+            while block_start - 1 >= 0 and et(block_start - 1) in (8, 9):
+                block_start -= 1
+
+            rebound_clock = rows[rebound_event_index].get("PCTIMESTRING")
+            search_limit = min(rebound_event_index + 4, len(rows))
+            for candidate_idx in range(rebound_event_index + 1, search_limit):
+                candidate_row = rows[candidate_idx]
+                if rebound_period is not None and candidate_row.get("PERIOD") != rebound_period:
+                    break
+                candidate_clock = candidate_row.get("PCTIMESTRING")
+                if candidate_clock != rebound_clock:
+                    break
+                if et(candidate_idx) == 2:
+                    delayed_miss = rows.pop(candidate_idx)
+                    rebound_row = rows.pop(rebound_event_index)
+                    rows[block_start:block_start] = [delayed_miss, rebound_row]
+                    self.data = rows
+                    return
 
         # --- PATTERN -1: Move an orphan rebound back to the nearest prior miss ---
         # Only use this generic repair when the previous event is not itself a rebound.
@@ -228,6 +284,21 @@ class PbpProcessor(NbaEnhancedPbpLoader, NbaPossessionLoader):
             and rebound_event_index == issue_event_index + 1
             and et(issue_event_index) == 12
         ):
+            rebound_event_number = en(rebound_event_index)
+            search_limit = min(rebound_event_index + 12, len(rows))
+            if rebound_event_number is not None:
+                for candidate_idx in range(rebound_event_index + 1, search_limit):
+                    if rows[candidate_idx].get("PERIOD") != rebound_period:
+                        break
+                    if en(candidate_idx) != rebound_event_number - 1:
+                        continue
+                    if is_missed_shot_or_ft(candidate_idx):
+                        rebound_row = rows.pop(rebound_event_index)
+                        if rebound_event_index < candidate_idx:
+                            candidate_idx -= 1
+                        rows.insert(candidate_idx + 1, rebound_row)
+                        self.data = rows
+                        return
             for candidate_idx in range(rebound_event_index + 1, min(rebound_event_index + 4, len(rows))):
                 if rows[candidate_idx].get("PERIOD") != rebound_period:
                     break
@@ -258,6 +329,188 @@ class PbpProcessor(NbaEnhancedPbpLoader, NbaPossessionLoader):
             self.data = rows
             return
 
+        # --- PATTERN -0.46: Earlier rebound stranded behind a shooting-foul FT block ---
+        # Some historical feeds log:
+        #   MISS_A -> foul/free throws -> REBOUND_A -> REBOUND_B
+        # where REBOUND_A actually belongs to MISS_A before the foul/FT block,
+        # leaving REBOUND_B as the real rebound on the missed last free throw.
+        if (
+            rebound_event_index is not None
+            and et(issue_event_index) == 4
+            and et(rebound_event_index) == 4
+        ):
+            rebound_event_number = en(rebound_event_index)
+            if rebound_event_number is not None:
+                search_start = max(0, rebound_event_index - 12)
+                for candidate_idx in range(search_start, issue_event_index):
+                    if rows[candidate_idx].get("PERIOD") != rebound_period:
+                        continue
+                    if en(candidate_idx) != rebound_event_number - 1:
+                        continue
+                    if not is_missed_shot_or_ft(candidate_idx):
+                        continue
+                    block_range = range(candidate_idx + 1, issue_event_index)
+                    if block_range and all(et(block_idx) in (3, 6) for block_idx in block_range):
+                        rebound_row = rows.pop(rebound_event_index)
+                        rows.insert(candidate_idx + 1, rebound_row)
+                        self.data = rows
+                        return
+            first_rebound_team = effective_team_id(issue_event_index)
+            second_rebound_team = effective_team_id(rebound_event_index)
+            prev_idx = issue_event_index - 1
+            if (
+                first_rebound_team is not None
+                and second_rebound_team is not None
+                and first_rebound_team != second_rebound_team
+                and prev_idx >= 0
+                and rows[prev_idx].get("PERIOD") == rebound_period
+                and et(prev_idx) == 3
+                and is_missed_shot_or_ft(prev_idx)
+            ):
+                scan_idx = prev_idx - 1
+                saw_foul = False
+                while (
+                    scan_idx >= 0
+                    and rows[scan_idx].get("PERIOD") == rebound_period
+                    and et(scan_idx) in (3, 6)
+                ):
+                    saw_foul = saw_foul or et(scan_idx) == 6
+                    scan_idx -= 1
+
+                if (
+                    saw_foul
+                    and scan_idx >= 0
+                    and rows[scan_idx].get("PERIOD") == rebound_period
+                    and is_missed_shot_or_ft(scan_idx)
+                    and team_id(scan_idx) == first_rebound_team
+                ):
+                    first_rebound = rows.pop(issue_event_index)
+                    rows.insert(scan_idx + 1, first_rebound)
+                    self.data = rows
+                    return
+
+        # --- PATTERN -0.455: Stacked same-clock misses/rebounds before opponent rebound ---
+        # Some old feeds log a long offensive-rebound chain like:
+        #   MISS_A0 -> MISS_A1 -> REBOUND_A0 -> MISS_A2 -> REBOUND_A1 -> REBOUND_B
+        # where each same-team rebound actually belongs to the immediately earlier miss.
+        # Re-pair the same-team rebounds before the opponent rebound gets treated as orphaned.
+        if (
+            rebound_event_index is not None
+            and issue_event_index - 4 >= 0
+            and et(issue_event_index) == 4
+            and et(rebound_event_index) == 4
+            and et(issue_event_index - 1) == 2
+            and et(issue_event_index - 2) == 4
+            and et(issue_event_index - 3) == 2
+            and et(issue_event_index - 4) == 2
+        ):
+            current_team = effective_team_id(issue_event_index)
+            opponent_team = effective_team_id(rebound_event_index)
+            if (
+                current_team is not None
+                and opponent_team is not None
+                and current_team != opponent_team
+                and effective_team_id(issue_event_index - 2) == current_team
+                and team_id(issue_event_index - 1) == current_team
+                and team_id(issue_event_index - 3) == current_team
+                and team_id(issue_event_index - 4) == current_team
+            ):
+                earlier_miss_clock = rows[issue_event_index - 3].get("PCTIMESTRING")
+                earlier_rebound_clock = rows[issue_event_index - 2].get("PCTIMESTRING")
+                current_miss_clock = rows[issue_event_index - 1].get("PCTIMESTRING")
+                current_rebound_clock = rows[issue_event_index].get("PCTIMESTRING")
+                if (
+                    earlier_miss_clock == earlier_rebound_clock
+                    and current_miss_clock == current_rebound_clock
+                    and earlier_miss_clock == current_miss_clock
+                ):
+                    slice_start = issue_event_index - 4
+                    slice_end = rebound_event_index + 1
+                    prefix = rows[:slice_start]
+                    suffix = rows[slice_end:]
+                    reordered = [
+                        rows[issue_event_index - 4],
+                        rows[issue_event_index - 2],
+                        rows[issue_event_index - 3],
+                        rows[issue_event_index],
+                        rows[issue_event_index - 1],
+                        rows[rebound_event_index],
+                    ]
+                    self.data = prefix + reordered + suffix
+                    return
+
+        # --- PATTERN -0.45: Rebound, rebound, then delayed same-clock miss ---
+        # Historical feeds sometimes log:
+        #   MISS -> REBOUND_A -> REBOUND_B -> delayed MISS
+        # where REBOUND_B actually belongs after the delayed same-clock miss.
+        if (
+            rebound_event_index is not None
+            and et(issue_event_index) == 4
+            and et(rebound_event_index) == 4
+        ):
+            rebound_clock = rows[rebound_event_index].get("PCTIMESTRING")
+            first_rebound_team = effective_team_id(issue_event_index)
+            search_limit = min(rebound_event_index + 3, len(rows))
+            for candidate_idx in range(rebound_event_index + 1, search_limit):
+                candidate_row = rows[candidate_idx]
+                if rebound_period is not None and candidate_row.get("PERIOD") != rebound_period:
+                    break
+                if candidate_row.get("PCTIMESTRING") != rebound_clock:
+                    break
+                if not is_missed_shot_or_ft(candidate_idx):
+                    continue
+                if first_rebound_team is not None and team_id(candidate_idx) != first_rebound_team:
+                    continue
+
+                rebound_row = rows.pop(rebound_event_index)
+                if rebound_event_index < candidate_idx:
+                    candidate_idx -= 1
+                rows.insert(candidate_idx + 1, rebound_row)
+                self.data = rows
+                return
+
+        # --- PATTERN -0.4: Shadowing TEAM rebound before a future miss chain ---
+        # Some historical feeds place a later TEAM rebound ahead of the missed shot
+        # or free throw it actually belongs to. That rebound can "shadow" an earlier
+        # valid rebound and cause the valid rebound to be deleted by fallback.
+        if (
+            rebound_event_index is not None
+            and et(issue_event_index) == 4
+            and et(rebound_event_index) == 4
+            and is_team_rebound(issue_event_index)
+        ):
+            shadow_clock = rows[issue_event_index].get("PCTIMESTRING")
+            rebound_clock = rows[rebound_event_index].get("PCTIMESTRING")
+            if rebound_clock == shadow_clock:
+                shadow_clock = None
+            search_limit = min(issue_event_index + 8, len(rows))
+            if shadow_clock is not None:
+                for candidate_idx in range(issue_event_index + 1, search_limit):
+                    candidate_row = rows[candidate_idx]
+                    if rebound_period is not None and candidate_row.get("PERIOD") != rebound_period:
+                        break
+                    if candidate_idx == rebound_event_index:
+                        continue
+                    if candidate_row.get("PCTIMESTRING") != shadow_clock:
+                        continue
+                    if not is_missed_shot_or_ft(candidate_idx):
+                        continue
+
+                    insert_after_idx = candidate_idx
+                    if (
+                        candidate_idx + 1 < len(rows)
+                        and et(candidate_idx + 1) == 4
+                        and rows[candidate_idx + 1].get("PCTIMESTRING") == shadow_clock
+                    ):
+                        insert_after_idx = candidate_idx + 1
+
+                    shadow_rebound = rows.pop(issue_event_index)
+                    if issue_event_index < insert_after_idx:
+                        insert_after_idx -= 1
+                    rows.insert(insert_after_idx + 1, shadow_rebound)
+                    self.data = rows
+                    return
+
         # --- PATTERN 0: Miss, made putback/layup, rebound ---
         if (
             rebound_event_index is not None
@@ -275,36 +528,6 @@ class PbpProcessor(NbaEnhancedPbpLoader, NbaPossessionLoader):
             rows[issue_event_index], rows[rebound_event_index] = rebound_event, made_shot
             self.data = rows
             return
-
-        # --- PATTERN 0.9: Sub/timeout block, rebound, then delayed same-clock miss ---
-        # Some historical feeds log:
-        #   ... -> REBOUND -> SUB/TIMEOUT... -> REBOUND -> MISS
-        # where the trailing miss/rebound pair belongs before the dead-ball block.
-        if (
-            rebound_event_index is not None
-            and rebound_event_index == issue_event_index + 1
-            and et(issue_event_index) in (8, 9)
-        ):
-            block_start = issue_event_index
-            while block_start - 1 >= 0 and et(block_start - 1) in (8, 9):
-                block_start -= 1
-
-            rebound_clock = rows[rebound_event_index].get("PCTIMESTRING")
-            rebound_team = team_id(rebound_event_index)
-            search_limit = min(rebound_event_index + 4, len(rows))
-            for candidate_idx in range(rebound_event_index + 1, search_limit):
-                candidate_row = rows[candidate_idx]
-                if rebound_period is not None and candidate_row.get("PERIOD") != rebound_period:
-                    break
-                candidate_clock = candidate_row.get("PCTIMESTRING")
-                if candidate_clock != rebound_clock:
-                    break
-                if is_missed_shot_or_ft(candidate_idx) and team_id(candidate_idx) == rebound_team:
-                    delayed_miss = rows.pop(candidate_idx)
-                    rebound_row = rows.pop(rebound_event_index)
-                    rows[block_start:block_start] = [delayed_miss, rebound_row]
-                    self.data = rows
-                    return
 
         # --- PATTERN 1: Previous event is sub/timeout (type 8 or 9) ---
         if et(issue_event_index) in (8, 9):

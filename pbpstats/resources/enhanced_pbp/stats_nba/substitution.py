@@ -26,4 +26,8 @@ class StatsSubstitution(Substitution, StatsEnhancedPbpItem):
         """
         returns player id of player coming in to the game
         """
-        return self.player2_id
+        if hasattr(self, "player2_id"):
+            return self.player2_id
+        # Malformed historical rows occasionally omit the incoming player.
+        # Treat these as no-op substitutions so lineup tracking can continue.
+        return self.player1_id
