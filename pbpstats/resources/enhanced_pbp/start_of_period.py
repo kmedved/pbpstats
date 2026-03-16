@@ -184,15 +184,132 @@ class StartOfPeriod(metaclass=abc.ABCMeta):
         """
         return self.team_starting_with_ball
 
+    def _get_known_team_ids_for_period(self):
+        team_ids = set()
+        prev_lineups = getattr(self, "previous_period_end_lineups", None)
+        if isinstance(prev_lineups, dict):
+            for team_id in prev_lineups.keys():
+                if isinstance(team_id, int) and team_id > 0:
+                    team_ids.add(team_id)
+
+        event = self
+        while event is not None and not isinstance(event, EndOfPeriod):
+            for attr in [
+                "team_id",
+                "player1_team_id",
+                "player2_team_id",
+                "player3_team_id",
+            ]:
+                team_id = getattr(event, attr, None)
+                if isinstance(team_id, int) and team_id > 0:
+                    team_ids.add(team_id)
+            event = event.next_event
+        return team_ids
+
+    def _is_valid_starter_candidate(self, player_id, known_team_ids):
+        if not isinstance(player_id, int) or player_id <= 0:
+            return False
+        if player_id in known_team_ids:
+            return False
+        # Team ids in malformed historical rows are 10-digit values.
+        if player_id >= 100000000:
+            return False
+        return True
+
+    def _record_starter_candidate(
+        self,
+        player_id,
+        starters,
+        subbed_in_players,
+        player_first_seen_order,
+        known_team_ids,
+        event_order,
+        player_first_seen_seconds_remaining=None,
+        seconds_remaining=None,
+    ):
+        if not self._is_valid_starter_candidate(player_id, known_team_ids):
+            return
+        if player_id not in player_first_seen_order:
+            player_first_seen_order[player_id] = event_order
+        if (
+            player_first_seen_seconds_remaining is not None
+            and player_id not in player_first_seen_seconds_remaining
+        ):
+            player_first_seen_seconds_remaining[player_id] = (
+                float(seconds_remaining)
+                if seconds_remaining is not None
+                else float("-inf")
+            )
+        if player_id not in starters and player_id not in subbed_in_players:
+            starters.append(player_id)
+
+    def _get_first_team_substitution_order(self):
+        first_sub_order = {}
+        event = self
+        event_order = 0
+        while event is not None and not isinstance(event, EndOfPeriod):
+            event_order += 1
+            if isinstance(event, Substitution) and isinstance(
+                getattr(event, "team_id", None), int
+            ):
+                team_id = event.team_id
+                if team_id > 0 and team_id not in first_sub_order:
+                    first_sub_order[team_id] = event_order
+            event = event.next_event
+        return first_sub_order
+
+    def _trim_excess_starters(
+        self, starters_by_team, player_first_seen_order, known_team_ids
+    ):
+        first_team_sub_order = self._get_first_team_substitution_order()
+        for team_id, starters in list(starters_by_team.items()):
+            if len(starters) <= 5:
+                continue
+
+            unique_starters = []
+            for player_id in starters:
+                if (
+                    self._is_valid_starter_candidate(player_id, known_team_ids)
+                    and player_id not in unique_starters
+                ):
+                    unique_starters.append(player_id)
+
+            if len(unique_starters) <= 5:
+                starters_by_team[team_id] = unique_starters
+                continue
+
+            team_sub_order = first_team_sub_order.get(team_id, float("inf"))
+
+            def _sort_key(player_id):
+                first_seen = player_first_seen_order.get(player_id, float("inf"))
+                appears_before_team_sub = 0 if first_seen < team_sub_order else 1
+                unseen_penalty = 0 if first_seen != float("inf") else 1
+                return (
+                    appears_before_team_sub,
+                    unseen_penalty,
+                    first_seen,
+                    unique_starters.index(player_id),
+                )
+
+            starters_by_team[team_id] = sorted(unique_starters, key=_sort_key)[:5]
+
+        return starters_by_team
+
     def _get_players_who_started_period_with_team_map(self):
         starters = []
         subbed_in_players = []
         player_team_map = {}  # only player1 has team id in event, this is to track team
+        player_first_seen_order = {}
+        player_first_seen_seconds_remaining = {}
+        player_first_sub_in_seconds_remaining = {}
+        known_team_ids = self._get_known_team_ids_for_period()
         event = self
+        event_order = 0
         while event is not None and not isinstance(event, EndOfPeriod):
+            event_order += 1
             if (
                 not isinstance(event, Timeout)
-                and event.player1_id != 0
+                and self._is_valid_starter_candidate(event.player1_id, known_team_ids)
                 and hasattr(event, "team_id")
             ):
                 player_id = event.player1_id
@@ -203,14 +320,32 @@ class StartOfPeriod(metaclass=abc.ABCMeta):
                     isinstance(event, Substitution)
                     and event.incoming_player_id is not None
                 ):
-                    player_team_map[event.incoming_player_id] = event.team_id
-                    if (
+                    if self._is_valid_starter_candidate(
+                        event.incoming_player_id, known_team_ids
+                    ):
+                        player_team_map[event.incoming_player_id] = event.team_id
+                        if event.incoming_player_id not in player_first_sub_in_seconds_remaining:
+                            player_first_sub_in_seconds_remaining[event.incoming_player_id] = float(
+                                getattr(event, "seconds_remaining", float("-inf"))
+                            )
+                    if self._is_valid_starter_candidate(
+                        event.incoming_player_id, known_team_ids
+                    ) and (
                         event.incoming_player_id not in starters
                         and event.incoming_player_id not in subbed_in_players
                     ):
                         subbed_in_players.append(event.incoming_player_id)
                     if player_id not in starters and player_id not in subbed_in_players:
-                        starters.append(player_id)
+                        self._record_starter_candidate(
+                            player_id,
+                            starters,
+                            subbed_in_players,
+                            player_first_seen_order,
+                            known_team_ids,
+                            event_order,
+                            player_first_seen_seconds_remaining=player_first_seen_seconds_remaining,
+                            seconds_remaining=getattr(event, "seconds_remaining", None),
+                        )
 
                 is_technical_foul = isinstance(event, Foul) and (
                     event.is_technical or event.is_double_technical
@@ -225,32 +360,69 @@ class StartOfPeriod(metaclass=abc.ABCMeta):
                         or tech_ft_at_period_start
                     ):
                         # ignore all techs because a player could get a technical foul when they aren't in the game
-                        starters.append(player_id)
+                        self._record_starter_candidate(
+                            player_id,
+                            starters,
+                            subbed_in_players,
+                            player_first_seen_order,
+                            known_team_ids,
+                            event_order,
+                            player_first_seen_seconds_remaining=player_first_seen_seconds_remaining,
+                            seconds_remaining=getattr(event, "seconds_remaining", None),
+                        )
                 # need player2_id and player3_id for players who play full period and never appear in an event as player_id - ex assists, blocks, steals, foul drawn
                 if not isinstance(event, Substitution) and not (
                     is_technical_foul or isinstance(event, Ejection)
                 ):
                     # ignore all techs because a player could get a technical foul when they aren't in the game
-                    if (
-                        hasattr(event, "player2_id")
-                        and event.player2_id not in starters
-                        and event.player2_id not in subbed_in_players
-                    ):
-                        starters.append(event.player2_id)
-                    if (
-                        hasattr(event, "player3_id")
-                        and event.player3_id not in starters
-                        and event.player3_id not in subbed_in_players
-                    ):
-                        starters.append(event.player3_id)
+                    if hasattr(event, "player2_id"):
+                        self._record_starter_candidate(
+                            event.player2_id,
+                            starters,
+                            subbed_in_players,
+                            player_first_seen_order,
+                            known_team_ids,
+                            event_order,
+                            player_first_seen_seconds_remaining=player_first_seen_seconds_remaining,
+                            seconds_remaining=getattr(event, "seconds_remaining", None),
+                        )
+                    if hasattr(event, "player3_id"):
+                        self._record_starter_candidate(
+                            event.player3_id,
+                            starters,
+                            subbed_in_players,
+                            player_first_seen_order,
+                            known_team_ids,
+                            event_order,
+                            player_first_seen_seconds_remaining=player_first_seen_seconds_remaining,
+                            seconds_remaining=getattr(event, "seconds_remaining", None),
+                        )
             event = event.next_event
-        return starters, player_team_map
+
+        # Some malformed recent windows log a player's first action before the
+        # substitution that actually brought them into the game. If the first
+        # explicit sub-in happens earlier in game time than the player's first
+        # recorded starter-like event, treat them as a sub, not a starter.
+        for player_id, sub_seconds_remaining in player_first_sub_in_seconds_remaining.items():
+            first_seen_seconds_remaining = player_first_seen_seconds_remaining.get(player_id)
+            if first_seen_seconds_remaining is None:
+                continue
+            if sub_seconds_remaining > first_seen_seconds_remaining + 0.001:
+                starters = [starter_id for starter_id in starters if starter_id != player_id]
+                if player_id not in subbed_in_players:
+                    subbed_in_players.append(player_id)
+        return starters, player_team_map, player_first_seen_order, subbed_in_players
 
     def _split_up_starters_by_team(self, starters, player_team_map):
         starters_by_team = {}
+        known_team_ids = {
+            team_id for team_id in player_team_map.values() if isinstance(team_id, int)
+        }
         # for players who don't appear in event as player1 - won't be in player_team_map
         dangling_starters = []
         for player_id in starters:
+            if not self._is_valid_starter_candidate(player_id, known_team_ids):
+                continue
             team_id = player_team_map.get(player_id)
             if team_id is not None:
                 if team_id not in starters_by_team.keys():
@@ -264,6 +436,48 @@ class StartOfPeriod(metaclass=abc.ABCMeta):
                 if len(team_starters) == 4:
                     team_starters += dangling_starters
         return starters_by_team
+
+    def _load_period_starter_overrides(self, file_directory):
+        if file_directory is None:
+            return {}
+
+        override_files = [
+            f"{file_directory}/overrides/missing_period_starters.json",
+            f"{file_directory}/overrides/period_starters_overrides.json",
+        ]
+        merged_overrides = {}
+
+        for override_file_path in override_files:
+            if not os.path.isfile(override_file_path):
+                continue
+            with open(override_file_path) as f:
+                override_data = json.loads(f.read(), cls=IntDecoder)
+            for game_id, game_periods in override_data.items():
+                merged_overrides.setdefault(game_id, {})
+                for period, team_map in game_periods.items():
+                    merged_overrides[game_id].setdefault(period, {})
+                    merged_overrides[game_id][period].update(team_map)
+
+        return merged_overrides
+
+    def _apply_period_starter_overrides(self, starters_by_team, file_directory):
+        overrides = self._load_period_starter_overrides(file_directory)
+        game_id_keys = [self.game_id]
+        try:
+            game_id_keys.append(int(self.game_id))
+        except (TypeError, ValueError):
+            pass
+
+        team_overrides = {}
+        for game_id in game_id_keys:
+            team_overrides.update(overrides.get(game_id, {}).get(self.period, {}))
+        if not team_overrides:
+            return starters_by_team
+
+        updated = dict(starters_by_team)
+        for team_id, starters in team_overrides.items():
+            updated[team_id] = starters
+        return updated
 
     def _check_both_teams_have_5_starters(self, starters_by_team, file_directory):
         """
@@ -427,12 +641,25 @@ class StartOfPeriod(metaclass=abc.ABCMeta):
     def _get_period_starters_from_period_events(
         self, file_directory, ignore_missing_starters=False
     ):
-        starters, player_team_map = self._get_players_who_started_period_with_team_map()
+        starters, player_team_map, player_first_seen_order, subbed_in_players = (
+            self._get_players_who_started_period_with_team_map()
+        )
+        known_team_ids = self._get_known_team_ids_for_period()
+        starters = [
+            player_id for player_id in starters if player_id not in subbed_in_players
+        ]
 
         starters_by_team = self._split_up_starters_by_team(starters, player_team_map)
         starters_by_team = self._fill_missing_starters_from_previous_period_end(
             starters_by_team
         )
+        starters_by_team = self._apply_period_starter_overrides(
+            starters_by_team, file_directory
+        )
+        if ignore_missing_starters:
+            starters_by_team = self._trim_excess_starters(
+                starters_by_team, player_first_seen_order, known_team_ids
+            )
         if not ignore_missing_starters:
             self._check_both_teams_have_5_starters(starters_by_team, file_directory)
 

@@ -58,10 +58,11 @@ class PbpProcessor(NbaEnhancedPbpLoader, NbaPossessionLoader):
         raw_data_dicts: List[dict],
         rebound_deletions_list: Optional[List[Dict]] = None,
         boxscore_source_loader=None,
+        file_directory: Optional[str] = None,
     ):
         self.game_id = str(game_id).zfill(10)
         self.league = "nba"
-        self.file_directory = None
+        self.file_directory = file_directory
         self.data = raw_data_dicts
         self.factory = StatsNbaEnhancedPbpFactory()
         self.boxscore_source_loader = boxscore_source_loader
@@ -1164,6 +1165,7 @@ def get_possessions_from_df(
     fetch_pbp_v3_fn: Optional[FetchPbpV3Fn] = None,
     rebound_deletions_list: Optional[List[Dict]] = None,
     boxscore_source_loader=None,
+    file_directory: Optional[str] = None,
 ) -> Possessions:
     """
     Build a pbpstats Possessions object from a single-game PBP DataFrame.
@@ -1211,5 +1213,6 @@ def get_possessions_from_df(
         raw_dicts,
         rebound_deletions_list,
         boxscore_source_loader=boxscore_source_loader,
+        file_directory=file_directory,
     )
     return Possessions(processor.possessions)
