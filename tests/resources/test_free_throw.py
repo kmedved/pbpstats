@@ -4,6 +4,13 @@ from pbpstats.resources.enhanced_pbp.stats_nba.foul import StatsFoul
 from pbpstats.resources.enhanced_pbp.stats_nba.free_throw import StatsFreeThrow
 
 
+class DummyReboundEvent:
+    event_type = 4
+
+    def __init__(self, team_id):
+        self.team_id = team_id
+
+
 def test_data_made_free_throw():
     item = {
         "evt": 110,
@@ -85,6 +92,46 @@ def test_stats_missed_free_throw():
     }
     order = 1
     event = StatsFreeThrow(item, order)
+    assert event.is_made is False
+
+
+def test_stats_ambiguous_final_free_throw_followed_by_offensive_rebound_is_missed():
+    item = {
+        "EVENTNUM": 228,
+        "PCTIMESTRING": "2:58",
+        "VISITORDESCRIPTION": "Free Throw 2 of 2",
+        "EVENTMSGACTIONTYPE": 12,
+        "EVENTMSGTYPE": 3,
+        "PLAYER1_ID": 1924,
+        "PLAYER1_TEAM_ID": 1610612739,
+        "PLAYER2_ID": None,
+        "PLAYER2_TEAM_ID": None,
+        "PLAYER3_ID": None,
+        "PLAYER3_TEAM_ID": None,
+    }
+    order = 1
+    event = StatsFreeThrow(item, order)
+    event.next_event = DummyReboundEvent(team_id=1610612739)
+    assert event.is_made is False
+
+
+def test_stats_ambiguous_final_free_throw_followed_by_defensive_rebound_is_missed():
+    item = {
+        "EVENTNUM": 490,
+        "PCTIMESTRING": "0:04",
+        "HOMEDESCRIPTION": "Free Throw 2 of 2",
+        "EVENTMSGACTIONTYPE": 12,
+        "EVENTMSGTYPE": 3,
+        "PLAYER1_ID": 157,
+        "PLAYER1_TEAM_ID": 1610612742,
+        "PLAYER2_ID": None,
+        "PLAYER2_TEAM_ID": None,
+        "PLAYER3_ID": None,
+        "PLAYER3_TEAM_ID": None,
+    }
+    order = 1
+    event = StatsFreeThrow(item, order)
+    event.next_event = DummyReboundEvent(team_id=1610612755)
     assert event.is_made is False
 
 

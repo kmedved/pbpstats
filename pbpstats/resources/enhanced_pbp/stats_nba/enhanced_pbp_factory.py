@@ -51,4 +51,13 @@ class StatsNbaEnhancedPbpFactory(object):
 
         :returns: class for event type
         """
-        return self.event_classes.get(event_type, StatsEnhancedPbpItem)
+        normalized_event_type = event_type
+        try:
+            normalized_event_type = int(event_type)
+        except (TypeError, ValueError):
+            pass
+
+        return self.event_classes.get(
+            normalized_event_type,
+            self.event_classes.get(event_type, StatsEnhancedPbpItem),
+        )

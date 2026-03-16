@@ -68,7 +68,29 @@ class Turnover(object):
         """
         stats = []
         second_chance_stats = []
-        if not self.is_no_turnover:
+        # Some stats.nba rows are mislabeled as "No Turnover" even though the
+        # official boxscore credits them as real turnovers. Preserve live-ball
+        # cases with steals across all seasons, but only count dead-ball
+        # "No Turnover" rows for 2017-18 and later seasons. Earlier seasons
+        # still use the older semantics where these rows are not official
+        # player turnovers.
+        no_turnover_with_steal = self.is_no_turnover and self.is_steal
+        raw_game_id = str(getattr(self, "game_id", "") or "")
+        try:
+            season_suffix = int(raw_game_id[3:5])
+        except (TypeError, ValueError):
+            season_suffix = None
+        valid_no_turnover_committer = self.is_no_turnover and getattr(
+            self, "player1_id", 0
+        ) not in [0, None, "0"] and getattr(self, "team_id", 0) not in [
+            0,
+            None,
+            "0",
+        ]
+        countable_no_turnover = valid_no_turnover_committer and (
+            season_suffix is not None and season_suffix >= 17
+        )
+        if not self.is_no_turnover or no_turnover_with_steal or countable_no_turnover:
             team_ids = list(self.current_players.keys())
             opponent_team_id = (
                 team_ids[0] if self.team_id == team_ids[1] else team_ids[1]
@@ -77,9 +99,16 @@ class Turnover(object):
             if self.is_steal:
                 turnover_key = (
                     pbpstats.LOST_BALL_TURNOVER_STRING
-                    if self.is_lost_ball
+                    if self.is_lost_ball or self.is_no_turnover
                     else pbpstats.BAD_PASS_TURNOVER_STRING
                 )
+                steal_team_id = opponent_team_id
+                # Some historical stats.nba turnover rows credit a "steal" to the same
+                # player/team as the turnover. When the stealer id is actually on the
+                # offensive lineup, keep the steal on that team instead of forcing it
+                # onto the opponent and creating a ghost player row.
+                if self.player3_id in self.current_players.get(self.team_id, []):
+                    steal_team_id = self.team_id
                 stats.append(
                     {
                         "player_id": self.player1_id,
@@ -90,13 +119,13 @@ class Turnover(object):
                 )
                 steal_key = (
                     pbpstats.LOST_BALL_STEAL_STRING
-                    if self.is_lost_ball
+                    if self.is_lost_ball or self.is_no_turnover
                     else pbpstats.BAD_PASS_STEAL_STRING
                 )
                 stats.append(
                     {
                         "player_id": self.player3_id,
-                        "team_id": opponent_team_id,
+                        "team_id": steal_team_id,
                         "stat_key": steal_key,
                         "stat_value": 1,
                     }

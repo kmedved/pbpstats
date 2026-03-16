@@ -42,7 +42,7 @@ class NbaEnhancedPbpLoader(object):
                 event.next_event = None
             elif isinstance(event, StartOfPeriod) or i == 0:
                 event.previous_event = None
-                event.next_event = self.items[i + 1]
+                event.next_event = self.items[i + 1] if i < len(self.items) - 1 else None
                 self.start_period_indices.append(i)
                 if event.period <= 4:
                     fouls_to_give = defaultdict(lambda: 4)
@@ -140,6 +140,14 @@ class NbaEnhancedPbpLoader(object):
             else:
                 event.previous_period_end_lineups = None
                 event.previous_period_end_period = None
+
+            if getattr(event, "next_event", None) is None:
+                # Some malformed games end with a stray StartOfPeriod marker and
+                # no events in the new period. Skip starter / possession inference
+                # for those terminal sentinels instead of crashing.
+                event.team_starting_with_ball = None
+                event.period_starters = {}
+                continue
 
             team_id = event.get_team_starting_with_ball()
             event.team_starting_with_ball = team_id

@@ -15,6 +15,17 @@ class StatsFoul(Foul, StatsEnhancedPbpItem):
         super().__init__(*args)
 
     @property
+    def event_stats(self):
+        # Some legacy stats.nba rows are foul events with no valid committing
+        # team or player. Treat them as unattributable source corruption and
+        # preserve only base stats instead of raising during lineup attachment.
+        if getattr(self, "team_id", 0) in [0, None, "0"] and getattr(
+            self, "player1_id", 0
+        ) in [0, None, "0"]:
+            return self.base_stats
+        return super().event_stats
+
+    @property
     def number_of_fta_for_foul(self):
         """
         returns the number of free throws resulting from the foul

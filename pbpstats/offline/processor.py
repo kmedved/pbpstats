@@ -83,9 +83,207 @@ class PbpProcessor(NbaEnhancedPbpLoader, NbaPossessionLoader):
                 if isinstance(item, StartOfPeriod):
                     item.boxscore_source_loader = self.boxscore_source_loader
 
+    def _repair_silent_ft_rebound_windows(self) -> None:
+        """
+        Repair narrow historical missed-FT clusters that do not raise
+        ReboundEventOrderError but still pair a real player rebound to the wrong
+        missed free throw, causing it to be treated as a placeholder.
+        """
+        rows = self.data
+
+        def et(idx: int) -> Optional[int]:
+            if 0 <= idx < len(rows):
+                return rows[idx].get("EVENTMSGTYPE")
+            return None
+
+        def text_value(idx: int, key: str) -> str:
+            if 0 <= idx < len(rows):
+                return str(rows[idx].get(key) or "")
+            return ""
+
+        def int_value(value) -> Optional[int]:
+            if value is None or pd.isna(value):
+                return None
+            try:
+                return int(value)
+            except (TypeError, ValueError):
+                return None
+
+        def team_id(idx: int) -> Optional[int]:
+            if 0 <= idx < len(rows):
+                return int_value(rows[idx].get("PLAYER1_TEAM_ID"))
+            return None
+
+        def effective_team_id(idx: int) -> Optional[int]:
+            team = team_id(idx)
+            if team is not None and team > 0:
+                return team
+            if 0 <= idx < len(rows):
+                player = int_value(rows[idx].get("PLAYER1_ID"))
+                if player is not None and player >= 1610000000:
+                    return player
+            return None
+
+        def is_team_rebound(idx: int) -> bool:
+            if et(idx) != 4 or not (0 <= idx < len(rows)):
+                return False
+            player = int_value(rows[idx].get("PLAYER1_ID"))
+            return player is None or player == 0 or player >= 1610000000
+
+        def is_missed_ft(idx: int) -> bool:
+            if et(idx) != 3:
+                return False
+            desc = " ".join(
+                [
+                    text_value(idx, "HOMEDESCRIPTION"),
+                    text_value(idx, "VISITORDESCRIPTION"),
+                    text_value(idx, "NEUTRALDESCRIPTION"),
+                ]
+            ).lower()
+            return "miss" in desc
+
+        def clock_seconds(idx: int) -> Optional[int]:
+            if not (0 <= idx < len(rows)):
+                return None
+            clock = rows[idx].get("PCTIMESTRING")
+            if not clock:
+                return None
+            try:
+                minutes, seconds = str(clock).split(":")
+                return int(minutes) * 60 + int(seconds)
+            except (TypeError, ValueError):
+                return None
+
+        changed = True
+        while changed:
+            changed = False
+
+            # Reversed and-one / 1-of-1 block:
+            #   REBOUND_B -> MISS_FT_A -> FOUL_B -> MADE_A
+            # should be:
+            #   MADE_A -> FOUL_B -> MISS_FT_A -> REBOUND_B
+            for idx in range(len(rows) - 3):
+                if not (
+                    et(idx) == 4
+                    and et(idx + 1) == 3
+                    and et(idx + 2) == 6
+                    and et(idx + 3) == 1
+                ):
+                    continue
+                if is_team_rebound(idx) or not is_missed_ft(idx + 1):
+                    continue
+                period = rows[idx].get("PERIOD")
+                clock = rows[idx].get("PCTIMESTRING")
+                if any(
+                    rows[scan_idx].get("PERIOD") != period
+                    or rows[scan_idx].get("PCTIMESTRING") != clock
+                    for scan_idx in range(idx, idx + 4)
+                ):
+                    continue
+                rebound_team = effective_team_id(idx)
+                ft_team = effective_team_id(idx + 1)
+                foul_team = effective_team_id(idx + 2)
+                made_team = effective_team_id(idx + 3)
+                if (
+                    rebound_team is None
+                    or ft_team is None
+                    or foul_team is None
+                    or made_team is None
+                    or rebound_team != foul_team
+                    or ft_team != made_team
+                    or rebound_team == ft_team
+                ):
+                    continue
+                rows[idx : idx + 4] = [
+                    rows[idx + 3],
+                    rows[idx + 2],
+                    rows[idx + 1],
+                    rows[idx],
+                ]
+                changed = True
+                break
+
+            if changed:
+                continue
+
+            # Reversed two-shot FT block with a real player rebound stranded after
+            # the shooting foul but before the missed last FT has been placed:
+            #   MISS_FT2_A -> TEAM_REBOUND_A -> MISS_FT1_A -> FOUL_B -> REBOUND_B
+            # should be:
+            #   FOUL_B -> MISS_FT1_A -> TEAM_REBOUND_A -> MISS_FT2_A -> REBOUND_B
+            for idx in range(len(rows) - 4):
+                if not (
+                    et(idx) == 3
+                    and et(idx + 1) == 4
+                    and et(idx + 2) == 3
+                    and et(idx + 3) == 6
+                    and et(idx + 4) == 4
+                ):
+                    continue
+                if (
+                    not is_missed_ft(idx)
+                    or not is_missed_ft(idx + 2)
+                    or not is_team_rebound(idx + 1)
+                    or is_team_rebound(idx + 4)
+                ):
+                    continue
+                period = rows[idx].get("PERIOD")
+                if any(rows[scan_idx].get("PERIOD") != period for scan_idx in range(idx, idx + 5)):
+                    continue
+                ft_clock = clock_seconds(idx)
+                if (
+                    ft_clock is None
+                    or clock_seconds(idx + 1) != ft_clock
+                    or clock_seconds(idx + 2) != ft_clock
+                    or clock_seconds(idx + 3) != ft_clock
+                ):
+                    continue
+                rebound_clock = clock_seconds(idx + 4)
+                if rebound_clock is None or not (0 <= ft_clock - rebound_clock <= 1):
+                    continue
+                ft_team = effective_team_id(idx)
+                team_rebound_team = effective_team_id(idx + 1)
+                earlier_ft_team = effective_team_id(idx + 2)
+                foul_team = effective_team_id(idx + 3)
+                rebound_team = effective_team_id(idx + 4)
+                if (
+                    ft_team is None
+                    or team_rebound_team is None
+                    or earlier_ft_team is None
+                    or foul_team is None
+                    or rebound_team is None
+                    or ft_team != team_rebound_team
+                    or ft_team != earlier_ft_team
+                    or foul_team != rebound_team
+                    or foul_team == ft_team
+                ):
+                    continue
+                if rows[idx].get("PLAYER1_ID") != rows[idx + 2].get("PLAYER1_ID"):
+                    continue
+                later_ft_action = int_value(rows[idx].get("EVENTMSGACTIONTYPE"))
+                earlier_ft_action = int_value(rows[idx + 2].get("EVENTMSGACTIONTYPE"))
+                if (
+                    later_ft_action is None
+                    or earlier_ft_action is None
+                    or later_ft_action <= earlier_ft_action
+                ):
+                    continue
+                rows[idx : idx + 5] = [
+                    rows[idx + 3],
+                    rows[idx + 2],
+                    rows[idx + 1],
+                    rows[idx],
+                    rows[idx + 4],
+                ]
+                changed = True
+                break
+
+        self.data = rows
+
     def _process_with_retries(self, max_retries: int) -> None:
         attempts = 0
         while attempts <= max_retries:
+            self._repair_silent_ft_rebound_windows()
             try:
                 # Build enhanced events
                 self._build_items_from_data()
@@ -259,11 +457,297 @@ class PbpProcessor(NbaEnhancedPbpLoader, NbaPossessionLoader):
                     self.data = rows
                     return
 
+        # --- PATTERN -0.9: Real player rebound stranded behind a foul / FT block ---
+        # Some old feeds log:
+        #   MISS_FG -> foul / FT / TEAM placeholder block -> PLAYER rebound
+        # where the player rebound really belongs to the earlier missed field goal.
+        # Keep this narrow:
+        #   - only move PLAYER rebounds
+        #   - only when EVENTNUM immediately follows the earlier missed FG
+        #   - only when the rows in between are a real foul / FT block with
+        #     optional TEAM placeholders mixed in
+        if rebound_event_index is not None and not is_team_rebound(rebound_event_index):
+            rebound_event_number = en(rebound_event_index)
+            if rebound_event_number is not None:
+                search_start = max(0, rebound_event_index - 10)
+                for candidate_idx in range(search_start, rebound_event_index):
+                    if rows[candidate_idx].get("PERIOD") != rebound_period:
+                        continue
+                    if en(candidate_idx) != rebound_event_number - 1:
+                        continue
+                    if et(candidate_idx) != 2:
+                        continue
+
+                    block_range = range(candidate_idx + 1, rebound_event_index)
+                    if not block_range:
+                        continue
+
+                    block_event_types = [et(block_idx) for block_idx in block_range]
+                    if not any(event_type in (3, 6) for event_type in block_event_types):
+                        continue
+
+                    if all(
+                        event_type in (3, 6)
+                        or (event_type == 4 and is_team_rebound(block_idx))
+                        for block_idx, event_type in zip(block_range, block_event_types)
+                    ):
+                        rebound_row = rows.pop(rebound_event_index)
+                        if rebound_event_index < candidate_idx:
+                            candidate_idx -= 1
+                        rows.insert(candidate_idx + 1, rebound_row)
+                        self.data = rows
+                        return
+
+        # --- PATTERN -0.895: Real player rebound stranded behind a dead-ball FT block ---
+        # Some old feeds log:
+        #   MISS_FT_A -> foul / timeout / sub / FT block -> PLAYER rebound_B
+        # where the player rebound really belongs to the earlier missed free throw.
+        # Keep this narrow:
+        #   - only move PLAYER rebounds
+        #   - only when EVENTNUM immediately follows the earlier missed FT
+        #   - only when the rows in between are dead-ball events
+        if rebound_event_index is not None and not is_team_rebound(rebound_event_index):
+            rebound_event_number = en(rebound_event_index)
+            if rebound_event_number is not None:
+                search_start = max(0, rebound_event_index - 12)
+                for candidate_idx in range(search_start, rebound_event_index):
+                    if rows[candidate_idx].get("PERIOD") != rebound_period:
+                        continue
+                    if en(candidate_idx) != rebound_event_number - 1:
+                        continue
+                    if et(candidate_idx) != 3 or not is_missed_shot_or_ft(candidate_idx):
+                        continue
+
+                    block_range = range(candidate_idx + 1, rebound_event_index)
+                    if not block_range:
+                        continue
+                    if not all(et(block_idx) in (3, 6, 8, 9) for block_idx in block_range):
+                        continue
+
+                    rebound_team = effective_team_id(rebound_event_index)
+                    missed_ft_team = effective_team_id(candidate_idx)
+                    if (
+                        rebound_team is None
+                        or missed_ft_team is None
+                        or rebound_team == missed_ft_team
+                    ):
+                        continue
+
+                    rebound_row = rows.pop(rebound_event_index)
+                    if rebound_event_index < candidate_idx:
+                        candidate_idx -= 1
+                    rows.insert(candidate_idx + 1, rebound_row)
+                    self.data = rows
+                    return
+
+        # --- PATTERN -0.85: Made shot, then stranded opponent rebound before future miss ---
+        # Some 90s feeds log:
+        #   MAKE_A -> REBOUND_B -> MISS_B -> MAKE_B -> MISS_A -> REBOUND_B
+        # where the rebound really belongs to MISS_B, not to any earlier miss
+        # before MAKE_A. Move only the stranded rebound behind that future MISS_B
+        # before the generic "nearest prior miss" repair can steal the wrong shot.
+        if (
+            rebound_event_index is not None
+            and rebound_event_index == issue_event_index + 1
+            and et(issue_event_index) == 1
+            and et(rebound_event_index) == 4
+            and rebound_event_index + 4 < len(rows)
+            and et(rebound_event_index + 1) == 2
+            and et(rebound_event_index + 2) == 1
+            and et(rebound_event_index + 3) == 2
+            and et(rebound_event_index + 4) == 4
+        ):
+            rebound_team = effective_team_id(rebound_event_index)
+            issue_team = effective_team_id(issue_event_index)
+            rebound_clock = rows[rebound_event_index].get("PCTIMESTRING")
+            if (
+                rebound_team is not None
+                and issue_team is not None
+                and rebound_team != issue_team
+                and rows[rebound_event_index + 1].get("PCTIMESTRING") == rebound_clock
+                and rows[rebound_event_index + 2].get("PCTIMESTRING") == rebound_clock
+                and rows[rebound_event_index + 3].get("PCTIMESTRING") == rebound_clock
+                and rows[rebound_event_index + 4].get("PCTIMESTRING") == rebound_clock
+                and team_id(rebound_event_index + 1) == rebound_team
+                and team_id(rebound_event_index + 2) == rebound_team
+                and team_id(rebound_event_index + 3) == issue_team
+                and effective_team_id(rebound_event_index + 4) == rebound_team
+                and not is_team_rebound(rebound_event_index)
+            ):
+                rebound_row = rows.pop(rebound_event_index)
+                rows.insert(rebound_event_index + 1, rebound_row)
+                self.data = rows
+                return
+
+        # --- PATTERN -0.8: TEAM rebound + turnover stranded ahead of its delayed miss ---
+        # Some historical feeds log:
+        #   MADE/FT -> TEAM_REBOUND_A -> TURNOVER_A -> delayed MISS_A
+        # where the TEAM rebound and turnover really belong after the delayed miss.
+        # Handle this before the generic "nearest prior miss" repair can steal an
+        # earlier valid rebound from the other team.
+        if (
+            rebound_event_index is not None
+            and rebound_event_index == issue_event_index + 1
+            and et(issue_event_index) in (1, 3)
+            and et(rebound_event_index) == 4
+            and is_team_rebound(rebound_event_index)
+            and rebound_event_index + 2 < len(rows)
+            and et(rebound_event_index + 1) == 5
+            and is_missed_shot_or_ft(rebound_event_index + 2)
+        ):
+            rebound_team = effective_team_id(rebound_event_index)
+            turnover_team = effective_team_id(rebound_event_index + 1)
+            delayed_miss_team = effective_team_id(rebound_event_index + 2)
+            rebound_event_number = en(rebound_event_index)
+            delayed_miss_event_number = en(rebound_event_index + 2)
+            if (
+                rebound_team is not None
+                and rebound_team == turnover_team
+                and rebound_team == delayed_miss_team
+                and rebound_event_number is not None
+                and delayed_miss_event_number == rebound_event_number - 1
+            ):
+                delayed_miss = rows.pop(rebound_event_index + 2)
+                rows.insert(rebound_event_index, delayed_miss)
+                self.data = rows
+                return
+
+        # --- PATTERN -0.79: Player rebound stranded ahead of a future missed FT ---
+        # Some historical feeds log:
+        #   MADE/other -> REBOUND_B -> foul / FT block -> MISS_FT_A
+        # where the player rebound actually belongs after that missed last FT.
+        # Keep this narrow:
+        #   - only move PLAYER rebounds
+        #   - only when the future missed FT EVENTNUM immediately precedes the rebound
+        #   - only when the intervening rows are foul / FT / sub events
+        if rebound_event_index is not None and not is_team_rebound(rebound_event_index):
+            rebound_event_number = en(rebound_event_index)
+            if rebound_event_number is not None:
+                search_limit = min(rebound_event_index + 8, len(rows))
+                for candidate_idx in range(rebound_event_index + 1, search_limit):
+                    if rows[candidate_idx].get("PERIOD") != rebound_period:
+                        break
+                    if en(candidate_idx) != rebound_event_number - 1:
+                        continue
+                    if not is_missed_shot_or_ft(candidate_idx):
+                        continue
+
+                    block_range = range(rebound_event_index + 1, candidate_idx)
+                    if not block_range:
+                        continue
+                    if not any(et(block_idx) in (3, 6) for block_idx in block_range):
+                        continue
+                    if not all(et(block_idx) in (3, 6, 8) for block_idx in block_range):
+                        continue
+
+                    rebound_team = effective_team_id(rebound_event_index)
+                    delayed_miss_team = effective_team_id(candidate_idx)
+                    if (
+                        rebound_team is None
+                        or delayed_miss_team is None
+                        or rebound_team == delayed_miss_team
+                    ):
+                        continue
+
+                    rebound_row = rows.pop(rebound_event_index)
+                    if rebound_event_index < candidate_idx:
+                        candidate_idx -= 1
+                    rows.insert(candidate_idx + 1, rebound_row)
+                    self.data = rows
+                    return
+
+        # --- PATTERN -0.784: Player rebound ahead of future opponent missed FT block ---
+        # Some historical feeds log:
+        #   REBOUND_A/turnover -> REBOUND_B -> dead-ball FT block for team A -> MISS_FT_A
+        # where REBOUND_B is the real defensive rebound on the missed last free throw.
+        # Keep this narrow:
+        #   - only move PLAYER rebounds
+        #   - only when the future missed FT EVENTNUM immediately precedes the rebound
+        #   - only when the in-between rows are dead-ball events and TEAM placeholders
+        if (
+            rebound_event_index is not None
+            and not is_team_rebound(rebound_event_index)
+            and et(issue_event_index) in (4, 5)
+        ):
+            rebound_team = effective_team_id(rebound_event_index)
+            rebound_event_number = en(rebound_event_index)
+            if rebound_team is not None and rebound_event_number is not None:
+                search_limit = min(rebound_event_index + 10, len(rows))
+                for candidate_idx in range(rebound_event_index + 1, search_limit):
+                    if rows[candidate_idx].get("PERIOD") != rebound_period:
+                        break
+                    if en(candidate_idx) != rebound_event_number - 1:
+                        continue
+                    if et(candidate_idx) != 3 or not is_missed_shot_or_ft(candidate_idx):
+                        continue
+
+                    missed_ft_team = effective_team_id(candidate_idx)
+                    if missed_ft_team is None or missed_ft_team == rebound_team:
+                        continue
+
+                    block_range = range(rebound_event_index + 1, candidate_idx)
+                    if not block_range:
+                        continue
+                    if not any(et(block_idx) in (6, 8, 9) for block_idx in block_range):
+                        continue
+                    if not all(
+                        et(block_idx) in (3, 6, 8, 9)
+                        or (et(block_idx) == 4 and is_team_rebound(block_idx))
+                        for block_idx in block_range
+                    ):
+                        continue
+
+                    rebound_row = rows.pop(rebound_event_index)
+                    if rebound_event_index < candidate_idx:
+                        candidate_idx -= 1
+                    rows.insert(candidate_idx + 1, rebound_row)
+                    self.data = rows
+                    return
+
+        # --- PATTERN -0.782: Made shot, then stranded same-team rebound before future miss ---
+        # Some historical feeds log:
+        #   MAKE_A -> REBOUND_A -> delayed same-clock MISS_B
+        # where REBOUND_A actually belongs after the future MISS_B, not immediately
+        # after the earlier make. Move only the stranded rebound.
+        if (
+            rebound_event_index is not None
+            and et(issue_event_index) == 1
+            and et(rebound_event_index) == 4
+            and rebound_event_index == issue_event_index + 1
+            and not is_team_rebound(rebound_event_index)
+        ):
+            issue_team = effective_team_id(issue_event_index)
+            rebound_team = effective_team_id(rebound_event_index)
+            rebound_clock = rows[rebound_event_index].get("PCTIMESTRING")
+            if (
+                issue_team is not None
+                and rebound_team is not None
+                and issue_team == rebound_team
+            ):
+                search_limit = min(rebound_event_index + 6, len(rows))
+                for candidate_idx in range(rebound_event_index + 1, search_limit):
+                    if rows[candidate_idx].get("PERIOD") != rebound_period:
+                        break
+                    if rows[candidate_idx].get("PCTIMESTRING") != rebound_clock:
+                        continue
+                    if not is_missed_shot_or_ft(candidate_idx):
+                        continue
+                    candidate_team = effective_team_id(candidate_idx)
+                    if candidate_team is None or candidate_team == rebound_team:
+                        continue
+
+                    issue_rebound = rows.pop(rebound_event_index)
+                    if rebound_event_index < candidate_idx:
+                        candidate_idx -= 1
+                    rows.insert(candidate_idx + 1, issue_rebound)
+                    self.data = rows
+                    return
+
         # --- PATTERN -1: Move an orphan rebound back to the nearest prior miss ---
-        # Only use this generic repair when the previous event is not itself a rebound.
-        # Rebound-after-rebound cases need more specific handling below; applying this
-        # rule there causes the two rebounds to toggle back and forth across retries.
-        if rebound_event_index is not None and et(issue_event_index) != 4:
+        if (
+            rebound_event_index is not None
+            and et(issue_event_index) != 4
+        ):
             search_start = rebound_event_index - 1
             search_stop = max(-1, rebound_event_index - 8)
             for candidate_idx in range(search_start, search_stop, -1):
@@ -376,6 +860,23 @@ class PbpProcessor(NbaEnhancedPbpLoader, NbaPossessionLoader):
                 ):
                     saw_foul = saw_foul or et(scan_idx) == 6
                     scan_idx -= 1
+
+                if (
+                    saw_foul
+                    and scan_idx - 1 >= 0
+                    and rows[scan_idx].get("PERIOD") == rebound_period
+                    and et(scan_idx) == 1
+                    and effective_team_id(scan_idx) == first_rebound_team
+                    and rows[scan_idx - 1].get("PERIOD") == rebound_period
+                    and is_missed_shot_or_ft(scan_idx - 1)
+                    and team_id(scan_idx - 1) == first_rebound_team
+                    and en(scan_idx - 1) is not None
+                    and en(issue_event_index) == en(scan_idx - 1) + 1
+                ):
+                    first_rebound = rows.pop(issue_event_index)
+                    rows.insert(scan_idx, first_rebound)
+                    self.data = rows
+                    return
 
                 if (
                     saw_foul
@@ -526,42 +1027,6 @@ class PbpProcessor(NbaEnhancedPbpLoader, NbaPossessionLoader):
             rebound_event = rows[rebound_event_index]
             made_shot = rows[issue_event_index]
             rows[issue_event_index], rows[rebound_event_index] = rebound_event, made_shot
-            self.data = rows
-            return
-
-        # --- PATTERN 1: Previous event is sub/timeout (type 8 or 9) ---
-        if et(issue_event_index) in (8, 9):
-            row_index = issue_event_index
-            while row_index >= 0 and et(row_index) in (8, 9):
-                row_index -= 1
-
-            if row_index >= 0:
-                ft_event_num = en(row_index)
-                new_rows: List[dict] = []
-                row_to_move: Optional[dict] = None
-                for row in rows:
-                    if row.get("EVENTNUM") == ft_event_num:
-                        row_to_move = row
-                    elif row.get("EVENTNUM") == context_event_num:
-                        new_rows.append(row)
-                        if row_to_move is not None:
-                            new_rows.append(row_to_move)
-                    else:
-                        new_rows.append(row)
-                if row_to_move is not None:
-                    self.data = new_rows
-                    return
-
-        # --- PATTERN 2: Instant replay (type 18) before rebound ---
-        if (
-            et(issue_event_index) == 18
-            and issue_event_index + 1 < len(rows)
-            and et(issue_event_index + 1) == 4
-        ):
-            rows[issue_event_index], rows[issue_event_index + 1] = (
-                rows[issue_event_index + 1],
-                rows[issue_event_index],
-            )
             self.data = rows
             return
 

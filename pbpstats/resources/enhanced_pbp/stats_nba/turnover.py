@@ -14,17 +14,38 @@ class StatsTurnover(Turnover, StatsEnhancedPbpItem):
     def __init__(self, *args):
         super().__init__(*args)
 
+    @property
+    def event_stats(self):
+        # Some legacy stats.nba turnover rows have no valid committing team or
+        # player and are just unattributable source corruption. Preserve only
+        # base stats instead of trying to attach turnover stats to team_id 0.
+        if getattr(self, "team_id", 0) in [0, None, "0"] and getattr(
+            self, "player1_id", 0
+        ) in [0, None, "0"]:
+            return self.base_stats
+        return super().event_stats
+
     def get_offense_team_id(self):
         """
         returns team id for team on offense for event
         """
-        if self.is_no_turnover:
-            return self.previous_event.get_offense_team_id()
+        if self.is_no_turnover and not self.is_steal:
+            previous_event = getattr(self, "previous_event", None)
+            if previous_event is None:
+                return self.team_id
+            try:
+                return previous_event.get_offense_team_id()
+            except RecursionError:
+                # Some malformed same-clock period-start clusters bounce between
+                # a foul and a synthetic "No Turnover" row. Fall back to the
+                # turnover row's own team id instead of recursing indefinitely.
+                return self.team_id
         return self.team_id
 
     @property
     def is_no_turnover(self):
-        return self.event_action_type == 0
+        description = str(getattr(self, "description", "") or "")
+        return self.event_action_type == 0 and "No Turnover" in description
 
     @property
     def is_bad_pass(self):
