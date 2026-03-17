@@ -517,7 +517,8 @@ def test_stats_start_of_period_uses_period_boxscore_before_best_effort():
     assert call_log == [("strict", False)]
 
 
-def test_stats_start_of_period_prefers_v3_over_strict_when_loader_available():
+def test_stats_start_of_period_uses_strict_pbp_when_it_succeeds():
+    """When strict PBP finds 10 starters, use them — don't override with V3."""
     start = DummyStatsStart()
     start.period = 5
     start.period_boxscore_source_loader = object()
@@ -536,8 +537,9 @@ def test_stats_start_of_period_prefers_v3_over_strict_when_loader_available():
 
     starters = start.get_period_starters()
 
+    # Strict PBP result is used, V3 is NOT consulted
     assert starters == {
-        TEAM_A: [1, 2, 3, 4, 5],
+        TEAM_A: [1, 2, 3, 4, 6],
         TEAM_B: [11, 12, 13, 14, 15],
     }
     assert call_log == [("strict", False)]

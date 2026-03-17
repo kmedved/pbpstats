@@ -21,10 +21,9 @@ class StatsStartOfPeriod(StartOfPeriod, StatsEnhancedPbpItem):
         """
         Try, in order:
           1) PBP-based inference (strict, including overrides).
-          2) When available, prefer period-level V3 starters for periods after Q1.
-          3) Local boxscore-based starters (Period 1 via START_POSITION).
-          4) Period-level V3 boxscore fallback.
-          5) Best-effort PBP inference (ignore_missing_starters=True).
+          2) Local boxscore-based starters (Period 1 via START_POSITION).
+          3) Period-level V3 boxscore fallback (only when strict PBP failed).
+          4) Best-effort PBP inference (ignore_missing_starters=True).
         """
         # 1) Strict PBP-based inference
         try:
@@ -33,27 +32,14 @@ class StatsStartOfPeriod(StartOfPeriod, StatsEnhancedPbpItem):
             starters = None
 
         if starters is not None:
-            # Wrong-full-five carryover cases can still survive strict PBP.
-            # When a cached period-level V3 loader is available, prefer that
-            # period-start lineup for post-Q1 periods if it resolves cleanly.
-            if (
-                self.period > 1
-                and getattr(self, "period_boxscore_source_loader", None) is not None
-            ):
-                try:
-                    v3_starters = self._get_starters_from_boxscore_request()
-                except InvalidNumberOfStartersException:
-                    v3_starters = None
-                if v3_starters is not None:
-                    return v3_starters
             return starters
 
-        # 3) Local boxscore-based starters (Period 1)
+        # 2) Local boxscore-based starters (Period 1)
         starters = self._get_period_starters_from_boxscore_loader()
         if starters is not None:
             return starters
 
-        # 4) Period-level V3 boxscore fallback.
+        # 3) Period-level V3 boxscore fallback (PBP failed to find 10).
         try:
             starters = self._get_starters_from_boxscore_request()
         except InvalidNumberOfStartersException:
@@ -61,7 +47,7 @@ class StatsStartOfPeriod(StartOfPeriod, StatsEnhancedPbpItem):
         if starters is not None:
             return starters
 
-        # 5) Best-effort PBP inference.
+        # 4) Best-effort PBP inference.
         return self._get_period_starters_from_period_events(
             file_directory, ignore_missing_starters=True
         )
