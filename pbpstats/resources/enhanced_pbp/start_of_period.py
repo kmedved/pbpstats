@@ -67,6 +67,13 @@ class StartOfPeriod(metaclass=abc.ABCMeta):
         return self.period_starters
 
     @property
+    def _raw_current_players(self):
+        """
+        returns period starters for raw lineup propagation
+        """
+        return self.period_starters
+
+    @property
     def league(self):
         """
         Returns League for game id.
@@ -653,13 +660,13 @@ class StartOfPeriod(metaclass=abc.ABCMeta):
         starters_by_team = self._fill_missing_starters_from_previous_period_end(
             starters_by_team
         )
-        starters_by_team = self._apply_period_starter_overrides(
-            starters_by_team, file_directory
-        )
         if ignore_missing_starters:
             starters_by_team = self._trim_excess_starters(
                 starters_by_team, player_first_seen_order, known_team_ids
             )
+        starters_by_team = self._apply_period_starter_overrides(
+            starters_by_team, file_directory
+        )
         if not ignore_missing_starters:
             self._check_both_teams_have_5_starters(starters_by_team, file_directory)
 

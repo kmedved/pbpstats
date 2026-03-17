@@ -26,6 +26,8 @@ class NbaEnhancedPbpLoader(object):
         """
         self.start_period_indices = []
         self._load_possession_changing_event_overrides()
+        self.lineup_window_overrides = self._load_lineup_window_overrides()
+        lineup_window_override_lookup = self._build_lineup_window_override_lookup()
         game_id = self.game_id if self.league == NBA_STRING else int(self.game_id)
         change_override_event_nums = self.possession_changing_event_overrides.get(
             game_id, []
@@ -85,6 +87,7 @@ class NbaEnhancedPbpLoader(object):
             event.non_possession_changing_override = (
                 event.event_num in non_change_override_event_nums
             )
+            event.lineup_override_by_team = lineup_window_override_lookup.get(i, {})
 
         # these need next and previous event to be added to all events
         self._set_period_start_items()
@@ -207,3 +210,79 @@ class NbaEnhancedPbpLoader(object):
         else:
             self.possession_changing_event_overrides = {}
             self.non_possession_changing_event_overrides = {}
+
+    def _load_lineup_window_overrides(self):
+        if self.file_directory is None:
+            return {}
+
+        file_path = f"{self.file_directory}/overrides/lineup_window_overrides.json"
+        if not os.path.isfile(file_path):
+            return {}
+
+        with open(file_path) as f:
+            return json.loads(f.read(), cls=IntDecoder)
+
+    def _build_lineup_window_override_lookup(self):
+        overrides = getattr(self, "lineup_window_overrides", {})
+        if not overrides:
+            return {}
+
+        game_id_keys = [self.game_id]
+        try:
+            game_id_keys.append(int(self.game_id))
+        except (TypeError, ValueError):
+            pass
+
+        windows = []
+        for game_id in game_id_keys:
+            game_windows = overrides.get(game_id, [])
+            if isinstance(game_windows, list):
+                windows.extend(game_windows)
+        if not windows:
+            return {}
+
+        event_positions = {}
+        for idx, event in enumerate(getattr(self, "items", [])):
+            try:
+                period = int(getattr(event, "period"))
+                event_num = int(getattr(event, "event_num"))
+            except (AttributeError, TypeError, ValueError):
+                continue
+            event_positions.setdefault((period, event_num), []).append(idx)
+
+        lookup = {}
+        for window in windows:
+            try:
+                period = int(window["period"])
+                team_id = int(window["team_id"])
+                start_event_num = int(window["start_event_num"])
+                end_event_num = int(window["end_event_num"])
+            except (KeyError, TypeError, ValueError):
+                continue
+
+            lineup_player_ids = window.get("lineup_player_ids")
+            if not isinstance(lineup_player_ids, list) or len(lineup_player_ids) != 5:
+                continue
+            try:
+                normalized_lineup = [int(player_id) for player_id in lineup_player_ids]
+            except (TypeError, ValueError):
+                continue
+            if len(set(normalized_lineup)) != 5:
+                continue
+
+            start_indices = event_positions.get((period, start_event_num), [])
+            end_indices = event_positions.get((period, end_event_num), [])
+            if not start_indices or not end_indices:
+                continue
+
+            low_idx, high_idx = sorted((start_indices[0], end_indices[-1]))
+            for idx in range(low_idx, high_idx + 1):
+                event = self.items[idx]
+                try:
+                    event_period = int(getattr(event, "period"))
+                except (AttributeError, TypeError, ValueError):
+                    continue
+                if event_period != period:
+                    continue
+                lookup.setdefault(idx, {})[team_id] = list(normalized_lineup)
+        return lookup
