@@ -180,11 +180,14 @@ class EnhancedPbpItem(metaclass=abc.ABCMeta):
         """
         if self.previous_event is None:
             return 0
-        if self.seconds_remaining == 720:
-            # so that subs between periods for live don't have negative seconds
+        prev_period = getattr(self.previous_event, "period", None)
+        if self.seconds_remaining == 720 and prev_period != self.period:
+            # Between-period subs (live data) where previous event is from a
+            # different period.  Without this guard the result would be negative
+            # (e.g. 0 - 720 = -720).
             return 0
-        if self.seconds_remaining == 300 and self.period > 4:
-            # so that subs between periods for live don't have negative seconds
+        if self.seconds_remaining == 300 and self.period > 4 and prev_period != self.period:
+            # Same guard for overtime period boundaries.
             return 0
         return self.previous_event.seconds_remaining - self.seconds_remaining
 
