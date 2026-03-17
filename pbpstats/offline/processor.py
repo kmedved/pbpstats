@@ -14,6 +14,7 @@ from pbpstats.resources.possessions.possessions import Possessions
 from pbpstats.offline.ordering import (
     create_raw_dicts_from_df,
     dedupe_with_v3,
+    enrich_clocks_with_v3,
     patch_start_of_periods,
     reorder_with_v3,
     _ensure_eventnum_int,
@@ -1190,6 +1191,9 @@ def get_possessions_from_df(
 
     # Always drop remaining duplicates
     df = df.drop_duplicates(subset=["GAME_ID", "EVENTNUM"], keep="first")
+
+    # Enrich V2 PCTIMESTRING with V3 sub-second clock precision
+    df = enrich_clocks_with_v3(df, game_id, fetch_pbp_v3_fn)
 
     # Patch missing start-of-period markers
     df = patch_start_of_periods(df, game_id, fetch_pbp_v3_fn)

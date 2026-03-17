@@ -1,3 +1,4 @@
+import re
 from typing import Callable, Dict, List
 
 import numpy as np
@@ -214,6 +215,63 @@ def patch_start_of_periods(
         df = _insert_row_before_period(df, start_row, period)
 
     return df.reset_index(drop=True)
+
+
+def enrich_clocks_with_v3(
+    game_df: pd.DataFrame,
+    game_id: str,
+    fetch_pbp_v3_fn: FetchPbpV3Fn | None = None,
+) -> pd.DataFrame:
+    """
+    Replace V2 PCTIMESTRING with V3 sub-second clock precision where available.
+
+    The V2 playbyplayv2 PCTIMESTRING truncates game clock times to whole seconds
+    (e.g. 40.5s → "0:40").  The V3 playbyplayv3 clock field preserves tenths
+    (e.g. "PT00M40.50S").  Using the truncated V2 values causes per-player
+    seconds to be systematically ~0.5s short at substitution boundaries, which
+    accumulates to ~1s per-player discrepancies vs the official boxscore.
+
+    This enrichment replaces V2 PCTIMESTRING with V3 sub-second values for
+    events where V3 has fractional seconds.  Events where V3 has whole seconds
+    (identical to V2) are left untouched.  Row order and all other columns are
+    preserved.
+    """
+    if fetch_pbp_v3_fn is None:
+        return game_df
+
+    df_v3 = fetch_pbp_v3_fn(game_id)
+    if df_v3 is None or df_v3.empty:
+        return game_df
+    if "clock" not in df_v3.columns or "actionNumber" not in df_v3.columns:
+        return game_df
+
+    # Build map: actionNumber -> enriched PCTIMESTRING (only for fractional seconds)
+    v3_clock_map: Dict[int, str] = {}
+    for _, row in df_v3.iterrows():
+        anum = row.get("actionNumber")
+        clock = row.get("clock", "")
+        if anum is None or not isinstance(clock, str):
+            continue
+        m = re.match(r"PT(\d+)M([\d.]+)S", clock)
+        if not m:
+            continue
+        minutes = int(m.group(1))
+        seconds = float(m.group(2))
+        if seconds == int(seconds):
+            continue  # whole seconds — V2 already matches
+        v3_clock_map[int(anum)] = f"{minutes}:{seconds:05.2f}"
+
+    if not v3_clock_map:
+        return game_df
+
+    df = game_df.copy()
+    df["EVENTNUM"] = pd.to_numeric(df["EVENTNUM"], errors="coerce")
+    mask = df["EVENTNUM"].isin(v3_clock_map)
+    if not mask.any():
+        return game_df
+
+    df.loc[mask, "PCTIMESTRING"] = df.loc[mask, "EVENTNUM"].map(v3_clock_map)
+    return df
 
 
 def reorder_with_v3(
