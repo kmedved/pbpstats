@@ -59,6 +59,7 @@ class PbpProcessor(NbaEnhancedPbpLoader, NbaPossessionLoader):
         raw_data_dicts: List[dict],
         rebound_deletions_list: Optional[List[Dict]] = None,
         boxscore_source_loader=None,
+        period_boxscore_source_loader=None,
         file_directory: Optional[str] = None,
     ):
         self.game_id = str(game_id).zfill(10)
@@ -67,6 +68,7 @@ class PbpProcessor(NbaEnhancedPbpLoader, NbaPossessionLoader):
         self.data = raw_data_dicts
         self.factory = StatsNbaEnhancedPbpFactory()
         self.boxscore_source_loader = boxscore_source_loader
+        self.period_boxscore_source_loader = period_boxscore_source_loader
         # Per-processor log of any fallback rebound deletions
         self._rebound_deletions_list = rebound_deletions_list
 
@@ -78,12 +80,20 @@ class PbpProcessor(NbaEnhancedPbpLoader, NbaPossessionLoader):
             for i, item in enumerate(self.data)
         ]
 
-        if self.boxscore_source_loader is not None:
+        if (
+            self.boxscore_source_loader is not None
+            or self.period_boxscore_source_loader is not None
+        ):
             from pbpstats.resources.enhanced_pbp import StartOfPeriod
 
             for item in self.items:
                 if isinstance(item, StartOfPeriod):
-                    item.boxscore_source_loader = self.boxscore_source_loader
+                    if self.boxscore_source_loader is not None:
+                        item.boxscore_source_loader = self.boxscore_source_loader
+                    if self.period_boxscore_source_loader is not None:
+                        item.period_boxscore_source_loader = (
+                            self.period_boxscore_source_loader
+                        )
 
     def _repair_silent_ft_rebound_windows(self) -> None:
         """
@@ -1166,6 +1176,7 @@ def get_possessions_from_df(
     fetch_pbp_v3_fn: Optional[FetchPbpV3Fn] = None,
     rebound_deletions_list: Optional[List[Dict]] = None,
     boxscore_source_loader=None,
+    period_boxscore_source_loader=None,
     file_directory: Optional[str] = None,
 ) -> Possessions:
     """
@@ -1217,6 +1228,7 @@ def get_possessions_from_df(
         raw_dicts,
         rebound_deletions_list,
         boxscore_source_loader=boxscore_source_loader,
+        period_boxscore_source_loader=period_boxscore_source_loader,
         file_directory=file_directory,
     )
     return Possessions(processor.possessions)

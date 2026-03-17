@@ -21,31 +21,50 @@ class StatsStartOfPeriod(StartOfPeriod, StatsEnhancedPbpItem):
         """
         Try, in order:
           1) PBP-based inference (strict, including overrides).
-          2) Local boxscore-based starters (Period 1 via START_POSITION).
-          3) Offline best-effort PBP inference (ignore_missing_starters=True).
-          4) Legacy web fallback ONLY if no local boxscore loader was provided.
+          2) When available, prefer period-level V3 starters for periods after Q1.
+          3) Local boxscore-based starters (Period 1 via START_POSITION).
+          4) Period-level V3 boxscore fallback.
+          5) Best-effort PBP inference (ignore_missing_starters=True).
         """
         # 1) Strict PBP-based inference
         try:
-            return self._get_period_starters_from_period_events(file_directory)
+            starters = self._get_period_starters_from_period_events(file_directory)
         except InvalidNumberOfStartersException:
-            pass
+            starters = None
 
-        # 2) Local boxscore-based starters (Period 1)
+        if starters is not None:
+            # Wrong-full-five carryover cases can still survive strict PBP.
+            # When a cached period-level V3 loader is available, prefer that
+            # period-start lineup for post-Q1 periods if it resolves cleanly.
+            if (
+                self.period > 1
+                and getattr(self, "period_boxscore_source_loader", None) is not None
+            ):
+                try:
+                    v3_starters = self._get_starters_from_boxscore_request()
+                except InvalidNumberOfStartersException:
+                    v3_starters = None
+                if v3_starters is not None:
+                    return v3_starters
+            return starters
+
+        # 3) Local boxscore-based starters (Period 1)
         starters = self._get_period_starters_from_boxscore_loader()
         if starters is not None:
             return starters
 
-        # 3) Offline best-effort PBP inference:
-        #    if we have a local boxscore loader, stay offline and don't crash.
-        if getattr(self, "boxscore_source_loader", None) is not None:
-            # ignore_missing_starters=True skips the strict 5-per-team assertion
-            return self._get_period_starters_from_period_events(
-                file_directory, ignore_missing_starters=True
-            )
+        # 4) Period-level V3 boxscore fallback.
+        try:
+            starters = self._get_starters_from_boxscore_request()
+        except InvalidNumberOfStartersException:
+            starters = None
+        if starters is not None:
+            return starters
 
-        # 4) Legacy behavior: only use web if no local loader exists at all.
-        return self._get_starters_from_boxscore_request()
+        # 5) Best-effort PBP inference.
+        return self._get_period_starters_from_period_events(
+            file_directory, ignore_missing_starters=True
+        )
 
     def _get_period_starters_from_boxscore_loader(self):
         """

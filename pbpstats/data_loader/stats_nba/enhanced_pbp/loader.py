@@ -60,6 +60,9 @@ class StatsNbaEnhancedPbpLoader(StatsNbaPbpLoader, NbaEnhancedPbpLoader):
         self.boxscore_source_loader = getattr(
             source_loader, "boxscore_source_loader", None
         )
+        self.period_boxscore_source_loader = getattr(
+            source_loader, "period_boxscore_source_loader", None
+        )
         super().__init__(game_id, source_loader)
 
     def _make_pbp_items(self):
@@ -70,12 +73,23 @@ class StatsNbaEnhancedPbpLoader(StatsNbaPbpLoader, NbaEnhancedPbpLoader):
             for i, item in enumerate(self.data)
         ]
 
-        if getattr(self, "boxscore_source_loader", None) is not None:
+        if (
+            getattr(self, "boxscore_source_loader", None) is not None
+            or getattr(self, "period_boxscore_source_loader", None) is not None
+        ):
             from pbpstats.resources.enhanced_pbp import StartOfPeriod
 
             for ev in self.items:
                 if isinstance(ev, StartOfPeriod):
-                    ev.boxscore_source_loader = self.boxscore_source_loader
+                    if getattr(self, "boxscore_source_loader", None) is not None:
+                        ev.boxscore_source_loader = self.boxscore_source_loader
+                    if (
+                        getattr(self, "period_boxscore_source_loader", None)
+                        is not None
+                    ):
+                        ev.period_boxscore_source_loader = (
+                            self.period_boxscore_source_loader
+                        )
 
         self._add_extra_attrs_to_all_events()
         self._check_rebound_event_order(6)

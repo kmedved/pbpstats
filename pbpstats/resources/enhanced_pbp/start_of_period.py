@@ -96,73 +96,231 @@ class StartOfPeriod(metaclass=abc.ABCMeta):
         elif self.game_id[0:2] == WNBA_GAME_ID_PREFIX:
             return WNBA_STRING
 
-    def _get_starters_from_boxscore_request(self):
-        """
-        makes request to boxscore url for time from period start to first event to get period starters
-        """
-        base_url = (
-            f"https://stats.{self.league_url_part}.com/stats/boxscoretraditionalv2"
-        )
-        event = self
-        while event is not None and event.seconds_remaining == self.seconds_remaining:
-            event = event.next_event
-        seconds_to_first_event = self.seconds_remaining - event.seconds_remaining
-
+    def _get_period_start_tenths(self):
         if self.league == WNBA_STRING:
-            seconds_in_period = 6000
+            regulation_tenths = 6000
         else:
-            seconds_in_period = 7200
+            regulation_tenths = 7200
 
         if self.period == 1:
-            start_range = 0
-        elif self.period <= 4:
-            start_range = int(seconds_in_period * (self.period - 1))
-        else:
-            start_range = int(4 * seconds_in_period + 3000 * (self.period - 5))
-        end_range = int(start_range + seconds_to_first_event * 10)
-        params = {
-            "GameId": self.game_id,
-            "StartPeriod": 0,
-            "EndPeriod": 0,
-            "RangeType": 2,
-            "StartRange": start_range,
-            "EndRange": end_range,
-        }
-        starters_by_team = {}
+            return 0
+        if self.period <= 4:
+            return int(regulation_tenths * (self.period - 1))
+        return int(4 * regulation_tenths + 3000 * (self.period - 5))
+
+    def _get_period_boxscore_request_params(self, mode):
+        period_start_tenths = self._get_period_start_tenths()
+        if mode == "rt2_start_window":
+            return {
+                "GameId": self.game_id,
+                "StartPeriod": 0,
+                "EndPeriod": 0,
+                "RangeType": 2,
+                "StartRange": period_start_tenths,
+                "EndRange": period_start_tenths + 10,
+            }
+        if mode == "rt1_period_participants":
+            return {
+                "GameId": self.game_id,
+                "StartPeriod": self.period,
+                "EndPeriod": self.period,
+                "RangeType": 1,
+                "StartRange": 0,
+                "EndRange": 0,
+            }
+        raise ValueError(f"Unknown period boxscore mode: {mode}")
+
+    def _fetch_period_boxscore_response(self, mode):
+        base_url = (
+            f"https://stats.{self.league_url_part}.com/stats/boxscoretraditionalv3"
+        )
         response = requests.get(
-            base_url, params, headers=HEADERS, timeout=REQUEST_TIMEOUT
+            base_url,
+            self._get_period_boxscore_request_params(mode),
+            headers=HEADERS,
+            timeout=REQUEST_TIMEOUT,
         )
         if response.status_code == 200:
-            response_json = response.json()
-        else:
-            response.raise_for_status()
+            return response.json()
+        response.raise_for_status()
 
-        headers = response_json["resultSets"][0]["headers"]
-        rows = response_json["resultSets"][0]["rowSet"]
-        players = [dict(zip(headers, row)) for row in rows]
-        starters = sorted(
-            players, key=lambda k: int(k["MIN"].split(":")[1]), reverse=True
+    def _load_period_boxscore_response(self, mode):
+        loader_obj = getattr(self, "period_boxscore_source_loader", None)
+        if loader_obj is not None:
+            try:
+                return loader_obj.load_data(self.game_id, self.period, mode)
+            except Exception:
+                return None
+        try:
+            return self._fetch_period_boxscore_response(mode)
+        except Exception:
+            return None
+
+    def _normalize_boxscore_players_by_team(self, players_by_team):
+        normalized = {}
+        for team_id, players in players_by_team.items():
+            if not isinstance(team_id, int) or team_id <= 0:
+                continue
+            seen = set()
+            unique_players = []
+            for player_id in players:
+                if not isinstance(player_id, int) or player_id <= 0:
+                    continue
+                if player_id in seen:
+                    continue
+                seen.add(player_id)
+                unique_players.append(player_id)
+            if unique_players:
+                normalized[team_id] = unique_players
+        return normalized
+
+    def _extract_period_boxscore_candidates_by_team(self, response_json):
+        if not isinstance(response_json, dict):
+            return {}
+        boxscore = response_json.get("boxScoreTraditional")
+        if not isinstance(boxscore, dict):
+            return {}
+
+        players_by_team = {}
+        for team_key in ["awayTeam", "homeTeam"]:
+            team_data = boxscore.get(team_key)
+            if not isinstance(team_data, dict):
+                continue
+            team_id = team_data.get("teamId")
+            players = team_data.get("players", [])
+            if not isinstance(players, list):
+                continue
+            players_by_team[team_id] = [
+                player.get("personId")
+                for player in players
+                if isinstance(player, dict)
+            ]
+        return self._normalize_boxscore_players_by_team(players_by_team)
+
+    def _is_exact_starter_map(self, starters_by_team):
+        starters_by_team = self._normalize_boxscore_players_by_team(starters_by_team)
+        return (
+            len(starters_by_team) == 2
+            and all(len(starters) == 5 for starters in starters_by_team.values())
+            and len(
+                {
+                    player_id
+                    for starters in starters_by_team.values()
+                    for player_id in starters
+                }
+            )
+            == 10
         )
 
-        if len(starters) < 10:
-            raise InvalidNumberOfStartersException(
-                f"GameId: {self.game_id}, Period: {self.period}, Starters: {starters}"
+    def _iter_period_events(self):
+        event = getattr(self, "first_period_event", None)
+        if event is None:
+            event = self.next_event
+        while event is not None and getattr(event, "period", None) == self.period:
+            yield event
+            event = event.next_event
+
+    def _get_period_substitution_order_lookup(self):
+        substitution_order_lookup = {}
+        for event_order, event in enumerate(self._iter_period_events(), start=1):
+            if not isinstance(event, Substitution):
+                continue
+            team_id = getattr(event, "team_id", None)
+            if not isinstance(team_id, int) or team_id <= 0:
+                continue
+            for kind, player_id in [
+                ("in", getattr(event, "incoming_player_id", None)),
+                ("out", getattr(event, "outgoing_player_id", None)),
+            ]:
+                if not isinstance(player_id, int) or player_id <= 0:
+                    continue
+                team_lookup = substitution_order_lookup.setdefault(team_id, {})
+                player_lookup = team_lookup.setdefault(player_id, {"in": [], "out": []})
+                player_lookup[kind].append(event_order)
+        return substitution_order_lookup
+
+    def _classify_period_boxscore_candidate(self, team_id, player_id, substitution_lookup):
+        player_lookup = (
+            substitution_lookup.get(team_id, {}).get(
+                player_id, {"in": [], "out": []}
             )
+        )
+        sub_in_orders = player_lookup["in"]
+        sub_out_orders = player_lookup["out"]
+        has_sub_in = len(sub_in_orders) > 0
+        has_sub_out = len(sub_out_orders) > 0
 
-        for starter in starters[0:10]:
-            team_id = starter["TEAM_ID"]
-            player_id = starter["PLAYER_ID"]
-            if team_id not in starters_by_team.keys():
-                starters_by_team[team_id] = []
-            starters_by_team[team_id].append(player_id)
+        if not has_sub_in and not has_sub_out:
+            return True
+        if has_sub_out and not has_sub_in:
+            return True
+        if has_sub_in and not has_sub_out:
+            return False
 
-        for team_id, starters in starters_by_team.items():
-            if len(starters) != 5:
-                raise InvalidNumberOfStartersException(
-                    f"GameId: {self.game_id}, Period: {self.period}, TeamId: {team_id}, Players: {starters}"
+        first_sub_in_order = min(sub_in_orders)
+        first_sub_out_order = min(sub_out_orders)
+        if first_sub_out_order < first_sub_in_order:
+            return True
+        if first_sub_in_order < first_sub_out_order:
+            return False
+        return None
+
+    def _narrow_period_boxscore_candidates_to_starters(self, candidates_by_team):
+        candidates_by_team = self._normalize_boxscore_players_by_team(candidates_by_team)
+        if len(candidates_by_team) != 2:
+            return None
+
+        substitution_lookup = self._get_period_substitution_order_lookup()
+        starters_by_team = {}
+        for team_id, candidates in candidates_by_team.items():
+            starters = []
+            for player_id in candidates:
+                is_starter = self._classify_period_boxscore_candidate(
+                    team_id, player_id, substitution_lookup
                 )
+                if is_starter is None:
+                    return None
+                if is_starter:
+                    starters.append(player_id)
+            starters_by_team[team_id] = starters
 
-        return starters_by_team
+        if self._is_exact_starter_map(starters_by_team):
+            return starters_by_team
+        return None
+
+    def _get_starters_from_boxscore_request(self):
+        """
+        Use period-level boxscoretraditionalv3 fallback to resolve starters.
+
+        The fallback prefers a one-second start-of-period RangeType=2 window.
+        If that window does not resolve to an exact 5-on-5 lineup, it narrows the
+        returned candidates with substitution timing. It then repeats the same
+        narrowing with a RangeType=1 participant set if needed.
+        """
+        rt2_response = self._load_period_boxscore_response("rt2_start_window")
+        rt2_candidates = self._extract_period_boxscore_candidates_by_team(rt2_response)
+        if self._is_exact_starter_map(rt2_candidates):
+            return rt2_candidates
+
+        if rt2_candidates:
+            starters_by_team = self._narrow_period_boxscore_candidates_to_starters(
+                rt2_candidates
+            )
+            if starters_by_team is not None:
+                return starters_by_team
+
+        rt1_response = self._load_period_boxscore_response("rt1_period_participants")
+        rt1_candidates = self._extract_period_boxscore_candidates_by_team(rt1_response)
+        if rt1_candidates:
+            starters_by_team = self._narrow_period_boxscore_candidates_to_starters(
+                rt1_candidates
+            )
+            if starters_by_team is not None:
+                return starters_by_team
+
+        raise InvalidNumberOfStartersException(
+            f"GameId: {self.game_id}, Period: {self.period}, Starters: {rt2_candidates or rt1_candidates}"
+        )
 
     def get_team_starting_with_ball(self):
         """
@@ -408,13 +566,13 @@ class StartOfPeriod(metaclass=abc.ABCMeta):
 
         # Some malformed recent windows log a player's first action before the
         # substitution that actually brought them into the game. If the first
-        # explicit sub-in happens earlier in game time than the player's first
-        # recorded starter-like event, treat them as a sub, not a starter.
+        # explicit sub-in happens earlier in game time, or at the exact same
+        # clock, treat them as a sub, not a starter.
         for player_id, sub_seconds_remaining in player_first_sub_in_seconds_remaining.items():
             first_seen_seconds_remaining = player_first_seen_seconds_remaining.get(player_id)
             if first_seen_seconds_remaining is None:
                 continue
-            if sub_seconds_remaining > first_seen_seconds_remaining + 0.001:
+            if sub_seconds_remaining + 0.001 >= first_seen_seconds_remaining:
                 starters = [starter_id for starter_id in starters if starter_id != player_id]
                 if player_id not in subbed_in_players:
                     subbed_in_players.append(player_id)
@@ -540,14 +698,7 @@ class StartOfPeriod(metaclass=abc.ABCMeta):
             dict: {team_id: {"in": set of player_ids, "out": set of player_ids}}
         """
         result = {}
-
-        if self.period <= 4:
-            if self.league == WNBA_STRING:
-                start_seconds = 600.0
-            else:
-                start_seconds = 720.0
-        else:
-            start_seconds = 300.0
+        start_seconds = self._get_period_start_seconds()
 
         # Scan from first event of this period (may be before StartOfPeriod marker)
         first_event = getattr(self, "first_period_event", None)
@@ -589,6 +740,49 @@ class StartOfPeriod(metaclass=abc.ABCMeta):
 
         return result
 
+    def _get_period_start_seconds(self):
+        if self.period <= 4:
+            if self.league == WNBA_STRING:
+                return 600.0
+            return 720.0
+        return 300.0
+
+    def _get_later_period_sub_in_players(self):
+        """
+        Track players who explicitly sub IN after the period-start window.
+
+        These players are not safe carryover candidates when we try to
+        backfill missing starters from the previous period's ending lineup.
+        """
+        result = {}
+        start_seconds = self._get_period_start_seconds()
+
+        first_event = getattr(self, "first_period_event", None)
+        event = first_event if first_event is not None else self.next_event
+
+        while event is not None:
+            if getattr(event, "period", None) != self.period:
+                break
+
+            event_seconds = getattr(event, "seconds_remaining", None)
+            if event_seconds is None:
+                event = event.next_event
+                continue
+
+            if event_seconds >= start_seconds - 0.001:
+                event = event.next_event
+                continue
+
+            if isinstance(event, Substitution):
+                team_id = getattr(event, "team_id", None)
+                incoming = getattr(event, "incoming_player_id", None)
+                if team_id is not None and incoming is not None:
+                    result.setdefault(team_id, set()).add(incoming)
+
+            event = event.next_event
+
+        return result
+
     def _fill_missing_starters_from_previous_period_end(self, starters_by_team):
         """
         Fill in missing period starters using the previous period's ending lineup.
@@ -610,6 +804,7 @@ class StartOfPeriod(metaclass=abc.ABCMeta):
             return starters_by_team
 
         period_start_subs = self._get_period_start_substitutions()
+        later_period_sub_ins = self._get_later_period_sub_in_players()
 
         for team_id, prev_players in prev_lineups.items():
             if not isinstance(prev_players, list) or len(prev_players) != 5:
@@ -628,8 +823,6 @@ class StartOfPeriod(metaclass=abc.ABCMeta):
 
             implied_carryover = (cur_set - subbed_in_at_start) | subbed_out_at_start
 
-            if not implied_carryover.issubset(prev_set):
-                continue
             missing = [
                 player
                 for player in prev_players
@@ -638,7 +831,21 @@ class StartOfPeriod(metaclass=abc.ABCMeta):
             need = 5 - len(cur)
             if need <= 0:
                 continue
-            filled = cur + missing[:need]
+
+            if implied_carryover.issubset(prev_set):
+                fill_candidates = missing
+            else:
+                # Relax the subset gate only when the remaining carryover
+                # candidates are uniquely identifiable after excluding players
+                # who later have an explicit sub-in event in the same period.
+                later_sub_ins = later_period_sub_ins.get(team_id, set())
+                fill_candidates = [
+                    player for player in missing if player not in later_sub_ins
+                ]
+                if len(fill_candidates) != need:
+                    continue
+
+            filled = cur + fill_candidates[:need]
             seen = set()
             starters_by_team[team_id] = [
                 player for player in filled if not (player in seen or seen.add(player))
