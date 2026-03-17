@@ -108,6 +108,62 @@ class EnhancedPbpItem(metaclass=abc.ABCMeta):
             event = event.next_event
         return sorted(events, key=lambda k: k.order)
 
+    def _get_previous_raw_players(self):
+        prev = getattr(self, "previous_event", None)
+        if prev is None:
+            logger.debug(
+                "No previous_event for %r (game_id=%s); returning empty current_players.",
+                self,
+                getattr(self, "game_id", "unknown"),
+            )
+            return {}
+        try:
+            return prev._raw_current_players
+        except AttributeError:
+            try:
+                return prev.current_players
+            except Exception as e:
+                logger.debug(
+                    "Error walking current_players chain for %r (game_id=%s): %s; "
+                    "returning empty current_players.",
+                    self,
+                    getattr(self, "game_id", "unknown"),
+                    e,
+                )
+                return {}
+        except Exception as e:
+            logger.debug(
+                "Error walking current_players chain for %r (game_id=%s): %s; "
+                "returning empty current_players.",
+                self,
+                getattr(self, "game_id", "unknown"),
+                e,
+            )
+            return {}
+
+    @property
+    def _raw_current_players(self):
+        return self._get_previous_raw_players()
+
+    def _apply_lineup_overrides(self, players):
+        overrides = getattr(self, "lineup_override_by_team", None)
+        if not overrides:
+            return players
+
+        updated_players = {}
+        for team_id, team_players in getattr(players, "items", lambda: [])():
+            if isinstance(team_players, (list, tuple, set)):
+                updated_players[team_id] = list(team_players)
+            else:
+                updated_players[team_id] = team_players
+
+        for team_id, team_players in overrides.items():
+            if isinstance(team_players, (list, tuple, set)):
+                updated_players[team_id] = list(team_players)
+            else:
+                updated_players[team_id] = team_players
+        return updated_players
+
     @property
     def current_players(self):
         """
@@ -120,27 +176,7 @@ class EnhancedPbpItem(metaclass=abc.ABCMeta):
         This gets overwritten in :obj:`~pbpstats.resources.enhanced_pbp.substitution.Substitution`
         since those are the only event types where players are not the same as the previous event
         """
-        prev = getattr(self, "previous_event", None)
-        if prev is None:
-            # no context for lineups (start of game / broken pbp)
-            logger.debug(
-                "No previous_event for %r (game_id=%s); returning empty current_players.",
-                self,
-                getattr(self, "game_id", "unknown"),
-            )
-            return {}
-        try:
-            return prev.current_players
-        except Exception as e:
-            # KeyError / AttributeError in prior events -> treat as unknown lineup
-            logger.debug(
-                "Error walking current_players chain for %r (game_id=%s): %s; "
-                "returning empty current_players.",
-                self,
-                getattr(self, "game_id", "unknown"),
-                e,
-            )
-            return {}
+        return self._apply_lineup_overrides(self._raw_current_players)
 
     @property
     def score_margin(self):

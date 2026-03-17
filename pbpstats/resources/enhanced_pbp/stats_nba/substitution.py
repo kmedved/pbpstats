@@ -28,7 +28,7 @@ class StatsSubstitution(Substitution, StatsEnhancedPbpItem):
         if getattr(self, "team_id", 0) in [0, None, "0"] or getattr(
             self, "player1_id", 0
         ) in [0, None, "0"]:
-            return getattr(self.previous_event, "current_players", {})
+            return self._apply_lineup_overrides(self._get_previous_raw_players())
         return super().current_players
 
     @property
