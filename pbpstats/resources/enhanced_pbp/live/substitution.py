@@ -31,18 +31,28 @@ class LiveSubstitution(Substitution, LiveEnhancedPbpItem):
         return self.player1_id
 
     @property
+    def _raw_current_players(self):
+        """
+        returns dict with list of player ids for each team
+        with players on the floor following the sub
+        """
+        previous_players = self._get_previous_raw_players()
+        players = {
+            team_id: [player_id for player_id in team_players]
+            for team_id, team_players in previous_players.items()
+        }
+        if self.player1_id is not None and self.team_id in players:
+            if self.sub_type == "in":
+                players[self.team_id].append(self.player1_id)
+            elif self.sub_type == "out" and self.player1_id in players[self.team_id]:
+                players[self.team_id].remove(self.player1_id)
+            players[self.team_id] = list(dict.fromkeys(players[self.team_id]))
+        return players
+
+    @property
     def current_players(self):
         """
         returns dict with list of player ids for each team
         with players on the floor following the sub
         """
-        players = {}
-        for team_id, team_players in self.previous_event.current_players.items():
-            players[team_id] = [player_id for player_id in team_players]
-        if self.player1_id is not None:
-            if self.sub_type == "in":
-                players[self.team_id].append(self.player1_id)
-            elif self.sub_type == "out" and self.player1_id in players[self.team_id]:
-                players[self.team_id].remove(self.player1_id)
-            players[self.team_id] = list(set(players[self.team_id]))
-        return players
+        return self._apply_lineup_overrides(self._raw_current_players)
