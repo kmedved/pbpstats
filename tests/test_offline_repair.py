@@ -1,7 +1,7 @@
 import pandas as pd
 import pytest
 
-from pbpstats.offline.ordering import reorder_with_v3
+from pbpstats.offline.ordering import preserve_order_after_v3_repairs, reorder_with_v3
 from pbpstats.offline.processor import PbpProcessor
 from pbpstats.resources.enhanced_pbp.data_nba.field_goal import DataFieldGoal
 from pbpstats.resources.enhanced_pbp.data_nba.rebound import DataRebound
@@ -80,7 +80,7 @@ def _data_rebound(event_num, description, team_id, player_id=1):
     }
 
 
-def test_reorder_with_v3_preserves_existing_row_order_for_putback_cluster():
+def test_preserve_order_after_v3_repairs_keeps_putback_cluster_row_order():
     game_df = pd.DataFrame(
         [
             {"GAME_ID": "0029601035", "EVENTNUM": 463, "EVENTMSGTYPE": 2, "PERIOD": 4, "PCTIMESTRING": "2:01"},
@@ -96,12 +96,12 @@ def test_reorder_with_v3_preserves_existing_row_order_for_putback_cluster():
         ]
     )
 
-    ordered = reorder_with_v3(game_df, "0029601035", lambda _: v3_df)
+    ordered = preserve_order_after_v3_repairs(game_df)
 
     assert ordered["EVENTNUM"].tolist() == [463, 465, 464]
 
 
-def test_reorder_with_v3_preserves_existing_row_order_for_missed_free_throw_cluster():
+def test_preserve_order_after_v3_repairs_keeps_missed_free_throw_cluster_row_order():
     game_df = pd.DataFrame(
         [
             {"GAME_ID": "0029601101", "EVENTNUM": 450, "EVENTMSGTYPE": 3, "PERIOD": 4, "PCTIMESTRING": "6:50"},
@@ -121,12 +121,27 @@ def test_reorder_with_v3_preserves_existing_row_order_for_missed_free_throw_clus
         ]
     )
 
-    ordered = reorder_with_v3(game_df, "0029601101", lambda _: v3_df)
+    ordered = preserve_order_after_v3_repairs(game_df)
 
     assert ordered["EVENTNUM"].tolist() == [450, 454, 451, 452, 453]
 
 
-def test_reorder_with_v3_coerces_eventnum_to_int_without_resorting():
+def test_preserve_order_after_v3_repairs_coerces_eventnum_to_int_without_resorting():
+    game_df = pd.DataFrame(
+        [
+            {"GAME_ID": "0029601086", "EVENTNUM": "425", "EVENTMSGTYPE": 2, "PERIOD": 4},
+            {"GAME_ID": "0029601086", "EVENTNUM": "427", "EVENTMSGTYPE": 4, "PERIOD": 4},
+            {"GAME_ID": "0029601086", "EVENTNUM": "426", "EVENTMSGTYPE": 1, "PERIOD": 4},
+        ]
+    )
+
+    ordered = preserve_order_after_v3_repairs(game_df)
+
+    assert ordered["EVENTNUM"].tolist() == [425, 427, 426]
+    assert ordered["EVENTNUM"].dtype.kind in {"i", "u"}
+
+
+def test_reorder_with_v3_is_a_compatibility_alias():
     game_df = pd.DataFrame(
         [
             {"GAME_ID": "0029601086", "EVENTNUM": "425", "EVENTMSGTYPE": 2, "PERIOD": 4},
@@ -138,7 +153,6 @@ def test_reorder_with_v3_coerces_eventnum_to_int_without_resorting():
     ordered = reorder_with_v3(game_df, "0029601086", lambda _: pd.DataFrame())
 
     assert ordered["EVENTNUM"].tolist() == [425, 427, 426]
-    assert ordered["EVENTNUM"].dtype.kind in {"i", "u"}
 
 
 def test_stats_rebound_event_order_error_exposes_event_numbers():

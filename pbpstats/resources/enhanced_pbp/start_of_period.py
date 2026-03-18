@@ -215,7 +215,7 @@ class StartOfPeriod(metaclass=abc.ABCMeta):
     def _iter_period_events(self):
         event = getattr(self, "first_period_event", None)
         if event is None:
-            event = self.next_event
+            event = getattr(self, "next_event", None)
         while event is not None and getattr(event, "period", None) == self.period:
             yield event
             event = event.next_event
@@ -287,6 +287,45 @@ class StartOfPeriod(metaclass=abc.ABCMeta):
         if self._is_exact_starter_map(starters_by_team):
             return starters_by_team
         return None
+
+    def _strict_starters_are_impossible(self, starters_by_team):
+        """
+        Return True when a strict PBP starter map is internally contradictory.
+
+        This stays intentionally narrow: it only flags impossible lineup states,
+        not merely suspicious ones. The main target is the case where a claimed
+        starter later has a same-period substitution pattern that proves they
+        were not actually on the floor when the period began.
+        """
+        if not isinstance(starters_by_team, dict) or len(starters_by_team) != 2:
+            return True
+
+        substitution_lookup = self._get_period_substitution_order_lookup()
+        seen_players = set()
+
+        for team_id, starters in starters_by_team.items():
+            if not isinstance(team_id, int) or team_id <= 0:
+                return True
+            if not isinstance(starters, list) or len(starters) != 5:
+                return True
+
+            team_seen = set()
+            for player_id in starters:
+                if not isinstance(player_id, int) or player_id <= 0:
+                    return True
+                if player_id in team_seen or player_id in seen_players:
+                    return True
+
+                team_seen.add(player_id)
+                seen_players.add(player_id)
+
+                starter_classification = self._classify_period_boxscore_candidate(
+                    team_id, player_id, substitution_lookup
+                )
+                if starter_classification is not True:
+                    return True
+
+        return False
 
     def _get_starters_from_boxscore_request(self):
         """

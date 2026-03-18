@@ -543,3 +543,75 @@ def test_stats_start_of_period_uses_strict_pbp_when_it_succeeds():
         TEAM_B: [11, 12, 13, 14, 15],
     }
     assert call_log == [("strict", False)]
+
+
+def test_stats_start_of_period_uses_period_boxscore_when_strict_result_is_impossible():
+    end = DummyEnd()
+    later_sub = DummySubstitution(
+        team_id=TEAM_A,
+        incoming_player_id=6,
+        outgoing_player_id=5,
+        seconds_remaining=600.0,
+        next_event=end,
+    )
+    start = DummyStatsStart()
+    start.period = 2
+    start.next_event = later_sub
+    start.first_period_event = later_sub
+    call_log = []
+
+    def strict(file_directory, ignore_missing_starters=False):
+        call_log.append(("strict", ignore_missing_starters))
+        if ignore_missing_starters:
+            return {"best_effort": True}
+        return {TEAM_A: [1, 2, 3, 4, 6], TEAM_B: [11, 12, 13, 14, 15]}
+
+    start._get_period_starters_from_period_events = strict
+    start._get_period_starters_from_boxscore_loader = lambda: None
+    start._get_starters_from_boxscore_request = lambda: {
+        TEAM_A: [1, 2, 3, 4, 5],
+        TEAM_B: [11, 12, 13, 14, 15],
+    }
+
+    starters = start.get_period_starters()
+
+    assert starters == {
+        TEAM_A: [1, 2, 3, 4, 5],
+        TEAM_B: [11, 12, 13, 14, 15],
+    }
+    assert call_log == [("strict", False)]
+
+
+def test_stats_start_of_period_uses_best_effort_when_strict_result_is_impossible_and_v3_fails():
+    end = DummyEnd()
+    later_sub = DummySubstitution(
+        team_id=TEAM_A,
+        incoming_player_id=6,
+        outgoing_player_id=5,
+        seconds_remaining=600.0,
+        next_event=end,
+    )
+    start = DummyStatsStart()
+    start.period = 2
+    start.next_event = later_sub
+    start.first_period_event = later_sub
+    call_log = []
+
+    def strict(file_directory, ignore_missing_starters=False):
+        call_log.append(("strict", ignore_missing_starters))
+        if ignore_missing_starters:
+            return {"best_effort": True}
+        return {TEAM_A: [1, 2, 3, 4, 6], TEAM_B: [11, 12, 13, 14, 15]}
+
+    start._get_period_starters_from_period_events = strict
+    start._get_period_starters_from_boxscore_loader = lambda: None
+
+    def v3_fallback():
+        raise InvalidNumberOfStartersException("fallback unavailable")
+
+    start._get_starters_from_boxscore_request = v3_fallback
+
+    starters = start.get_period_starters()
+
+    assert starters == {"best_effort": True}
+    assert call_log == [("strict", False), ("strict", True)]

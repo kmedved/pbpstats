@@ -274,11 +274,7 @@ def enrich_clocks_with_v3(
     return df
 
 
-def reorder_with_v3(
-    game_df: pd.DataFrame,
-    game_id: str,
-    fetch_pbp_v3_fn: FetchPbpV3Fn,
-) -> pd.DataFrame:
+def preserve_order_after_v3_repairs(game_df: pd.DataFrame) -> pd.DataFrame:
     """
     Preserve the existing row order after v3-backed dedupe/period patching.
 
@@ -294,3 +290,19 @@ def reorder_with_v3(
     start-of-period markers, not as a chronology rewrite.
     """
     return _ensure_eventnum_int(game_df).reset_index(drop=True)
+
+
+def reorder_with_v3(
+    game_df: pd.DataFrame,
+    game_id: str,
+    fetch_pbp_v3_fn: FetchPbpV3Fn,
+) -> pd.DataFrame:
+    """
+    Backwards-compatible alias for preserve_order_after_v3_repairs().
+
+    The legacy name and extra arguments suggested that the offline pipeline
+    performed a v3-driven chronology rewrite here. It does not. The active
+    offline path intentionally preserves the existing row order and only
+    normalizes EVENTNUM to integers.
+    """
+    return preserve_order_after_v3_repairs(game_df)

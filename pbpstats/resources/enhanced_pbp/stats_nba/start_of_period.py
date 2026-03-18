@@ -21,6 +21,7 @@ class StatsStartOfPeriod(StartOfPeriod, StatsEnhancedPbpItem):
         """
         Try, in order:
           1) PBP-based inference (strict, including overrides).
+             If the strict result is internally impossible, treat it as failure.
           2) Local boxscore-based starters (Period 1 via START_POSITION).
           3) Period-level V3 boxscore fallback (only when strict PBP failed).
           4) Best-effort PBP inference (ignore_missing_starters=True).
@@ -31,7 +32,7 @@ class StatsStartOfPeriod(StartOfPeriod, StatsEnhancedPbpItem):
         except InvalidNumberOfStartersException:
             starters = None
 
-        if starters is not None:
+        if starters is not None and not self._strict_starters_are_impossible(starters):
             return starters
 
         # 2) Local boxscore-based starters (Period 1)

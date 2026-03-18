@@ -16,7 +16,7 @@ from pbpstats.offline.ordering import (
     dedupe_with_v3,
     enrich_clocks_with_v3,
     patch_start_of_periods,
-    reorder_with_v3,
+    preserve_order_after_v3_repairs,
     _ensure_eventnum_int,
 )
 
@@ -1212,7 +1212,7 @@ def get_possessions_from_df(
     # Preserve the post-dedupe row order; numeric re-sorts can break old-game chronology.
     if fetch_pbp_v3_fn is not None:
         try:
-            df_ordered = reorder_with_v3(df, game_id, fetch_pbp_v3_fn)
+            df_ordered = preserve_order_after_v3_repairs(df)
         except Exception:
             df_ordered = _ensure_eventnum_int(df).reset_index(drop=True)
     else:
