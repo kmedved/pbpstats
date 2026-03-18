@@ -14,7 +14,7 @@ the raw play-by-play data I recommend setting up a data directory to save the re
 of requests you make to the NBA Stats API and allow you to manually fix issues with the raw data.
 Within this directory you will need to add four subdirectories(game_details, overrides, pbp and schedule).
 To use the directory, just include it in your settings when initializing the client like in the example below.
-This directory is also where `override files <https://github.com/dblackrun/pbpstats/wiki/Overrides-to-fix-issues-parsing-pbp>`_
+This directory is also where `override files <https://github.com/kmedved/pbpstats/wiki/Overrides-to-fix-issues-parsing-pbp>`_
 to fix periods starters and handle issues with parsing pbp that can't be fixed by editing pbp file are placed.
 
 Download data

@@ -1,5 +1,3 @@
-[![PyPI version](https://badge.fury.io/py/pbpstats.svg)](https://badge.fury.io/py/pbpstats)
-
 A package to scrape and parse NBA, WNBA and G-League play-by-play data.
 
 # Features
@@ -17,9 +15,6 @@ Tested on Python >=3.8
 pip install pbpstats
 ```
 
-# Resources
-[Documentation](https://pbpstats.readthedocs.io/en/latest/)
-
 # LLM Context
 LLM-facing context artifacts live in `context/`.
 
@@ -33,14 +28,13 @@ Refresh local bundles with `python scripts/build_context_bundle.py`.
 Version policy: Policy B, so only shipped/runtime behavior changes require a version bump.
 
 # Local Development
-Using [poetry](https://python-poetry.org/) for package managment. Install it first if it is not install on your system.
+Using [poetry](https://python-poetry.org/) for package management. Install it first if it is not already installed on your system.
 
-`git clone https://github.com/dblackrun/pbpstats.git`
+Clone the repo on the default `main` branch:
+
+`git clone https://github.com/kmedved/pbpstats.git`
 
 `cd pbpstats`
-
-Develop using `develop` branch:
-`git checkout develop`
 
 Install dependencies:
 
