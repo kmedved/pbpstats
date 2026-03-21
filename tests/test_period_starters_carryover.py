@@ -4,7 +4,13 @@ import json
 
 sys.path.insert(0, os.path.abspath("."))
 
-from pbpstats.resources.enhanced_pbp import EndOfPeriod, Substitution
+from pbpstats.resources.enhanced_pbp import (
+    Ejection,
+    EndOfPeriod,
+    Foul,
+    FreeThrow,
+    Substitution,
+)
 from pbpstats.resources.enhanced_pbp.start_of_period import (
     InvalidNumberOfStartersException,
     StartOfPeriod,
@@ -80,6 +86,208 @@ class DummySubstitution(Substitution):
     @property
     def outgoing_player_id(self):
         return self._outgoing_player_id
+
+
+class DummyFoul(Foul):
+    def __init__(
+        self,
+        *,
+        player1_id,
+        team_id,
+        seconds_remaining,
+        period=2,
+        next_event=None,
+        is_technical=False,
+        is_double_technical=False,
+        is_flagrant1=False,
+        is_flagrant2=False,
+        clock="12:00",
+    ):
+        self.player1_id = player1_id
+        self.team_id = team_id
+        self.seconds_remaining = seconds_remaining
+        self.period = period
+        self.next_event = next_event
+        self._is_technical = is_technical
+        self._is_double_technical = is_double_technical
+        self._is_flagrant1 = is_flagrant1
+        self._is_flagrant2 = is_flagrant2
+        self.clock = clock
+
+    @property
+    def number_of_fta_for_foul(self):
+        return 0
+
+    @property
+    def is_personal_foul(self):
+        return False
+
+    @property
+    def is_shooting_foul(self):
+        return False
+
+    @property
+    def is_loose_ball_foul(self):
+        return False
+
+    @property
+    def is_offensive_foul(self):
+        return False
+
+    @property
+    def is_inbound_foul(self):
+        return False
+
+    @property
+    def is_away_from_play_foul(self):
+        return False
+
+    @property
+    def is_clear_path_foul(self):
+        return False
+
+    @property
+    def is_double_foul(self):
+        return False
+
+    @property
+    def is_technical(self):
+        return self._is_technical
+
+    @property
+    def is_flagrant1(self):
+        return self._is_flagrant1
+
+    @property
+    def is_flagrant2(self):
+        return self._is_flagrant2
+
+    @property
+    def is_double_technical(self):
+        return self._is_double_technical
+
+    @property
+    def is_defensive_3_seconds(self):
+        return False
+
+    @property
+    def is_delay_of_game(self):
+        return False
+
+    @property
+    def is_charge(self):
+        return False
+
+    @property
+    def is_personal_block_foul(self):
+        return False
+
+    @property
+    def is_personal_take_foul(self):
+        return False
+
+    @property
+    def is_shooting_block_foul(self):
+        return False
+
+    @property
+    def is_transition_take_foul(self):
+        return False
+
+
+class DummyFreeThrow(FreeThrow):
+    def __init__(
+        self,
+        *,
+        player1_id,
+        team_id,
+        seconds_remaining,
+        period=2,
+        next_event=None,
+        is_technical_ft=True,
+        is_flagrant_ft=False,
+        ft_number=1,
+        trip_size=1,
+        clock="12:00",
+    ):
+        self.player1_id = player1_id
+        self.team_id = team_id
+        self.seconds_remaining = seconds_remaining
+        self.period = period
+        self.next_event = next_event
+        self._is_technical_ft = is_technical_ft
+        self._is_flagrant_ft = is_flagrant_ft
+        self._ft_number = ft_number
+        self._trip_size = trip_size
+        self.clock = clock
+        self.description = ""
+
+    @property
+    def is_made(self):
+        return True
+
+    @property
+    def is_ft_1_of_1(self):
+        return self._ft_number == 1 and self._trip_size == 1
+
+    @property
+    def is_ft_1_of_2(self):
+        return self._ft_number == 1 and self._trip_size == 2
+
+    @property
+    def is_ft_2_of_2(self):
+        return self._ft_number == 2 and self._trip_size == 2
+
+    @property
+    def is_ft_1_of_3(self):
+        return self._ft_number == 1 and self._trip_size == 3
+
+    @property
+    def is_ft_2_of_3(self):
+        return self._ft_number == 2 and self._trip_size == 3
+
+    @property
+    def is_ft_3_of_3(self):
+        return self._ft_number == 3 and self._trip_size == 3
+
+    @property
+    def is_technical_ft(self):
+        return self._is_technical_ft
+
+    @property
+    def is_flagrant_ft(self):
+        return self._is_flagrant_ft
+
+    @property
+    def is_ft_1pt(self):
+        return False
+
+    @property
+    def is_ft_2pt(self):
+        return False
+
+    @property
+    def is_ft_3pt(self):
+        return False
+
+
+class DummyEjection(Ejection):
+    def __init__(
+        self,
+        *,
+        player1_id,
+        team_id,
+        seconds_remaining,
+        period=2,
+        next_event=None,
+        clock="12:00",
+    ):
+        self.player1_id = player1_id
+        self.team_id = team_id
+        self.seconds_remaining = seconds_remaining
+        self.period = period
+        self.next_event = next_event
+        self.clock = clock
 
 
 class DummyPeriodBoxscoreLoader:
@@ -215,6 +423,298 @@ def test_fill_missing_starters_noop_when_already_5():
     starters_by_team = {TEAM_A: [1, 2, 3, 4, 5]}
 
     result = start._fill_missing_starters_from_previous_period_end(starters_by_team)
+
+    assert result[TEAM_A] == [1, 2, 3, 4, 5]
+
+
+def test_fill_missing_starters_keeps_outgoing_player_for_period_start_technical_ft_cluster():
+    end = DummyEnd()
+    sub = DummySubstitution(
+        team_id=TEAM_A,
+        incoming_player_id=9,
+        outgoing_player_id=5,
+        seconds_remaining=720.0,
+        next_event=end,
+    )
+    tech_ft = DummyFreeThrow(
+        player1_id=5,
+        team_id=TEAM_A,
+        seconds_remaining=720.0,
+        next_event=sub,
+    )
+    tech_foul = DummyFoul(
+        player1_id=11,
+        team_id=TEAM_B,
+        seconds_remaining=720.0,
+        next_event=tech_ft,
+        is_technical=True,
+    )
+    start = DummyStart()
+    start.next_event = tech_foul
+    start.first_period_event = tech_foul
+    start.previous_period_end_lineups = {
+        TEAM_A: [1, 2, 3, 4, 5],
+        TEAM_B: [11, 12, 13, 14, 15],
+    }
+    start.previous_period_end_period = 1
+    starters_by_team = {TEAM_A: [1, 2, 3, 4]}
+
+    result = start._fill_missing_starters_from_previous_period_end(starters_by_team)
+
+    assert result[TEAM_A] == [1, 2, 3, 4, 5]
+
+
+def test_fill_missing_starters_keeps_outgoing_player_for_period_start_flagrant_cluster():
+    end = DummyEnd()
+    opponent_ft = DummyFreeThrow(
+        player1_id=12,
+        team_id=TEAM_B,
+        seconds_remaining=720.0,
+        next_event=end,
+        is_technical_ft=False,
+    )
+    sub = DummySubstitution(
+        team_id=TEAM_A,
+        incoming_player_id=9,
+        outgoing_player_id=5,
+        seconds_remaining=720.0,
+        next_event=opponent_ft,
+    )
+    ejection = DummyEjection(
+        player1_id=5,
+        team_id=TEAM_A,
+        seconds_remaining=720.0,
+        next_event=sub,
+    )
+    flagrant = DummyFoul(
+        player1_id=5,
+        team_id=TEAM_A,
+        seconds_remaining=720.0,
+        next_event=ejection,
+        is_flagrant2=True,
+    )
+    start = DummyStart()
+    start.next_event = flagrant
+    start.first_period_event = flagrant
+    start.previous_period_end_lineups = {
+        TEAM_A: [1, 2, 3, 4, 5],
+        TEAM_B: [11, 12, 13, 14, 15],
+    }
+    start.previous_period_end_period = 1
+    starters_by_team = {TEAM_A: [1, 2, 3, 4]}
+
+    result = start._fill_missing_starters_from_previous_period_end(starters_by_team)
+
+    assert result[TEAM_A] == [1, 2, 3, 4, 5]
+
+
+def test_fill_missing_starters_still_treats_plain_period_start_sub_as_pre_cluster():
+    end = DummyEnd()
+    sub = DummySubstitution(
+        team_id=TEAM_A,
+        incoming_player_id=9,
+        outgoing_player_id=5,
+        seconds_remaining=720.0,
+        next_event=end,
+    )
+    start = DummyStart()
+    start.next_event = sub
+    start.first_period_event = sub
+    start.previous_period_end_lineups = {
+        TEAM_A: [1, 2, 3, 4, 5],
+        TEAM_B: [11, 12, 13, 14, 15],
+    }
+    start.previous_period_end_period = 1
+    starters_by_team = {TEAM_A: [1, 2, 3, 4]}
+
+    result = start._fill_missing_starters_from_previous_period_end(starters_by_team)
+
+    assert result[TEAM_A] == [1, 2, 3, 4]
+
+
+def test_fill_missing_starters_keeps_outgoing_player_for_pre_marker_same_clock_technical_ft_cluster():
+    end = DummyEnd()
+    tech_ft = DummyFreeThrow(
+        player1_id=5,
+        team_id=TEAM_A,
+        seconds_remaining=720.0,
+        next_event=end,
+    )
+    tech_foul = DummyFoul(
+        player1_id=11,
+        team_id=TEAM_B,
+        seconds_remaining=720.0,
+        next_event=tech_ft,
+        is_technical=True,
+    )
+    start_marker = DummyEvent(
+        seconds_remaining=720.0,
+        period=2,
+        next_event=tech_foul,
+    )
+    sub = DummySubstitution(
+        team_id=TEAM_A,
+        incoming_player_id=9,
+        outgoing_player_id=5,
+        seconds_remaining=720.0,
+        next_event=start_marker,
+    )
+    start = DummyStart()
+    start.next_event = sub
+    start.first_period_event = sub
+    start.previous_period_end_lineups = {
+        TEAM_A: [1, 2, 3, 4, 5],
+        TEAM_B: [11, 12, 13, 14, 15],
+    }
+    start.previous_period_end_period = 1
+    starters_by_team = {TEAM_A: [1, 2, 3, 4]}
+
+    result = start._fill_missing_starters_from_previous_period_end(starters_by_team)
+
+    assert result[TEAM_A] == [1, 2, 3, 4, 5]
+
+
+def test_fill_missing_starters_keeps_outgoing_player_for_pre_marker_same_clock_flagrant_ft_cluster():
+    end = DummyEnd()
+    opponent_ft = DummyFreeThrow(
+        player1_id=12,
+        team_id=TEAM_B,
+        seconds_remaining=720.0,
+        next_event=end,
+        is_technical_ft=False,
+    )
+    ejection = DummyEjection(
+        player1_id=5,
+        team_id=TEAM_A,
+        seconds_remaining=720.0,
+        next_event=opponent_ft,
+    )
+    flagrant = DummyFoul(
+        player1_id=5,
+        team_id=TEAM_A,
+        seconds_remaining=720.0,
+        next_event=ejection,
+        is_flagrant2=True,
+    )
+    start_marker = DummyEvent(
+        seconds_remaining=720.0,
+        period=2,
+        next_event=flagrant,
+    )
+    sub = DummySubstitution(
+        team_id=TEAM_A,
+        incoming_player_id=9,
+        outgoing_player_id=5,
+        seconds_remaining=720.0,
+        next_event=start_marker,
+    )
+    start = DummyStart()
+    start.next_event = sub
+    start.first_period_event = sub
+    start.previous_period_end_lineups = {
+        TEAM_A: [1, 2, 3, 4, 5],
+        TEAM_B: [11, 12, 13, 14, 15],
+    }
+    start.previous_period_end_period = 1
+    starters_by_team = {TEAM_A: [1, 2, 3, 4]}
+
+    result = start._fill_missing_starters_from_previous_period_end(starters_by_team)
+
+    assert result[TEAM_A] == [1, 2, 3, 4, 5]
+
+
+def test_fill_missing_starters_keeps_outgoing_player_for_pre_marker_same_clock_technical_ft_cluster():
+    end = DummyEnd()
+    tech_ft = DummyFreeThrow(
+        player1_id=5,
+        team_id=TEAM_A,
+        seconds_remaining=720.0,
+        next_event=end,
+        is_technical_ft=True,
+    )
+    tech_foul = DummyFoul(
+        player1_id=11,
+        team_id=TEAM_B,
+        seconds_remaining=720.0,
+        next_event=tech_ft,
+        is_technical=True,
+    )
+    pre_marker_sub = DummySubstitution(
+        team_id=TEAM_A,
+        incoming_player_id=9,
+        outgoing_player_id=5,
+        seconds_remaining=720.0,
+        next_event=tech_foul,
+    )
+    start = DummyStart()
+    start.next_event = tech_foul
+    start.first_period_event = pre_marker_sub
+    start.previous_period_end_lineups = {
+        TEAM_A: [1, 2, 3, 4, 5],
+        TEAM_B: [11, 12, 13, 14, 15],
+    }
+    start.previous_period_end_period = 1
+
+    result = start._fill_missing_starters_from_previous_period_end(
+        {
+            TEAM_A: [1, 2, 3, 4],
+            TEAM_B: [11, 12, 13, 14, 15],
+        }
+    )
+
+    assert result[TEAM_A] == [1, 2, 3, 4, 5]
+
+
+def test_fill_missing_starters_keeps_outgoing_player_for_pre_marker_same_clock_flagrant_ft_cluster():
+    end = DummyEnd()
+    second_flagrant_ft = DummyFreeThrow(
+        player1_id=5,
+        team_id=TEAM_A,
+        seconds_remaining=720.0,
+        next_event=end,
+        is_technical_ft=False,
+        is_flagrant_ft=True,
+        ft_number=2,
+        trip_size=2,
+    )
+    first_flagrant_ft = DummyFreeThrow(
+        player1_id=5,
+        team_id=TEAM_A,
+        seconds_remaining=720.0,
+        next_event=second_flagrant_ft,
+        is_technical_ft=False,
+        is_flagrant_ft=True,
+        ft_number=1,
+        trip_size=2,
+    )
+    support_ruling = DummyEjection(
+        player1_id=41,
+        team_id=TEAM_B,
+        seconds_remaining=720.0,
+        next_event=first_flagrant_ft,
+    )
+    pre_marker_sub = DummySubstitution(
+        team_id=TEAM_A,
+        incoming_player_id=9,
+        outgoing_player_id=5,
+        seconds_remaining=720.0,
+        next_event=support_ruling,
+    )
+    start = DummyStart()
+    start.next_event = support_ruling
+    start.first_period_event = pre_marker_sub
+    start.previous_period_end_lineups = {
+        TEAM_A: [1, 2, 3, 4, 5],
+        TEAM_B: [11, 12, 13, 14, 15],
+    }
+    start.previous_period_end_period = 1
+
+    result = start._fill_missing_starters_from_previous_period_end(
+        {
+            TEAM_A: [1, 2, 3, 4],
+            TEAM_B: [11, 12, 13, 14, 15],
+        }
+    )
 
     assert result[TEAM_A] == [1, 2, 3, 4, 5]
 
@@ -543,6 +1043,294 @@ def test_stats_start_of_period_uses_strict_pbp_when_it_succeeds():
         TEAM_B: [11, 12, 13, 14, 15],
     }
     assert call_log == [("strict", False)]
+
+
+def test_stats_start_of_period_prefers_strict_over_exact_v6_for_opening_technical_cluster():
+    end = DummyEnd()
+    tech_ft = DummyFreeThrow(
+        player1_id=5,
+        team_id=TEAM_A,
+        seconds_remaining=720.0,
+        next_event=end,
+    )
+    tech_foul = DummyFoul(
+        player1_id=11,
+        team_id=TEAM_B,
+        seconds_remaining=720.0,
+        next_event=tech_ft,
+        is_technical=True,
+    )
+    pre_marker_sub = DummySubstitution(
+        team_id=TEAM_A,
+        incoming_player_id=9,
+        outgoing_player_id=5,
+        seconds_remaining=720.0,
+        next_event=tech_foul,
+    )
+    start = DummyStatsStart()
+    start.game_id = "0020000001"
+    start.period = 2
+    start.next_event = tech_foul
+    start.first_period_event = pre_marker_sub
+    start._has_period_starter_override = lambda file_directory: False
+    start._get_period_starters_from_period_events = lambda file_directory, ignore_missing_starters=False: {
+        TEAM_A: [1, 2, 3, 4, 5],
+        TEAM_B: [11, 12, 13, 14, 15],
+    }
+    start._get_exact_local_period_boxscore_starters = lambda: (
+        {
+            TEAM_A: [1, 2, 3, 4, 9],
+            TEAM_B: [11, 12, 13, 14, 15],
+        },
+        "v6",
+    )
+
+    starters = start.get_period_starters()
+
+    assert starters == {
+        TEAM_A: [1, 2, 3, 4, 5],
+        TEAM_B: [11, 12, 13, 14, 15],
+    }
+
+
+def test_stats_start_of_period_still_prefers_exact_v6_without_supported_cluster():
+    end = DummyEnd()
+    plain_sub = DummySubstitution(
+        team_id=TEAM_A,
+        incoming_player_id=9,
+        outgoing_player_id=5,
+        seconds_remaining=720.0,
+        next_event=end,
+    )
+    start = DummyStatsStart()
+    start.game_id = "0020000001"
+    start.period = 2
+    start.next_event = plain_sub
+    start.first_period_event = plain_sub
+    start._has_period_starter_override = lambda file_directory: False
+    start._get_period_starters_from_period_events = lambda file_directory, ignore_missing_starters=False: {
+        TEAM_A: [1, 2, 3, 4, 5],
+        TEAM_B: [11, 12, 13, 14, 15],
+    }
+    start._get_exact_local_period_boxscore_starters = lambda: (
+        {
+            TEAM_A: [1, 2, 3, 4, 9],
+            TEAM_B: [11, 12, 13, 14, 15],
+        },
+        "v6",
+    )
+
+    starters = start.get_period_starters()
+
+    assert starters == {
+        TEAM_A: [1, 2, 3, 4, 9],
+        TEAM_B: [11, 12, 13, 14, 15],
+    }
+
+
+def test_stats_start_of_period_prefers_strict_over_exact_v6_for_real_opening_cluster_canaries():
+    scenarios = [
+        {
+            "label": "0021200444_P4_PHX_brown_over_morris",
+            "game_id": "0021200444",
+            "period": 4,
+            "strict": {
+                1610612756: [101162, 2449, 2742, 200769, 200782],
+                1610612742: [708, 1880, 200755, 201580, 201954],
+            },
+            "exact_v6": {
+                1610612756: [101162, 2449, 2742, 200782, 202693],
+                1610612742: [708, 1880, 200755, 201580, 201954],
+            },
+            "first_period_event_factory": lambda: _link_events(
+                DummyEvent(seconds_remaining=720.0, period=4),
+                DummyFoul(
+                    player1_id=708,
+                    team_id=1610612742,
+                    seconds_remaining=720.0,
+                    period=4,
+                    is_technical=True,
+                ),
+                DummyFreeThrow(
+                    player1_id=200769,
+                    team_id=1610612756,
+                    seconds_remaining=720.0,
+                    period=4,
+                ),
+                DummySubstitution(
+                    team_id=1610612756,
+                    incoming_player_id=202693,
+                    outgoing_player_id=200769,
+                    seconds_remaining=720.0,
+                    period=4,
+                ),
+            ),
+            "next_event_selector": lambda first: first,
+        },
+        {
+            "label": "0021300594_P3_IND_west_over_scola",
+            "game_id": "0021300594",
+            "period": 3,
+            "strict": {
+                1610612754: [1718, 2449, 2561, 2590, 2733],
+                1610612746: [101114, 201935, 202332, 203085, 203143],
+            },
+            "exact_v6": {
+                1610612754: [1718, 2449, 2590, 2733, 2564],
+                1610612746: [101114, 201935, 202332, 203085, 203143],
+            },
+            "first_period_event_factory": lambda: _link_events(
+                DummyEvent(seconds_remaining=720.0, period=3),
+                DummyFoul(
+                    player1_id=2561,
+                    team_id=1610612754,
+                    seconds_remaining=720.0,
+                    period=3,
+                    is_flagrant2=True,
+                ),
+                DummyEjection(
+                    player1_id=2561,
+                    team_id=1610612754,
+                    seconds_remaining=720.0,
+                    period=3,
+                ),
+                DummySubstitution(
+                    team_id=1610612754,
+                    incoming_player_id=2564,
+                    outgoing_player_id=2561,
+                    seconds_remaining=720.0,
+                    period=3,
+                ),
+                DummyFreeThrow(
+                    player1_id=203085,
+                    team_id=1610612746,
+                    seconds_remaining=720.0,
+                    period=3,
+                    is_technical_ft=False,
+                    is_flagrant_ft=True,
+                    ft_number=1,
+                    trip_size=2,
+                ),
+                DummyFreeThrow(
+                    player1_id=203085,
+                    team_id=1610612746,
+                    seconds_remaining=720.0,
+                    period=3,
+                    is_technical_ft=False,
+                    is_flagrant_ft=True,
+                    ft_number=2,
+                    trip_size=2,
+                ),
+            ),
+            "next_event_selector": lambda first: first,
+        },
+        {
+            "label": "0021400336_P2_CLE_james_over_irving",
+            "game_id": "0021400336",
+            "period": 2,
+            "strict": {
+                1610612739: [2544, 2592, 2738, 201567, 202684],
+                1610612764: [101162, 201575, 202322, 202397, 203078],
+            },
+            "exact_v6": {
+                1610612739: [202681, 2592, 2738, 201567, 202684],
+                1610612764: [101162, 201575, 202322, 202397, 203078],
+            },
+            "first_period_event_factory": lambda: _link_events(
+                DummyEvent(seconds_remaining=720.0, period=2),
+                DummyFoul(
+                    player1_id=203078,
+                    team_id=1610612764,
+                    seconds_remaining=720.0,
+                    period=2,
+                    is_technical=True,
+                ),
+                DummyFoul(
+                    player1_id=2544,
+                    team_id=1610612739,
+                    seconds_remaining=720.0,
+                    period=2,
+                    is_technical=True,
+                ),
+                DummyFreeThrow(
+                    player1_id=2544,
+                    team_id=1610612739,
+                    seconds_remaining=720.0,
+                    period=2,
+                ),
+                DummyFreeThrow(
+                    player1_id=2544,
+                    team_id=1610612739,
+                    seconds_remaining=720.0,
+                    period=2,
+                ),
+                DummySubstitution(
+                    team_id=1610612739,
+                    incoming_player_id=202681,
+                    outgoing_player_id=2544,
+                    seconds_remaining=720.0,
+                    period=2,
+                ),
+            ),
+            "next_event_selector": lambda first: first,
+        },
+        {
+            "label": "0021800748_P3_LAC_williams_over_sga",
+            "game_id": "0021800748",
+            "period": 3,
+            "strict": {
+                1610612746: [101162, 201976, 202340, 202699, 1626179],
+                1610612745: [101145, 200782, 201935, 202331, 203991],
+            },
+            "exact_v6": {
+                1610612746: [202340, 101162, 201976, 1628983, 202699],
+                1610612745: [101145, 200782, 201935, 202331, 203991],
+            },
+            "first_period_event_factory": lambda: _link_events(
+                DummyEvent(seconds_remaining=720.0, period=3),
+                DummyFoul(
+                    player1_id=101145,
+                    team_id=1610612745,
+                    seconds_remaining=720.0,
+                    period=3,
+                    is_technical=True,
+                ),
+                DummyFreeThrow(
+                    player1_id=1626179,
+                    team_id=1610612746,
+                    seconds_remaining=720.0,
+                    period=3,
+                ),
+                DummySubstitution(
+                    team_id=1610612746,
+                    incoming_player_id=1628983,
+                    outgoing_player_id=1626179,
+                    seconds_remaining=720.0,
+                    period=3,
+                ),
+            ),
+            "next_event_selector": lambda first: first,
+        },
+    ]
+
+    for scenario in scenarios:
+        first_period_event = scenario["first_period_event_factory"]()
+        start = DummyStatsStart()
+        start.game_id = scenario["game_id"]
+        start.period = scenario["period"]
+        start.first_period_event = first_period_event
+        start.next_event = scenario["next_event_selector"](first_period_event)
+        start._has_period_starter_override = lambda file_directory: False
+        start._get_period_starters_from_period_events = (
+            lambda file_directory, ignore_missing_starters=False, strict=scenario["strict"]: strict
+        )
+        start._get_exact_local_period_boxscore_starters = (
+            lambda exact_v6=scenario["exact_v6"]: (exact_v6, "v6")
+        )
+
+        starters = start.get_period_starters()
+
+        assert starters == scenario["strict"], scenario["label"]
 
 
 def test_stats_start_of_period_uses_period_boxscore_when_strict_result_is_impossible():

@@ -197,6 +197,17 @@ class StartOfPeriod(metaclass=abc.ABCMeta):
             ]
         return self._normalize_boxscore_players_by_team(players_by_team)
 
+    def _get_period_boxscore_source_name(self, response_json):
+        if not isinstance(response_json, dict):
+            return None
+        source_info = response_json.get("periodStarterSource")
+        if not isinstance(source_info, dict):
+            return None
+        source_name = source_info.get("name")
+        if isinstance(source_name, str) and source_name.strip():
+            return source_name.strip()
+        return None
+
     def _is_exact_starter_map(self, starters_by_team):
         starters_by_team = self._normalize_boxscore_players_by_team(starters_by_team)
         return (
@@ -359,6 +370,24 @@ class StartOfPeriod(metaclass=abc.ABCMeta):
 
         raise InvalidNumberOfStartersException(
             f"GameId: {self.game_id}, Period: {self.period}, Starters: {rt2_candidates or rt1_candidates}"
+        )
+
+    def _get_exact_local_period_boxscore_starters(self):
+        loader_obj = getattr(self, "period_boxscore_source_loader", None)
+        if loader_obj is None:
+            return None, None
+
+        rt2_response = self._load_period_boxscore_response("rt2_start_window")
+        if not isinstance(rt2_response, dict):
+            return None, None
+
+        rt2_candidates = self._extract_period_boxscore_candidates_by_team(rt2_response)
+        if not self._is_exact_starter_map(rt2_candidates):
+            return None, self._get_period_boxscore_source_name(rt2_response)
+
+        return (
+            self._normalize_boxscore_players_by_team(rt2_candidates),
+            self._get_period_boxscore_source_name(rt2_response),
         )
 
     def get_team_starting_with_ball(self):
@@ -683,6 +712,22 @@ class StartOfPeriod(metaclass=abc.ABCMeta):
             updated[team_id] = starters
         return updated
 
+    def _has_period_starter_override(self, file_directory):
+        if file_directory is None:
+            return False
+
+        overrides = self._load_period_starter_overrides(file_directory)
+        game_id_keys = [self.game_id]
+        try:
+            game_id_keys.append(int(self.game_id))
+        except (TypeError, ValueError):
+            pass
+
+        for game_id in game_id_keys:
+            if overrides.get(game_id, {}).get(self.period):
+                return True
+        return False
+
     def _check_both_teams_have_5_starters(self, starters_by_team, file_directory):
         """
         raises exception if either team does not have 5 starters
@@ -763,6 +808,9 @@ class StartOfPeriod(metaclass=abc.ABCMeta):
 
             # Process substitution events at period start
             if isinstance(event, Substitution):
+                if self._should_delay_period_start_substitution(event, start_seconds):
+                    event = event.next_event
+                    continue
                 team_id = getattr(event, "team_id", None)
                 if team_id is not None:
                     if team_id not in result:
@@ -778,6 +826,134 @@ class StartOfPeriod(metaclass=abc.ABCMeta):
             event = event.next_event
 
         return result
+
+    def _period_start_cluster_credits_outgoing_player_before_sub(
+        self, event, sub_team_id, outgoing_player_id
+    ):
+        if getattr(event, "player1_id", None) != outgoing_player_id:
+            return False
+
+        event_team_id = getattr(event, "team_id", None)
+        same_team_credit = event_team_id == sub_team_id or event_team_id in [0, None]
+
+        if isinstance(event, FreeThrow):
+            return event_team_id == sub_team_id
+
+        if isinstance(event, Foul):
+            return same_team_credit and (
+                event.is_technical or event.is_double_technical or event.is_flagrant
+            )
+
+        if isinstance(event, Ejection):
+            return same_team_credit
+
+        return False
+
+    def _should_delay_period_start_substitution(self, sub_event, start_seconds):
+        """
+        Some period-start dead-ball clusters record the substitution before the
+        outgoing player's technical/flagrant sequence has fully resolved.
+
+        In those windows the outgoing player is still on the floor for the
+        opening cluster, and the substitution should only take effect after the
+        cluster ends.
+        """
+        sub_team_id = getattr(sub_event, "team_id", None)
+        outgoing_player_id = getattr(sub_event, "outgoing_player_id", None)
+        if not isinstance(sub_team_id, int) or sub_team_id <= 0:
+            return False
+        if not isinstance(outgoing_player_id, int) or outgoing_player_id <= 0:
+            return False
+
+        first_event = getattr(self, "first_period_event", None)
+        event = first_event if first_event is not None else self.next_event
+
+        while event is not None:
+            if getattr(event, "period", None) != self.period:
+                break
+
+            event_seconds = getattr(event, "seconds_remaining", None)
+            if event_seconds is None:
+                event = event.next_event
+                continue
+            if event_seconds < start_seconds - 0.001:
+                break
+            if abs(event_seconds - start_seconds) > 0.001:
+                event = event.next_event
+                continue
+
+            if event is not sub_event and self._period_start_cluster_credits_outgoing_player_before_sub(
+                event, sub_team_id, outgoing_player_id
+            ):
+                return True
+
+            event = event.next_event
+
+        return False
+
+    def _period_start_v6_diff_matches_delayed_sub_cluster(
+        self, team_id, strict_players, local_boxscore_players, start_seconds
+    ):
+        strict_set = set(strict_players or [])
+        local_set = set(local_boxscore_players or [])
+        strict_only = strict_set - local_set
+        local_only = local_set - strict_set
+        if len(strict_only) != 1 or len(local_only) != 1:
+            return False
+
+        outgoing_player_id = next(iter(strict_only))
+        incoming_player_id = next(iter(local_only))
+        first_event = getattr(self, "first_period_event", None)
+        event = first_event if first_event is not None else self.next_event
+
+        while event is not None:
+            if getattr(event, "period", None) != self.period:
+                break
+
+            event_seconds = getattr(event, "seconds_remaining", None)
+            if event_seconds is None:
+                event = event.next_event
+                continue
+            if event_seconds < start_seconds - 0.001:
+                break
+            if abs(event_seconds - start_seconds) > 0.001:
+                event = event.next_event
+                continue
+
+            if (
+                isinstance(event, Substitution)
+                and getattr(event, "team_id", None) == team_id
+                and getattr(event, "incoming_player_id", None) == incoming_player_id
+                and getattr(event, "outgoing_player_id", None) == outgoing_player_id
+                and self._should_delay_period_start_substitution(event, start_seconds)
+            ):
+                return True
+
+            event = event.next_event
+
+        return False
+
+    def _should_prefer_strict_starters_over_exact_v6(
+        self, strict_starters, local_boxscore_starters
+    ):
+        if not self._is_exact_starter_map(strict_starters):
+            return False
+        if not self._is_exact_starter_map(local_boxscore_starters):
+            return False
+
+        start_seconds = self._get_period_start_seconds()
+        saw_supported_difference = False
+        for team_id, strict_players in strict_starters.items():
+            local_players = local_boxscore_starters.get(team_id, [])
+            if set(strict_players) == set(local_players):
+                continue
+            if not self._period_start_v6_diff_matches_delayed_sub_cluster(
+                team_id, strict_players, local_players, start_seconds
+            ):
+                return False
+            saw_supported_difference = True
+
+        return saw_supported_difference
 
     def _get_period_start_seconds(self):
         if self.period <= 4:

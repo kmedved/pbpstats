@@ -1,4 +1,5 @@
 import re
+import warnings
 from typing import Callable, Dict, List
 
 import numpy as np
@@ -276,7 +277,7 @@ def enrich_clocks_with_v3(
 
 def preserve_order_after_v3_repairs(game_df: pd.DataFrame) -> pd.DataFrame:
     """
-    Preserve the existing row order after v3-backed dedupe/period patching.
+    Canonical offline ordering contract after v3-backed repairs.
 
     Historical offline feeds often encode the useful chronology in raw row order,
     even when EVENTNUM/actionNumber disagree within same-clock clusters. Forcing a
@@ -301,8 +302,19 @@ def reorder_with_v3(
     Backwards-compatible alias for preserve_order_after_v3_repairs().
 
     The legacy name and extra arguments suggested that the offline pipeline
-    performed a v3-driven chronology rewrite here. It does not. The active
-    offline path intentionally preserves the existing row order and only
-    normalizes EVENTNUM to integers.
+    performed a v3-driven chronology rewrite here. It does not.
+
+    Deprecated: use preserve_order_after_v3_repairs() instead. The active
+    offline path preserves repaired raw row order and only normalizes
+    EVENTNUM to integers.
     """
+    _ignored_game_id = game_id
+    _ignored_fetch_pbp_v3_fn = fetch_pbp_v3_fn
+    del _ignored_game_id, _ignored_fetch_pbp_v3_fn
+    warnings.warn(
+        "reorder_with_v3() is deprecated and does not perform a v3-driven "
+        "chronology rewrite; use preserve_order_after_v3_repairs() instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     return preserve_order_after_v3_repairs(game_df)

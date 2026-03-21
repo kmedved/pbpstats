@@ -4,6 +4,7 @@ from pbpstats import NBA_STRING
 from pbpstats.data_loader.nba_enhanced_pbp_loader import NbaEnhancedPbpLoader
 from pbpstats.data_loader.nba_possession_loader import NbaPossessionLoader
 from pbpstats.resources.enhanced_pbp.stats_nba.foul import StatsFoul
+from pbpstats.resources.enhanced_pbp.stats_nba.free_throw import StatsFreeThrow
 from pbpstats.resources.enhanced_pbp.stats_nba.jump_ball import StatsJumpBall
 from pbpstats.resources.enhanced_pbp.stats_nba.start_of_period import StatsStartOfPeriod
 from pbpstats.resources.enhanced_pbp.stats_nba.substitution import StatsSubstitution
@@ -45,6 +46,17 @@ def _event(
         "NEUTRALDESCRIPTION": neutral_description,
         "VIDEO_AVAILABLE_FLAG": 0,
     }
+
+
+def _link_events(*events):
+    previous_event = None
+    for event in events:
+        event.previous_event = previous_event
+        if previous_event is not None:
+            previous_event.next_event = event
+        previous_event = event
+    if previous_event is not None:
+        previous_event.next_event = None
 
 
 def test_stats_substitution_missing_incoming_player_becomes_noop_lineup_change():
@@ -222,6 +234,192 @@ def test_stats_turnover_no_turnover_with_steal_counts_as_live_turnover():
         and stat["stat_value"] == 1
         for stat in event_stats
     )
+
+
+def test_same_clock_technical_ft_keeps_outgoing_shooter_on_court():
+    team_a = 1610612744
+    team_b = 1610612764
+    previous_players = {
+        team_a: [2738, 2585, 203110, 201156, 201939],
+        team_b: [203078, 203490, 1626162, 2030781, 203107],
+    }
+    start = SimpleNamespace(
+        current_players=previous_players,
+        _raw_current_players=previous_players,
+        clock="0:04.20",
+        seconds_remaining=4.2,
+        period=1,
+        order=-1,
+        previous_event=None,
+        next_event=None,
+    )
+    sub = StatsSubstitution(
+        _event(
+            game_id="0021700917",
+            event_num=147,
+            event_type=8,
+            clock="0:04.20",
+            period=1,
+            player1_id=201939,
+            player1_team_id=team_a,
+            player2_id=2733,
+            home_description="SUB: Livingston FOR Curry",
+            visitor_description="",
+        ),
+        1,
+    )
+    foul_event = _event(
+        game_id="0021700917",
+        event_num=149,
+        event_type=6,
+        clock="0:04.20",
+        period=1,
+        player1_id=1626162,
+        player1_team_id=team_b,
+        home_description="Oubre Jr. T.FOUL",
+        visitor_description="",
+    )
+    foul_event["EVENTMSGACTIONTYPE"] = 11
+    technical_foul = StatsFoul(foul_event, 2)
+    ft_event = _event(
+        game_id="0021700917",
+        event_num=150,
+        event_type=3,
+        clock="0:04.20",
+        period=1,
+        player1_id=201939,
+        player1_team_id=team_a,
+        home_description="Curry Free Throw Technical (10 PTS)",
+        visitor_description="",
+    )
+    ft_event["EVENTMSGACTIONTYPE"] = 10
+    technical_ft = StatsFreeThrow(ft_event, 3)
+
+    _link_events(start, sub, technical_foul, technical_ft)
+
+    assert 201939 in technical_ft.current_players[team_a]
+    assert 2733 not in technical_ft.current_players[team_a]
+    assert 2733 in technical_foul.current_players[team_a]
+    assert technical_ft.event_for_efficiency_stats is technical_ft
+
+
+def test_same_clock_shooting_foul_keeps_outgoing_fouler_on_court():
+    nets = 1610612751
+    warriors = 1610612744
+    previous_players = {
+        nets: [203112, 203925, 203092, 203915, 201960],
+        warriors: [2738, 203110, 201156, 2733, 2585],
+    }
+    start = SimpleNamespace(
+        current_players=previous_players,
+        _raw_current_players=previous_players,
+        clock="4:03",
+        seconds_remaining=243.0,
+        period=1,
+        order=-1,
+        previous_event=None,
+        next_event=None,
+    )
+    sub = StatsSubstitution(
+        _event(
+            game_id="0021700236",
+            event_num=130,
+            event_type=8,
+            clock="4:03",
+            period=1,
+            player1_id=203915,
+            player1_team_id=nets,
+            player2_id=1627747,
+            home_description="SUB: LeVert FOR Dinwiddie",
+            visitor_description="",
+        ),
+        1,
+    )
+    foul_event = _event(
+        game_id="0021700236",
+        event_num=186,
+        event_type=6,
+        clock="4:03",
+        period=1,
+        player1_id=203915,
+        player1_team_id=nets,
+        player2_id=2738,
+        home_description="Dinwiddie S.FOUL",
+        visitor_description="",
+    )
+    foul_event["EVENTMSGACTIONTYPE"] = 2
+    shooting_foul = StatsFoul(foul_event, 2)
+
+    _link_events(start, sub, shooting_foul)
+
+    assert 203915 in shooting_foul.current_players[nets]
+    assert 1627747 not in shooting_foul.current_players[nets]
+
+
+def test_same_clock_technical_ft_does_not_override_for_different_shooter():
+    team_a = 1610612744
+    team_b = 1610612764
+    previous_players = {
+        team_a: [2738, 2585, 203110, 201156, 201939],
+        team_b: [203078, 203490, 1626162, 2030781, 203107],
+    }
+    start = SimpleNamespace(
+        current_players=previous_players,
+        _raw_current_players=previous_players,
+        clock="0:04.20",
+        seconds_remaining=4.2,
+        period=1,
+        order=-1,
+        previous_event=None,
+        next_event=None,
+    )
+    sub = StatsSubstitution(
+        _event(
+            game_id="0021700917",
+            event_num=147,
+            event_type=8,
+            clock="0:04.20",
+            period=1,
+            player1_id=201939,
+            player1_team_id=team_a,
+            player2_id=2733,
+            home_description="SUB: Livingston FOR Curry",
+            visitor_description="",
+        ),
+        1,
+    )
+    foul_event = _event(
+        game_id="0021700917",
+        event_num=149,
+        event_type=6,
+        clock="0:04.20",
+        period=1,
+        player1_id=1626162,
+        player1_team_id=team_b,
+        home_description="Oubre Jr. T.FOUL",
+        visitor_description="",
+    )
+    foul_event["EVENTMSGACTIONTYPE"] = 11
+    technical_foul = StatsFoul(foul_event, 2)
+    ft_event = _event(
+        game_id="0021700917",
+        event_num=150,
+        event_type=3,
+        clock="0:04.20",
+        period=1,
+        player1_id=203110,
+        player1_team_id=team_a,
+        home_description="Durant Free Throw Technical (10 PTS)",
+        visitor_description="",
+    )
+    ft_event["EVENTMSGACTIONTYPE"] = 10
+    technical_ft = StatsFreeThrow(ft_event, 3)
+
+    _link_events(start, sub, technical_foul, technical_ft)
+
+    assert 2733 in technical_ft.current_players[team_a]
+    assert 201939 not in technical_ft.current_players[team_a]
+    assert technical_ft.event_for_efficiency_stats is technical_foul
 
 
 def test_stats_turnover_turnover_text_counts_as_dead_ball_turnover():

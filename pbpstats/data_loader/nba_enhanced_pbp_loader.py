@@ -5,6 +5,9 @@ from collections import defaultdict
 from pbpstats import NBA_STRING
 from pbpstats.overrides import IntDecoder
 from pbpstats.resources.enhanced_pbp import FieldGoal, Foul, FreeThrow, StartOfPeriod
+from pbpstats.resources.enhanced_pbp.intraperiod_lineup_repair import (
+    build_generated_lineup_override_lookup,
+)
 from pbpstats.resources.enhanced_pbp.shot_clock import annotate_shot_clock
 
 
@@ -91,6 +94,12 @@ class NbaEnhancedPbpLoader(object):
 
         # these need next and previous event to be added to all events
         self._set_period_start_items()
+        generated_lineup_window_override_lookup = (
+            self._build_generated_intraperiod_lineup_override_lookup()
+        )
+        self._merge_generated_lineup_override_lookup(
+            generated_lineup_window_override_lookup
+        )
 
         # annotate approximate shot clock for every enhanced pbp event.
         # LiveEnhancedPbpLoader recomputes shot clock after normalizing DREBs.
@@ -286,3 +295,83 @@ class NbaEnhancedPbpLoader(object):
                     continue
                 lookup.setdefault(idx, {})[team_id] = list(normalized_lineup)
         return lookup
+
+    def _get_explicit_lineup_window_override_period_team_keys(self):
+        overrides = getattr(self, "lineup_window_overrides", {})
+        if not overrides:
+            return set()
+
+        game_id_keys = [self.game_id]
+        try:
+            game_id_keys.append(int(self.game_id))
+        except (TypeError, ValueError):
+            pass
+
+        blocked_keys = set()
+        for game_id in game_id_keys:
+            game_windows = overrides.get(game_id, [])
+            if not isinstance(game_windows, list):
+                continue
+            for window in game_windows:
+                try:
+                    blocked_keys.add((int(window["period"]), int(window["team_id"])))
+                except (KeyError, TypeError, ValueError):
+                    continue
+        return blocked_keys
+
+    def _build_generated_intraperiod_lineup_override_lookup(self):
+        lookup, candidates = build_generated_lineup_override_lookup(
+            getattr(self, "items", []),
+            game_id=getattr(self, "game_id", None),
+        )
+        blocked_period_team_keys = (
+            self._get_explicit_lineup_window_override_period_team_keys()
+        )
+        if blocked_period_team_keys:
+            filtered_lookup = {}
+            for event_index, team_overrides in lookup.items():
+                try:
+                    period = int(getattr(self.items[event_index], "period"))
+                except (AttributeError, TypeError, ValueError, IndexError):
+                    continue
+                kept_team_overrides = {}
+                for team_id, team_players in team_overrides.items():
+                    key = (period, int(team_id))
+                    if key in blocked_period_team_keys:
+                        continue
+                    kept_team_overrides[int(team_id)] = list(team_players)
+                if kept_team_overrides:
+                    filtered_lookup[event_index] = kept_team_overrides
+            lookup = filtered_lookup
+
+            for candidate in candidates:
+                key = (
+                    int(candidate.get("period", 0) or 0),
+                    int(candidate.get("team_id", 0) or 0),
+                )
+                if key in blocked_period_team_keys and candidate.get("auto_apply"):
+                    candidate["auto_apply"] = False
+                    candidate["promotion_decision"] = "blocked_by_explicit_override"
+                    candidate["override_event_indices"] = []
+        self.generated_intraperiod_lineup_override_lookup = lookup
+        self.generated_intraperiod_lineup_repair_candidates = candidates
+        return lookup
+
+    def _merge_generated_lineup_override_lookup(self, generated_lookup):
+        if not generated_lookup:
+            return
+
+        for event_index, team_overrides in generated_lookup.items():
+            if event_index < 0 or event_index >= len(getattr(self, "items", [])):
+                continue
+            event = self.items[event_index]
+            existing_overrides = getattr(event, "lineup_override_by_team", {}) or {}
+            merged = {
+                team_id: list(team_players)
+                for team_id, team_players in existing_overrides.items()
+            }
+            for team_id, team_players in team_overrides.items():
+                if team_id in merged:
+                    continue
+                merged[team_id] = list(team_players)
+            event.lineup_override_by_team = merged

@@ -33,6 +33,25 @@ class StatsStartOfPeriod(StartOfPeriod, StatsEnhancedPbpItem):
             starters = None
 
         if starters is not None and not self._strict_starters_are_impossible(starters):
+            # Explicit local period-starter overrides should beat any parquet
+            # fallback source, including exact v6 gamerotation rows.
+            if self._has_period_starter_override(file_directory):
+                return starters
+            # When a local gamerotation-backed v6 row exists and disagrees with
+            # strict PBP, prefer the exact boundary map over fragile carryover.
+            local_boxscore_starters, local_boxscore_source = (
+                self._get_exact_local_period_boxscore_starters()
+            )
+            if (
+                local_boxscore_source == "v6"
+                and local_boxscore_starters is not None
+                and local_boxscore_starters != starters
+            ):
+                if self._should_prefer_strict_starters_over_exact_v6(
+                    starters, local_boxscore_starters
+                ):
+                    return starters
+                return local_boxscore_starters
             return starters
 
         # 2) Local boxscore-based starters (Period 1)

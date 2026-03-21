@@ -104,7 +104,7 @@ def test_get_possessions_from_df_forwards_boxscore_loader(monkeypatch):
 
     monkeypatch.setattr(processor_module, 'dedupe_with_v3', lambda df, *_args: df)
     monkeypatch.setattr(processor_module, 'patch_start_of_periods', lambda df, *_args: df)
-    monkeypatch.setattr(processor_module, 'reorder_with_v3', lambda df, *_args: df)
+    monkeypatch.setattr(processor_module, 'preserve_order_after_v3_repairs', lambda df: df)
     monkeypatch.setattr(processor_module, '_ensure_eventnum_int', lambda df: df)
     monkeypatch.setattr(processor_module, 'create_raw_dicts_from_df', lambda df: [{'EVENTNUM': int(df.iloc[0]['EVENTNUM'])}])
     monkeypatch.setattr(processor_module, 'PbpProcessor', DummyProcessor)

@@ -196,7 +196,7 @@
       "_ensure_eventnum_int",
       "dedupe_with_v3",
       "patch_start_of_periods",
-      "reorder_with_v3",
+      "preserve_order_after_v3_repairs",
       "create_raw_dicts_from_df",
       "PbpProcessor",
       "Possessions"

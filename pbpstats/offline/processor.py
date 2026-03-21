@@ -1185,7 +1185,8 @@ def get_possessions_from_df(
     - Optionally uses a fetch_pbp_v3_fn(game_id) -> DataFrame to:
         * filter EVENTNUMs to those present in v3,
         * add missing StartOfPeriod events,
-        * preserve the deduped raw row order without forcing a v3 numeric reorder.
+        * enrich sub-second clocks where v3 has better precision,
+        * preserve repaired offline row chronology without performing a v3 numeric reorder.
 
     - Optionally propagates a local stats.nba boxscore loader to StartOfPeriod events.
     - Always normalizes NaNs/ints and repairs rebound event ordering via PbpProcessor.
@@ -1209,7 +1210,7 @@ def get_possessions_from_df(
     # Patch missing start-of-period markers
     df = patch_start_of_periods(df, game_id, fetch_pbp_v3_fn)
 
-    # Preserve the post-dedupe row order; numeric re-sorts can break old-game chronology.
+    # Preserve repaired offline row order; numeric re-sorts can break old-game chronology.
     if fetch_pbp_v3_fn is not None:
         try:
             df_ordered = preserve_order_after_v3_repairs(df)

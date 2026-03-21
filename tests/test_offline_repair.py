@@ -150,9 +150,17 @@ def test_reorder_with_v3_is_a_compatibility_alias():
         ]
     )
 
-    ordered = reorder_with_v3(game_df, "0029601086", lambda _: pd.DataFrame())
+    def fetcher(_game_id):
+        raise AssertionError("reorder_with_v3 should not consult the v3 fetcher")
+
+    with pytest.warns(
+        DeprecationWarning,
+        match="does not perform a v3-driven chronology rewrite",
+    ):
+        ordered = reorder_with_v3(game_df, "0029601086", fetcher)
 
     assert ordered["EVENTNUM"].tolist() == [425, 427, 426]
+    assert ordered["EVENTNUM"].dtype.kind in {"i", "u"}
 
 
 def test_stats_rebound_event_order_error_exposes_event_numbers():

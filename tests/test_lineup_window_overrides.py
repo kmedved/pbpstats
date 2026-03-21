@@ -1,13 +1,31 @@
 import json
 import os
 import sys
+import importlib.util
 
-sys.path.insert(0, os.path.abspath("."))
+_TESTS_DIR = os.path.dirname(os.path.abspath(__file__))
+_REPO_ROOT = os.path.abspath(os.path.join(_TESTS_DIR, ".."))
 
-from pbpstats.data_loader.nba_enhanced_pbp_loader import NbaEnhancedPbpLoader
+sys.path.insert(0, _REPO_ROOT)
+
 from pbpstats.resources.enhanced_pbp.enhanced_pbp_item import EnhancedPbpItem
 from pbpstats.resources.enhanced_pbp.substitution import Substitution
 from pbpstats.resources.enhanced_pbp.start_of_period import StartOfPeriod
+
+_LOADER_PATH = os.path.join(
+    _REPO_ROOT,
+    "pbpstats",
+    "data_loader",
+    "nba_enhanced_pbp_loader.py",
+)
+_LOADER_SPEC = importlib.util.spec_from_file_location(
+    "nba_enhanced_pbp_loader_lineup_window_test",
+    _LOADER_PATH,
+)
+_LOADER_MODULE = importlib.util.module_from_spec(_LOADER_SPEC)
+assert _LOADER_SPEC.loader is not None
+_LOADER_SPEC.loader.exec_module(_LOADER_MODULE)
+NbaEnhancedPbpLoader = _LOADER_MODULE.NbaEnhancedPbpLoader
 
 TEAM_A = 100
 TEAM_B = 200
