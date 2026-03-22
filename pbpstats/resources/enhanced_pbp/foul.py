@@ -96,15 +96,6 @@ class Foul(object):
         pass
 
     @property
-    def _same_clock_pre_sub_actor_ids(self):
-        actor_ids = []
-        for attr in ["player1_id", "player3_id"]:
-            player_id = getattr(self, attr, 0)
-            if player_id not in [None, 0, "0"] and player_id not in actor_ids:
-                actor_ids.append(player_id)
-        return actor_ids
-
-    @property
     def counts_towards_penalty(self):
         """
         returns True if foul is a foul type that counts towards the penalty, False otherwise

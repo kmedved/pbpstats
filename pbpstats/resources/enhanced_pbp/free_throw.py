@@ -90,13 +90,6 @@ class FreeThrow(metaclass=abc.ABCMeta):
         pass
 
     @property
-    def _same_clock_pre_sub_actor_ids(self):
-        player_id = getattr(self, "player1_id", 0)
-        if player_id in [None, 0, "0"]:
-            return []
-        return [player_id]
-
-    @property
     def shot_value(self):
         """
         returns shot value of a free throw
@@ -321,12 +314,6 @@ class FreeThrow(metaclass=abc.ABCMeta):
         that resulted in the free throw. Plus/minus points should go to
         the players on the floor at the time of the foul, not the free throw.
         """
-        if (
-            self.is_technical_ft
-            and self._same_clock_pre_sub_lineup_for_actor(getattr(self, "player1_id", 0))
-            is not None
-        ):
-            return self
         clock = self.clock
         # foul should be before FT so start by going backwards
         event = self

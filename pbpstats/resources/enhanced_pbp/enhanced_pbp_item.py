@@ -164,66 +164,6 @@ class EnhancedPbpItem(metaclass=abc.ABCMeta):
                 updated_players[team_id] = team_players
         return updated_players
 
-    def _copy_players_dict(self, players):
-        copied_players = {}
-        for team_id, team_players in getattr(players, "items", lambda: [])():
-            if isinstance(team_players, (list, tuple, set)):
-                copied_players[team_id] = list(team_players)
-            else:
-                copied_players[team_id] = team_players
-        return copied_players
-
-    @property
-    def _same_clock_pre_sub_actor_ids(self):
-        return []
-
-    def _is_period_start_clock(self):
-        period = int(getattr(self, "period", 0) or 0)
-        if period <= 0:
-            return False
-        expected_clock = "5:00" if period > 4 else "12:00"
-        return str(getattr(self, "clock", "") or "") == expected_clock
-
-    def _same_clock_pre_sub_lineup_for_actor(self, actor_id):
-        if actor_id in [None, 0, "0"] or self._is_period_start_clock():
-            return None
-        current_players = self._copy_players_dict(self._raw_current_players)
-        if not current_players:
-            return None
-        try:
-            same_clock_events = self.get_all_events_at_current_time()
-        except Exception:
-            return None
-        prior_subs = sorted(
-            [
-                event
-                for event in same_clock_events
-                if getattr(event, "event_type", None) == 8
-                and getattr(event, "order", -1) < getattr(self, "order", -1)
-            ],
-            key=lambda event: event.order,
-            reverse=True,
-        )
-        for sub_event in prior_subs:
-            if getattr(sub_event, "outgoing_player_id", 0) != actor_id:
-                continue
-            team_id = getattr(sub_event, "team_id", None)
-            if team_id not in current_players:
-                continue
-            pre_sub_players = self._copy_players_dict(sub_event._get_previous_raw_players())
-            if team_id not in pre_sub_players:
-                continue
-            current_players[team_id] = list(pre_sub_players[team_id])
-            return current_players
-        return None
-
-    def _same_clock_current_players_override(self):
-        for actor_id in self._same_clock_pre_sub_actor_ids:
-            override_players = self._same_clock_pre_sub_lineup_for_actor(actor_id)
-            if override_players is not None:
-                return override_players
-        return None
-
     @property
     def current_players(self):
         """
@@ -236,9 +176,6 @@ class EnhancedPbpItem(metaclass=abc.ABCMeta):
         This gets overwritten in :obj:`~pbpstats.resources.enhanced_pbp.substitution.Substitution`
         since those are the only event types where players are not the same as the previous event
         """
-        override_players = self._same_clock_current_players_override()
-        if override_players is not None:
-            return self._apply_lineup_overrides(override_players)
         return self._apply_lineup_overrides(self._raw_current_players)
 
     @property
