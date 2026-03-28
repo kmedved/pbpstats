@@ -199,18 +199,28 @@ class Foul(object):
             return pbpstats.TRANSITION_TAKE_TYPE_STRING
 
     @property
+    def event_stat_player_id(self):
+        return self.player1_id
+
+    @property
+    def event_stat_team_id(self):
+        return self.team_id
+
+    @property
     def event_stats(self):
         """
         returns list of dicts with all stats for event
         """
         stats = []
+        current_players = None
+        lineup_ids = None
 
         # DARKO: track technical fouls committed explicitly
         if self.is_technical or self.is_double_technical:
             stats.append(
                 {
-                    "player_id": self.player1_id,
-                    "team_id": self.team_id,
+                    "player_id": self.event_stat_player_id,
+                    "team_id": self.event_stat_team_id,
                     "stat_key": pbpstats.TECHNICAL_FOULS_COMMITTED_STRING,
                     "stat_value": 1,
                 }
@@ -218,10 +228,16 @@ class Foul(object):
         foul_type = self.foul_type_string
         is_penalty_event = self.is_penalty_event()
         if foul_type is not None:
+            (
+                current_players,
+                team_ids,
+                lineup_ids,
+                opponent_team_id,
+            ) = self._require_team_in_event_stat_context(self.event_stat_team_id)
             stats.append(
                 {
-                    "player_id": self.player1_id,
-                    "team_id": self.team_id,
+                    "player_id": self.event_stat_player_id,
+                    "team_id": self.event_stat_team_id,
                     "stat_key": foul_type,
                     "stat_value": 1,
                 }
@@ -229,23 +245,19 @@ class Foul(object):
             if is_penalty_event:
                 stats.append(
                     {
-                        "player_id": self.player1_id,
-                        "team_id": self.team_id,
+                        "player_id": self.event_stat_player_id,
+                        "team_id": self.event_stat_team_id,
                         "stat_key": f"{pbpstats.PENALTY_STRING}{foul_type}",
                         "stat_value": 1,
                     }
                 )
-            team_ids = list(self.current_players.keys())
             if hasattr(self, "player3_id"):
                 p3_stat_key = (
                     foul_type
                     if self.is_double_foul
                     else foul_type + pbpstats.FOULS_DRAWN_TYPE_STRING
                 )
-                opponent_team_id = (
-                    team_ids[0] if self.team_id == team_ids[1] else team_ids[1]
-                )
-                if self.player3_id in self.current_players[self.team_id]:
+                if self.player3_id in current_players[self.team_id]:
                     stats.append(
                         {
                             "player_id": self.player3_id,
@@ -263,7 +275,7 @@ class Foul(object):
                                 "stat_value": 1,
                             }
                         )
-                elif self.player3_id in self.current_players[opponent_team_id]:
+                elif self.player3_id in current_players[opponent_team_id]:
                     stats.append(
                         {
                             "player_id": self.player3_id,
@@ -282,12 +294,14 @@ class Foul(object):
                             }
                         )
 
-            lineups_ids = self.lineup_ids
-            for stat in stats:
-                opponent_team_id = (
-                    team_ids[0] if stat["team_id"] == team_ids[1] else team_ids[1]
+        if stats:
+            if current_players is None or lineup_ids is None:
+                current_players, _, lineup_ids, _ = (
+                    self._require_team_in_event_stat_context(self.event_stat_team_id)
                 )
-                stat["lineup_id"] = lineups_ids[stat["team_id"]]
-                stat["opponent_team_id"] = opponent_team_id
-                stat["opponent_lineup_id"] = lineups_ids[opponent_team_id]
+            self._add_event_stat_context(
+                stats,
+                current_players=current_players,
+                lineup_ids=lineup_ids,
+            )
         return self.base_stats + stats

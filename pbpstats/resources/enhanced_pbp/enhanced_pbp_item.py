@@ -1,6 +1,7 @@
 """
 ``EnhancedPbpItem`` is an abstract base class for all enhanced pbp event types
 """
+
 import abc
 import logging
 
@@ -10,9 +11,21 @@ from pbpstats.resources.enhanced_pbp import FieldGoal, Foul, FreeThrow, Rebound
 logger = logging.getLogger(__name__)
 
 
+class IncompleteEventStatsContextError(RuntimeError):
+    """
+    Raised when an event cannot emit fully keyed stat rows.
+    """
+
+
 class EnhancedPbpItem(metaclass=abc.ABCMeta):
     def __repr__(self):
-        return f"<{type(self).__name__} GameId: {self.game_id}, Description: {self.description}, Time: {self.clock}, EventNum: {self.event_num}>"
+        return (
+            f"<{type(self).__name__} "
+            f"GameId: {getattr(self, 'game_id', 'unknown')}, "
+            f"Description: {getattr(self, 'description', '')}, "
+            f"Time: {getattr(self, 'clock', 'unknown')}, "
+            f"EventNum: {getattr(self, 'event_num', 'unknown')}>"
+        )
 
     @abc.abstractproperty
     def is_possession_ending_event(self):
@@ -178,6 +191,118 @@ class EnhancedPbpItem(metaclass=abc.ABCMeta):
         """
         return self._apply_lineup_overrides(self._raw_current_players)
 
+    @staticmethod
+    def _lineup_ids_for_players(players_by_team):
+        lineup_ids = {}
+        for team_id, team_players in players_by_team.items():
+            players = [str(player_id) for player_id in team_players]
+            lineup_ids[team_id] = "-".join(sorted(players))
+        return lineup_ids
+
+    def _resolve_event_stat_context(
+        self,
+        *,
+        current_players=None,
+        lineup_ids=None,
+        context_name="current_players",
+    ):
+        players_by_team = (
+            self.current_players if current_players is None else current_players
+        )
+        if not isinstance(players_by_team, dict):
+            raise IncompleteEventStatsContextError(
+                f"{type(self).__name__} requires dict {context_name}, got "
+                f"{type(players_by_team).__name__}"
+            )
+
+        team_ids = list(players_by_team.keys())
+        if len(team_ids) != 2:
+            raise IncompleteEventStatsContextError(
+                f"{type(self).__name__} requires exactly 2 teams in {context_name}, "
+                f"got {len(team_ids)} for game_id={getattr(self, 'game_id', 'unknown')}"
+            )
+
+        resolved_lineup_ids = (
+            self._lineup_ids_for_players(players_by_team)
+            if lineup_ids is None
+            else dict(lineup_ids)
+        )
+        missing_lineup_ids = [
+            team_id for team_id in team_ids if team_id not in resolved_lineup_ids
+        ]
+        if missing_lineup_ids:
+            raise IncompleteEventStatsContextError(
+                f"{type(self).__name__} missing lineup ids for teams {missing_lineup_ids} "
+                f"in {context_name} for game_id={getattr(self, 'game_id', 'unknown')}"
+            )
+
+        return players_by_team, team_ids, resolved_lineup_ids
+
+    def _add_event_stat_context(
+        self,
+        stats,
+        *,
+        current_players=None,
+        lineup_ids=None,
+        context_name="current_players",
+    ):
+        if not stats:
+            return stats
+
+        players_by_team, team_ids, resolved_lineup_ids = (
+            self._resolve_event_stat_context(
+                current_players=current_players,
+                lineup_ids=lineup_ids,
+                context_name=context_name,
+            )
+        )
+        for stat in stats:
+            missing_keys = [
+                key
+                for key in ("player_id", "team_id", "stat_key", "stat_value")
+                if key not in stat
+            ]
+            if missing_keys:
+                raise IncompleteEventStatsContextError(
+                    f"{type(self).__name__} emitted stat row missing keys {missing_keys} "
+                    f"for game_id={getattr(self, 'game_id', 'unknown')}"
+                )
+
+            team_id = stat["team_id"]
+            if team_id not in players_by_team:
+                raise IncompleteEventStatsContextError(
+                    f"{type(self).__name__} emitted stat row for unknown team_id={team_id} "
+                    f"in {context_name} for game_id={getattr(self, 'game_id', 'unknown')}"
+                )
+            opponent_team_id = team_ids[0] if team_id == team_ids[1] else team_ids[1]
+            stat["opponent_team_id"] = opponent_team_id
+            stat["lineup_id"] = resolved_lineup_ids[team_id]
+            stat["opponent_lineup_id"] = resolved_lineup_ids[opponent_team_id]
+        return stats
+
+    def _require_team_in_event_stat_context(
+        self,
+        team_id,
+        *,
+        current_players=None,
+        lineup_ids=None,
+        context_name="current_players",
+    ):
+        players_by_team, team_ids, resolved_lineup_ids = (
+            self._resolve_event_stat_context(
+                current_players=current_players,
+                lineup_ids=lineup_ids,
+                context_name=context_name,
+            )
+        )
+        if team_id not in players_by_team:
+            raise IncompleteEventStatsContextError(
+                f"{type(self).__name__} team_id={team_id} missing from {context_name} "
+                f"for game_id={getattr(self, 'game_id', 'unknown')}"
+            )
+        opponent_team_id = team_ids[0] if team_id == team_ids[1] else team_ids[1]
+        return players_by_team, team_ids, resolved_lineup_ids, opponent_team_id
+
     @property
     def score_margin(self):
         """
@@ -201,13 +326,7 @@ class EnhancedPbpItem(metaclass=abc.ABCMeta):
         returns dict with lineup ids for each team for current event.
         Lineup ids are hyphen separated sorted player id strings.
         """
-        lineup_ids = {}
-        for team_id, team_players in self.current_players.items():
-            players = [str(player_id) for player_id in team_players]
-            sorted_player_ids = sorted(players)
-            lineup_id = "-".join(sorted_player_ids)
-            lineup_ids[team_id] = lineup_id
-        return lineup_ids
+        return self._lineup_ids_for_players(self.current_players)
 
     @property
     def seconds_since_previous_event(self):
@@ -222,7 +341,11 @@ class EnhancedPbpItem(metaclass=abc.ABCMeta):
             # different period.  Without this guard the result would be negative
             # (e.g. 0 - 720 = -720).
             return 0
-        if self.seconds_remaining == 300 and self.period > 4 and prev_period != self.period:
+        if (
+            self.seconds_remaining == 300
+            and self.period > 4
+            and prev_period != self.period
+        ):
             # Same guard for overtime period boundaries.
             return 0
         return self.previous_event.seconds_remaining - self.seconds_remaining

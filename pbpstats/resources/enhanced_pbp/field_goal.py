@@ -77,8 +77,8 @@ class FieldGoal(object):
         returns shot distance in feet
         """
         if hasattr(self, "locX") and hasattr(self, "locY"):
-            x_squared = self.locX ** 2
-            y_squared = self.locY ** 2
+            x_squared = self.locX**2
+            y_squared = self.locY**2
             # unit for distance is off by factor of 10, divide by 10 to convert to feet
             shot_distance = math.sqrt(x_squared + y_squared) / 10
             return round(shot_distance, 1)
@@ -187,7 +187,9 @@ class FieldGoal(object):
         """
         team_ids = list(self.current_players.keys())
         opponent_team_candidates = [tid for tid in team_ids if tid != self.team_id]
-        opponent_team_id = opponent_team_candidates[0] if opponent_team_candidates else None
+        opponent_team_id = (
+            opponent_team_candidates[0] if opponent_team_candidates else None
+        )
         shot_data = {
             "PlayerId": self.player1_id,
             "TeamId": self.team_id,
@@ -380,18 +382,16 @@ class FieldGoal(object):
         stats = []
         is_penalty_event = self.is_penalty_event()
         is_second_chance_event = self.is_second_chance_event()
+        (
+            current_players,
+            team_ids,
+            lineup_ids,
+            opponent_team_id,
+        ) = self._require_team_in_event_stat_context(self.team_id)
         if self.distance is not None:
             stats += self._get_shot_distance_stat_items()
             if self.is_heave:
                 stats.append(self._get_heave_stat_item())
-
-        team_ids = list(self.current_players.keys())
-        opponent_team_candidates = [tid for tid in team_ids if tid != self.team_id]
-        opponent_team_id = opponent_team_candidates[0] if opponent_team_candidates else None
-        if opponent_team_id is None:
-            return self.base_stats + stats
-        if opponent_team_id not in self.current_players:
-            return self.base_stats + stats
         if self.is_made and not self.is_assisted:
             stats += self._get_unassisted_stat_items(
                 is_second_chance_event, is_penalty_event
@@ -477,18 +477,39 @@ class FieldGoal(object):
         # DARKO: on-court opponent FGA/3PA/3PM from defenders' POV
         team_ids = list(self.current_players.keys())
         opponent_team_candidates = [tid for tid in team_ids if tid != self.team_id]
-        opponent_team_id = opponent_team_candidates[0] if opponent_team_candidates else None
+        opponent_team_id = (
+            opponent_team_candidates[0] if opponent_team_candidates else None
+        )
 
         is_three = self.shot_value == 3
 
         # Calculate On-Court TEAM stats (For the offense)
-        if self.team_id in self.current_players:
-            for teammate_id in self.current_players[self.team_id]:
+        for teammate_id in current_players[self.team_id]:
+            stats.append(
+                {
+                    "player_id": teammate_id,
+                    "team_id": self.team_id,
+                    "stat_key": pbpstats.TEAM_FGA_STRING,
+                    "stat_value": 1,
+                }
+            )
+
+            if self.is_made:
                 stats.append(
                     {
                         "player_id": teammate_id,
                         "team_id": self.team_id,
-                        "stat_key": pbpstats.TEAM_FGA_STRING,
+                        "stat_key": pbpstats.TEAM_FGM_STRING,
+                        "stat_value": 1,
+                    }
+                )
+
+            if is_three:
+                stats.append(
+                    {
+                        "player_id": teammate_id,
+                        "team_id": self.team_id,
+                        "stat_key": pbpstats.TEAM_3PA_STRING,
                         "stat_value": 1,
                     }
                 )
@@ -498,71 +519,44 @@ class FieldGoal(object):
                         {
                             "player_id": teammate_id,
                             "team_id": self.team_id,
-                            "stat_key": pbpstats.TEAM_FGM_STRING,
+                            "stat_key": pbpstats.TEAM_3PM_STRING,
                             "stat_value": 1,
                         }
                     )
 
-                if is_three:
-                    stats.append(
-                        {
-                            "player_id": teammate_id,
-                            "team_id": self.team_id,
-                            "stat_key": pbpstats.TEAM_3PA_STRING,
-                            "stat_value": 1,
-                        }
-                    )
-
-                    if self.is_made:
-                        stats.append(
-                            {
-                                "player_id": teammate_id,
-                                "team_id": self.team_id,
-                                "stat_key": pbpstats.TEAM_3PM_STRING,
-                                "stat_value": 1,
-                            }
-                        )
-
-        if opponent_team_id is not None and opponent_team_id in self.current_players:
-            for defender_id in self.current_players[opponent_team_id]:
+        for defender_id in current_players[opponent_team_id]:
+            stats.append(
+                {
+                    "player_id": defender_id,
+                    "team_id": opponent_team_id,
+                    "stat_key": pbpstats.OPP_FGA_STRING,
+                    "stat_value": 1,
+                }
+            )
+            if is_three:
                 stats.append(
                     {
                         "player_id": defender_id,
                         "team_id": opponent_team_id,
-                        "stat_key": pbpstats.OPP_FGA_STRING,
+                        "stat_key": pbpstats.OPP_3PA_STRING,
                         "stat_value": 1,
                     }
                 )
-                if is_three:
+                if self.is_made:
                     stats.append(
                         {
                             "player_id": defender_id,
                             "team_id": opponent_team_id,
-                            "stat_key": pbpstats.OPP_3PA_STRING,
+                            "stat_key": pbpstats.OPP_3PM_STRING,
                             "stat_value": 1,
                         }
                     )
-                    if self.is_made:
-                        stats.append(
-                            {
-                                "player_id": defender_id,
-                                "team_id": opponent_team_id,
-                                "stat_key": pbpstats.OPP_3PM_STRING,
-                                "stat_value": 1,
-                            }
-                        )
 
-        lineups_ids = self.lineup_ids
-        for stat in stats:
-            opponent_team_candidates = [tid for tid in team_ids if tid != stat["team_id"]]
-            if not opponent_team_candidates:
-                continue
-            opponent_team_id = opponent_team_candidates[0]
-            if stat["team_id"] not in lineups_ids or opponent_team_id not in lineups_ids:
-                continue
-            stat["lineup_id"] = lineups_ids[stat["team_id"]]
-            stat["opponent_team_id"] = opponent_team_id
-            stat["opponent_lineup_id"] = lineups_ids[opponent_team_id]
+        self._add_event_stat_context(
+            stats,
+            current_players=current_players,
+            lineup_ids=lineup_ids,
+        )
 
         return self.base_stats + stats
 

@@ -48,8 +48,8 @@ pbpstats is a single-package Python library for loading NBA, WNBA, and G-League 
 | `Pbp` | `(self, items)` | Properties: `data`. |
 | `Possessions` | `(self, items)` | Properties: `data, lineup_opponent_stats, lineup_stats, opponent_stats, player_stats, team_stats`. |
 | `Shots` | `(self, items)` | Properties: `data`. |
-| `PbpProcessor` | `(self, game_id, raw_data_dicts, rebound_deletions_list=...)` | Offline bridge that turns stats-style event dicts into enhanced events and possessions. |
-| `get_possessions_from_df` | `(game_df, fetch_pbp_v3_fn=..., rebound_deletions_list=...)` | Offline convenience entrypoint for pandas workflows. |
+| `PbpProcessor` | `(self, game_id, raw_data_dicts, rebound_deletions_list=..., boxscore_source_loader=..., period_boxscore_source_loader=..., file_directory=...)` | Offline bridge that turns stats-style event dicts into enhanced events and possessions. |
+| `get_possessions_from_df` | `(game_df, fetch_pbp_v3_fn=..., rebound_deletions_list=..., boxscore_source_loader=..., period_boxscore_source_loader=..., file_directory=...)` | Offline convenience entrypoint for pandas workflows. |
 
 ## Core Abstractions
 - `Client`: metadata-driven binder that exposes objects and resources from a settings dict.

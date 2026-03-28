@@ -163,6 +163,7 @@ For implementation work, still provide raw source of the files you expect to edi
 - `pbpstats/resources/enhanced_pbp/field_goal.py`
 - `pbpstats/resources/enhanced_pbp/foul.py`
 - `pbpstats/resources/enhanced_pbp/free_throw.py`
+- `pbpstats/resources/enhanced_pbp/intraperiod_lineup_repair.py`
 - `pbpstats/resources/enhanced_pbp/jump_ball.py`
 - `pbpstats/resources/enhanced_pbp/live/__init__.py`
 - `pbpstats/resources/enhanced_pbp/live/ejection.py`
@@ -232,8 +233,14 @@ For implementation work, still provide raw source of the files you expect to edi
 - `tests/conftest.py`
 - `tests/test_client.py`
 - `tests/test_context_framework.py`
+- `tests/test_intraperiod_lineup_repair.py`
+- `tests/test_lineup_window_overrides.py`
+- `tests/test_offline_boxscore_loader.py`
+- `tests/test_offline_ordering.py`
+- `tests/test_offline_repair.py`
 - `tests/test_period_starters_carryover.py`
 - `tests/test_shot_clock.py`
+- `tests/test_stats_nba_malformed_events.py`
 - `tests/test_team_on_court_stats.py`
 
 ## tests/data_loaders
@@ -261,10 +268,14 @@ For implementation work, still provide raw source of the files you expect to edi
 
 ## tests/resources
 - `tests/resources/test_boxscore.py`
+- `tests/resources/test_event_stats_contract.py`
 - `tests/resources/test_field_goal.py`
+- `tests/resources/test_foul.py`
 - `tests/resources/test_free_throw.py`
 - `tests/resources/test_full_game_possessions.py`
 - `tests/resources/test_jump_ball.py`
 - `tests/resources/test_live_game_end.py`
+- `tests/resources/test_live_substitution.py`
 - `tests/resources/test_possession_offense_team_id.py`
 - `tests/resources/test_shot_clock_annotation.py`
+- `tests/resources/test_stats_nba_factory.py`

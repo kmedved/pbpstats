@@ -25,6 +25,42 @@ class StatsFoul(Foul, StatsEnhancedPbpItem):
             return self.base_stats
         return super().event_stats
 
+    def _get_linked_technical_free_throw(self):
+        for direction in ("previous_event", "next_event"):
+            event = getattr(self, direction, None)
+            while event is not None and getattr(event, "clock", None) == self.clock:
+                if getattr(event, "is_technical_ft", False):
+                    return event
+                event = getattr(event, direction, None)
+        return None
+
+    @property
+    def event_stat_team_id(self):
+        team_id = getattr(self, "team_id", None)
+        current_players = getattr(self, "current_players", {})
+        if team_id in current_players:
+            return team_id
+
+        if not (self.is_technical or self.is_double_technical):
+            return team_id
+
+        player1_id = getattr(self, "player1_id", 0)
+        if player1_id not in [0, None, "0"]:
+            for current_team_id, players in current_players.items():
+                if player1_id in players:
+                    return current_team_id
+
+        linked_ft = self._get_linked_technical_free_throw()
+        team_ids = list(current_players.keys())
+        if (
+            linked_ft is not None
+            and getattr(linked_ft, "team_id", None) in current_players
+            and len(team_ids) == 2
+        ):
+            return team_ids[0] if team_ids[1] == linked_ft.team_id else team_ids[1]
+
+        return team_id
+
     @property
     def number_of_fta_for_foul(self):
         """

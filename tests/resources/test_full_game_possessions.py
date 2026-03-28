@@ -185,7 +185,7 @@ class TestFullGamePossessions:
 
     def test_first_possession_stats(self):
         results = self.game.possessions.items[0].possession_stats
-        assert len(results) == 48
+        assert len(results) == 66
         assert {
             "player_id": 101162,
             "team_id": 1610612764,
@@ -621,7 +621,7 @@ class TestFullGamePossessions:
 
     def test_team_stats(self):
         results = self.game.possessions.team_stats
-        assert len(results) == 434
+        assert len(results) == 504
         assert {
             "team_id": 1610612760,
             "stat_key": "1627734:AssistsTo:201566:AtRim",
@@ -2075,7 +2075,7 @@ class TestFullGamePossessions:
 
     def test_opponent_stats(self):
         results = self.game.possessions.opponent_stats
-        assert len(results) == 434
+        assert len(results) == 504
         assert {
             "opponent_team_id": 1610612760,
             "stat_key": "PenaltyPersonal Fouls",
