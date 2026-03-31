@@ -13,6 +13,7 @@ from pbpstats.resources.enhanced_pbp.rebound import Rebound
 from pbpstats.resources.enhanced_pbp.start_of_period import (
     StartOfPeriod,
     InvalidNumberOfStartersException,
+    StartOfPeriodSourceLoaderError,
 )
 
 __all__ = [
@@ -26,6 +27,7 @@ __all__ = [
     "Replay",
     "StartOfPeriod",
     "InvalidNumberOfStartersException",
+    "StartOfPeriodSourceLoaderError",
     "Substitution",
     "Timeout",
     "Turnover",

@@ -23,6 +23,21 @@ class StatsRebound(Rebound, StatsEnhancedPbpItem):
     def __init__(self, *args):
         super().__init__(*args)
 
+    @property
+    def _is_source_limited_anonymous_rebound(self):
+        return (
+            getattr(self, "event_action_type", None) == 0
+            and getattr(self, "player1_id", 0) in [0, None, "0"]
+            and getattr(self, "team_id", 0) in [0, None, "0"]
+        )
+
+    @property
+    def event_stats(self):
+        if self._is_source_limited_anonymous_rebound:
+            self._log_source_limited_guard("source_limited_anonymous_rebound")
+            return self.base_stats
+        return super().event_stats
+
     def get_offense_team_id(self):
         """
         returns team id for team on offense for the shot that was rebounded

@@ -14,6 +14,171 @@ class StatsFoul(Foul, StatsEnhancedPbpItem):
     def __init__(self, *args):
         super().__init__(*args)
 
+    def _get_malformed_team_person_id(self):
+        player1_id = getattr(self, "player1_id", 0)
+        if player1_id not in [0, None, "0"]:
+            return player1_id
+        team_id = getattr(self, "team_id", None)
+        if team_id in [0, None, "0"]:
+            return None
+        return team_id
+
+    @staticmethod
+    def _coerce_int(value):
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return None
+
+    @staticmethod
+    def _get_opposite_team_id(team_ids, team_id):
+        if len(team_ids) != 2 or team_id not in team_ids:
+            return None
+        return team_ids[0] if team_ids[1] == team_id else team_ids[1]
+
+    @staticmethod
+    def _next_event_across_periods(event):
+        if event is None:
+            return None
+        return getattr(event, "next_event_any_period", getattr(event, "next_event", None))
+
+    @staticmethod
+    def _is_technical_foul_event(event):
+        return getattr(event, "event_type", None) == 6 and (
+            getattr(event, "is_technical", False)
+            or getattr(event, "is_double_technical", False)
+        )
+
+    @staticmethod
+    def _is_technical_anchor_foul_event(event):
+        return getattr(event, "event_type", None) == 6 and (
+            getattr(event, "is_technical", False)
+            or getattr(event, "is_double_technical", False)
+            or getattr(event, "is_defensive_3_seconds", False)
+        )
+
+    @staticmethod
+    def _is_boundary_admin_event(event):
+        return getattr(event, "event_type", None) in {8, 9, 11, 12, 13, 18}
+
+    def _resolve_same_clock_paired_technical_team_id(self, team_ids):
+        valid_team_ids = set()
+        for direction in ("previous_event", "next_event"):
+            event = getattr(self, direction, None)
+            while event is not None and getattr(event, "clock", None) == self.clock:
+                if self._is_technical_anchor_foul_event(event):
+                    event_team_id = getattr(event, "team_id", None)
+                    if event_team_id in team_ids:
+                        valid_team_ids.add(event_team_id)
+                event = getattr(event, direction, None)
+        if len(valid_team_ids) != 1:
+            return None
+        return self._get_opposite_team_id(team_ids, next(iter(valid_team_ids)))
+
+    def _resolve_boundary_cluster_technical_team_id(self, team_ids):
+        if self._coerce_int(getattr(self, "period", None)) is None:
+            return None
+        if getattr(self, "clock", None) != "0:00":
+            return None
+
+        current_period = self._coerce_int(self.period)
+        next_period = current_period + 1
+        technical_ft_team_ids = set()
+        saw_next_period_cluster = False
+        event = self._next_event_across_periods(self)
+
+        while event is not None:
+            event_period = self._coerce_int(getattr(event, "period", None))
+            if event_period not in {current_period, next_period}:
+                break
+
+            if getattr(event, "event_type", None) == 3 and getattr(
+                event, "is_technical_ft", False
+            ):
+                if event_period != next_period:
+                    break
+                shooter_team_id = getattr(event, "team_id", None)
+                if shooter_team_id not in team_ids:
+                    return None
+                saw_next_period_cluster = True
+                technical_ft_team_ids.add(shooter_team_id)
+                event = self._next_event_across_periods(event)
+                continue
+
+            if self._is_boundary_admin_event(event):
+                if event_period == next_period:
+                    saw_next_period_cluster = True
+                event = self._next_event_across_periods(event)
+                continue
+
+            if self._is_technical_foul_event(event):
+                if event_period == next_period:
+                    saw_next_period_cluster = True
+                event = self._next_event_across_periods(event)
+                continue
+
+            break
+
+        if not saw_next_period_cluster or len(technical_ft_team_ids) != 1:
+            return None
+        return self._get_opposite_team_id(team_ids, next(iter(technical_ft_team_ids)))
+
+    def _resolve_technical_team_id(self):
+        team_id = getattr(self, "team_id", None)
+        current_players = getattr(self, "current_players", {})
+        team_ids = list(current_players.keys())
+        if team_id in current_players:
+            return team_id
+
+        if not (self.is_technical or self.is_double_technical):
+            return None
+
+        candidate_person_id = self._get_malformed_team_person_id()
+        if candidate_person_id not in [0, None, "0"]:
+            for current_team_id, players in current_players.items():
+                if candidate_person_id in players:
+                    return current_team_id
+
+        linked_ft = self._get_linked_technical_free_throw()
+        if (
+            linked_ft is not None
+            and getattr(linked_ft, "team_id", None) in current_players
+            and len(team_ids) == 2
+        ):
+            return team_ids[0] if team_ids[1] == linked_ft.team_id else team_ids[1]
+
+        paired_team_id = self._resolve_same_clock_paired_technical_team_id(team_ids)
+        if paired_team_id is not None:
+            return paired_team_id
+
+        boundary_team_id = self._resolve_boundary_cluster_technical_team_id(team_ids)
+        if boundary_team_id is not None:
+            return boundary_team_id
+
+        player2_team_id = getattr(self, "player2_team_id", None)
+        if (
+            self.is_double_technical
+            and player2_team_id in current_players
+            and len(team_ids) == 2
+        ):
+            return team_ids[0] if team_ids[1] == player2_team_id else team_ids[1]
+
+        player2_id = getattr(self, "player3_id", 0)
+        if self.is_double_technical and player2_id not in [0, None, "0"] and len(team_ids) == 2:
+            for current_team_id, players in current_players.items():
+                if player2_id in players:
+                    return team_ids[0] if team_ids[1] == current_team_id else team_ids[1]
+
+        return None
+
+    def _is_unresolved_source_limited_technical(self):
+        current_players = getattr(self, "current_players", {})
+        if not (self.is_technical or self.is_double_technical):
+            return False
+        if getattr(self, "team_id", None) in current_players:
+            return False
+        return self._resolve_technical_team_id() is None
+
     @property
     def event_stats(self):
         # Some legacy stats.nba rows are foul events with no valid committing
@@ -22,6 +187,10 @@ class StatsFoul(Foul, StatsEnhancedPbpItem):
         if getattr(self, "team_id", 0) in [0, None, "0"] and getattr(
             self, "player1_id", 0
         ) in [0, None, "0"]:
+            self._log_source_limited_guard("source_limited_bench_technical_no_team")
+            return self.base_stats
+        if self._is_unresolved_source_limited_technical():
+            self._log_source_limited_guard("source_limited_bench_technical_no_team")
             return self.base_stats
         return super().event_stats
 
@@ -36,30 +205,10 @@ class StatsFoul(Foul, StatsEnhancedPbpItem):
 
     @property
     def event_stat_team_id(self):
-        team_id = getattr(self, "team_id", None)
-        current_players = getattr(self, "current_players", {})
-        if team_id in current_players:
-            return team_id
-
-        if not (self.is_technical or self.is_double_technical):
-            return team_id
-
-        player1_id = getattr(self, "player1_id", 0)
-        if player1_id not in [0, None, "0"]:
-            for current_team_id, players in current_players.items():
-                if player1_id in players:
-                    return current_team_id
-
-        linked_ft = self._get_linked_technical_free_throw()
-        team_ids = list(current_players.keys())
-        if (
-            linked_ft is not None
-            and getattr(linked_ft, "team_id", None) in current_players
-            and len(team_ids) == 2
-        ):
-            return team_ids[0] if team_ids[1] == linked_ft.team_id else team_ids[1]
-
-        return team_id
+        resolved_team_id = self._resolve_technical_team_id()
+        if resolved_team_id is not None:
+            return resolved_team_id
+        return getattr(self, "team_id", None)
 
     @property
     def number_of_fta_for_foul(self):

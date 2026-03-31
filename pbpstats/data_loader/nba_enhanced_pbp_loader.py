@@ -42,6 +42,10 @@ class NbaEnhancedPbpLoader(object):
         fouls_to_give = defaultdict(lambda: 4)
         score = defaultdict(int)
         for i, event in enumerate(self.items):
+            event.previous_event_any_period = self.items[i - 1] if i > 0 else None
+            event.next_event_any_period = (
+                self.items[i + 1] if i < len(self.items) - 1 else None
+            )
             if i == 0 and i == len(self.items) - 1:
                 event.previous_event = None
                 event.next_event = None

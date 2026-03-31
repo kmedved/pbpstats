@@ -314,16 +314,5 @@ class Rebound(object):
                         }
                     )
 
-            team_ids = list(self.current_players.keys())
-            lineups_ids = self.lineup_ids
-            for stat in stats:
-                opponent_team_candidates = [tid for tid in team_ids if tid != stat["team_id"]]
-                if not opponent_team_candidates:
-                    continue
-                opponent_team_id = opponent_team_candidates[0]
-                if stat["team_id"] not in lineups_ids or opponent_team_id not in lineups_ids:
-                    continue
-                stat["lineup_id"] = lineups_ids[stat["team_id"]]
-                stat["opponent_team_id"] = opponent_team_id
-                stat["opponent_lineup_id"] = lineups_ids[opponent_team_id]
+            stats = self._add_event_stat_context(stats)
         return self.base_stats + stats

@@ -47,3 +47,16 @@ Activate virtualenv:
 Install pre-commit:
 
 `pre-commit install`
+
+# `replace_tpdev` Compatibility Smoke
+This fork is consumed by the sibling historical pipeline at `../replace_tpdev`, so runtime refactors should be checked against its Golden Canary suite before being treated as safe.
+
+Run the local compatibility smoke gate from the `pbpstats` repo root:
+
+`python scripts/run_replace_tpdev_compatibility_smoke.py --replace-tpdev-root ../replace_tpdev`
+
+Notes:
+- The script pins `--pbpstats-repo` to the current editable checkout automatically.
+- It exits non-zero if `failed_games`, `event_stats_errors`, or the Golden Canary suite pass flags are not clean.
+- If `--output-dir` is omitted, it writes to a temporary directory and prints the resolved path.
+- This is a local data-dependent gate; it is not part of GitHub Actions because CI does not have the sibling repo and historical runtime inputs.

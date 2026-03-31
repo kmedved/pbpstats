@@ -31,6 +31,7 @@ KEY_ATTR_MAPPER = {
     "PLAYER1_ID": "player1_id",
     "PLAYER1_TEAM_ID": "team_id",
     "PLAYER2_ID": "player2_id",
+    "PLAYER2_TEAM_ID": "player2_team_id",
     "PLAYER3_ID": "player3_id",
     "VIDEO_AVAILABLE_FLAG": "video_available",
 }
@@ -104,6 +105,19 @@ class StatsEnhancedPbpItem(EnhancedPbpItem):
         self.possession_changing_override = False
         self.non_possession_changing_override = False
         self.score = defaultdict(int)
+
+    def _log_source_limited_guard(self, reason: str) -> None:
+        if getattr(self, "_source_limited_guard_logged", False):
+            return
+        logger.warning(
+            "Source-limited malformed event guarded: game_id=%s event_num=%s event_class=%s reason=%s description=%s",
+            getattr(self, "game_id", "unknown"),
+            getattr(self, "event_num", "unknown"),
+            type(self).__name__,
+            reason,
+            getattr(self, "description", ""),
+        )
+        self._source_limited_guard_logged = True
 
     @property
     def data(self):

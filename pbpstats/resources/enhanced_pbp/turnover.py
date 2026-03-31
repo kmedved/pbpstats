@@ -91,11 +91,10 @@ class Turnover(object):
             season_suffix is not None and season_suffix >= 17
         )
         if not self.is_no_turnover or no_turnover_with_steal or countable_no_turnover:
-            team_ids = list(self.current_players.keys())
-            opponent_team_id = (
-                team_ids[0] if self.team_id == team_ids[1] else team_ids[1]
+            _, _, resolved_lineup_ids, opponent_team_id = (
+                self._require_team_in_event_stat_context(self.team_id)
             )
-            lineup_ids = self.lineup_ids
+            lineup_ids = dict(resolved_lineup_ids)
             if self.is_steal:
                 turnover_key = (
                     pbpstats.LOST_BALL_TURNOVER_STRING
@@ -219,13 +218,8 @@ class Turnover(object):
                                 )
                                 lineup_ids[self.team_id] = fixed_lineup_id
 
+            stats = self._add_event_stat_context(stats, lineup_ids=lineup_ids)
             for stat in stats:
-                opponent_team_id = (
-                    team_ids[0] if stat["team_id"] == team_ids[1] else team_ids[1]
-                )
-                stat["lineup_id"] = lineup_ids[stat["team_id"]]
-                stat["opponent_team_id"] = opponent_team_id
-                stat["opponent_lineup_id"] = lineup_ids[opponent_team_id]
                 if self.is_second_chance_event():
                     second_chance_stats.append(
                         {

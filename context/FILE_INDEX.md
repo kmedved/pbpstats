@@ -228,6 +228,7 @@ For implementation work, still provide raw source of the files you expect to edi
 - `scripts/build_context_bundle.py`
 - `scripts/context_framework.py`
 - `scripts/generate_repo_architecture_sync.py`
+- `scripts/run_replace_tpdev_compatibility_smoke.py`
 
 ## tests
 - `tests/conftest.py`
@@ -239,6 +240,7 @@ For implementation work, still provide raw source of the files you expect to edi
 - `tests/test_offline_ordering.py`
 - `tests/test_offline_repair.py`
 - `tests/test_period_starters_carryover.py`
+- `tests/test_replace_tpdev_compatibility_smoke.py`
 - `tests/test_shot_clock.py`
 - `tests/test_stats_nba_malformed_events.py`
 - `tests/test_team_on_court_stats.py`

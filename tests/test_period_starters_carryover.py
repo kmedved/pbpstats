@@ -1,6 +1,7 @@
 import os
 import sys
 import json
+import pytest
 
 sys.path.insert(0, os.path.abspath("."))
 
@@ -14,6 +15,7 @@ from pbpstats.resources.enhanced_pbp import (
 from pbpstats.resources.enhanced_pbp.start_of_period import (
     InvalidNumberOfStartersException,
     StartOfPeriod,
+    StartOfPeriodSourceLoaderError,
 )
 from pbpstats.resources.enhanced_pbp.stats_nba.start_of_period import StatsStartOfPeriod
 
@@ -300,6 +302,16 @@ class DummyPeriodBoxscoreLoader:
         return self.responses.get(mode)
 
 
+class FailingPeriodBoxscoreLoader:
+    def load_data(self, game_id, period, mode):
+        raise RuntimeError("boom")
+
+
+class FailingBoxscoreLoader:
+    def load_data(self, game_id):
+        raise RuntimeError("boom")
+
+
 def _make_v3_team(team_id, player_ids):
     return {
         "teamId": team_id,
@@ -325,6 +337,9 @@ def _make_v3_response(away_team_id, away_players, home_team_id, home_players):
 class DummyStatsStart(StatsStartOfPeriod):
     def __init__(self):
         pass
+
+    game_id = "0020000001"
+    period = 2
 
 
 def _link_events(*events):
@@ -971,6 +986,47 @@ def test_period_boxscore_rt1_participants_used_when_rt2_unresolved():
     ]
 
 
+def test_period_boxscore_loader_none_is_treated_as_clean_coverage_miss():
+    start = DummyStart()
+    start.period_boxscore_source_loader = DummyPeriodBoxscoreLoader(
+        {"rt2_start_window": None}
+    )
+
+    response = start._load_period_boxscore_response("rt2_start_window")
+
+    assert response is None
+
+
+def test_period_boxscore_loader_exception_is_wrapped():
+    start = DummyStart()
+    start.period_boxscore_source_loader = FailingPeriodBoxscoreLoader()
+
+    with pytest.raises(StartOfPeriodSourceLoaderError) as exc_info:
+        start._load_period_boxscore_response("rt2_start_window")
+
+    assert exc_info.value.source_kind == "period_boxscore_source_loader"
+    assert exc_info.value.game_id == "0020000001"
+    assert exc_info.value.period == 2
+    assert exc_info.value.mode == "rt2_start_window"
+    assert isinstance(exc_info.value.__cause__, RuntimeError)
+
+
+def test_stats_start_of_period_boxscore_loader_exception_is_wrapped():
+    start = DummyStatsStart()
+    start.game_id = "0020000001"
+    start.period = 1
+    start.boxscore_source_loader = FailingBoxscoreLoader()
+
+    with pytest.raises(StartOfPeriodSourceLoaderError) as exc_info:
+        start._get_period_starters_from_boxscore_loader()
+
+    assert exc_info.value.source_kind == "boxscore_source_loader"
+    assert exc_info.value.game_id == "0020000001"
+    assert exc_info.value.period == 1
+    assert exc_info.value.mode is None
+    assert isinstance(exc_info.value.__cause__, RuntimeError)
+
+
 def test_period_boxscore_narrowing_uses_earliest_same_clock_sub_event():
     end = DummyEnd()
     later_sub = DummySubstitution(
@@ -1021,7 +1077,9 @@ def test_stats_start_of_period_uses_strict_pbp_when_it_succeeds():
     """When strict PBP finds 10 starters, use them — don't override with V3."""
     start = DummyStatsStart()
     start.period = 5
-    start.period_boxscore_source_loader = object()
+    start.period_boxscore_source_loader = DummyPeriodBoxscoreLoader(
+        {"rt2_start_window": None}
+    )
     call_log = []
 
     def strict(file_directory, ignore_missing_starters=False):

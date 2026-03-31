@@ -39,6 +39,22 @@ class InvalidNumberOfStartersException(Exception):
     pass
 
 
+class StartOfPeriodSourceLoaderError(RuntimeError):
+    """
+    Raised when an explicit local start-of-period source loader fails unexpectedly.
+    """
+
+    def __init__(self, source_kind, game_id, period, *, mode=None):
+        self.source_kind = source_kind
+        self.game_id = game_id
+        self.period = period
+        self.mode = mode
+        mode_suffix = f", mode={mode}" if mode is not None else ""
+        super().__init__(
+            f"{source_kind} failed for game_id={game_id}, period={period}{mode_suffix}"
+        )
+
+
 class StartOfPeriod(metaclass=abc.ABCMeta):
     """
     Class for start of period events
@@ -149,8 +165,13 @@ class StartOfPeriod(metaclass=abc.ABCMeta):
         if loader_obj is not None:
             try:
                 return loader_obj.load_data(self.game_id, self.period, mode)
-            except Exception:
-                return None
+            except Exception as exc:
+                raise StartOfPeriodSourceLoaderError(
+                    "period_boxscore_source_loader",
+                    getattr(self, "game_id", "unknown"),
+                    getattr(self, "period", None),
+                    mode=mode,
+                ) from exc
         try:
             return self._fetch_period_boxscore_response(mode)
         except Exception:

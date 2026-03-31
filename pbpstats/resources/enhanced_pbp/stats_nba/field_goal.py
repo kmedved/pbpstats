@@ -15,6 +15,23 @@ class StatsFieldGoal(FieldGoal, StatsEnhancedPbpItem):
         super().__init__(*args)
 
     @property
+    def _is_source_limited_anonymous_no_shot(self):
+        return (
+            getattr(self, "event_action_type", None) == 0
+            and getattr(self, "team_id", 0) in [0, None, "0"]
+            and getattr(self, "player1_id", 0) in [0, None, "0"]
+            and getattr(self, "player2_id", 0) in [0, None, "0"]
+            and getattr(self, "player3_id", 0) in [0, None, "0"]
+        )
+
+    @property
+    def event_stats(self):
+        if self._is_source_limited_anonymous_no_shot:
+            self._log_source_limited_guard("source_limited_anonymous_no_shot")
+            return self.base_stats
+        return super().event_stats
+
+    @property
     def is_made(self):
         """
         returns True if shot was made, False otherwise

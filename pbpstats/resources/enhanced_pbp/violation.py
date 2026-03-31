@@ -47,13 +47,5 @@ class Violation(object):
                     "stat_value": 1,
                 }
             )
-            team_ids = list(self.current_players.keys())
-            lineups_ids = self.lineup_ids
-            for stat in stats:
-                opponent_team_id = (
-                    team_ids[0] if stat["team_id"] == team_ids[1] else team_ids[1]
-                )
-                stat["lineup_id"] = lineups_ids[stat["team_id"]]
-                stat["opponent_team_id"] = opponent_team_id
-                stat["opponent_lineup_id"] = lineups_ids[opponent_team_id]
+            stats = self._add_event_stat_context(stats)
         return self.base_stats + stats
