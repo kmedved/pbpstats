@@ -48,6 +48,25 @@ def _stats_rebound(event_num, description, team_id, player_id=1, clock="06:47"):
     }
 
 
+def _stats_sub(event_num, description, team_id, out_player_id, in_player_id, clock="06:47"):
+    return {
+        "GAME_ID": "0049600063",
+        "EVENTNUM": event_num,
+        "PERIOD": 1,
+        "PCTIMESTRING": clock,
+        "EVENTMSGACTIONTYPE": 0,
+        "EVENTMSGTYPE": 8,
+        "PLAYER1_ID": out_player_id,
+        "PLAYER1_TEAM_ID": team_id,
+        "PLAYER2_ID": in_player_id,
+        "PLAYER2_TEAM_ID": team_id,
+        "PLAYER3_ID": None,
+        "PLAYER3_TEAM_ID": None,
+        "HOMEDESCRIPTION": description,
+        "VISITORDESCRIPTION": "",
+    }
+
+
 def _data_fg(event_num, event_type, description, team_id, player_id=1, action_type=1):
     return {
         "evt": event_num,
@@ -775,6 +794,30 @@ def test_fix_event_order_moves_player_rebound_back_to_earlier_missed_free_throw_
     assert [row["EVENTNUM"] for row in processor.data] == [542, 543, 544, 545, 546, 547, 550, 552, 553, 554, 555, 551]
 
 
+def test_fix_event_order_moves_subbed_in_rebounder_block_before_missed_ft():
+    processor = object.__new__(PbpProcessor)
+    processor.game_id = "0041900155"
+    processor.data = [
+        _stats_fg(347, 3, "Doncic Free Throw 1 of 2 (12 PTS)", team_id=1610612742, player_id=1629029, action_type=11, clock="0:03"),
+        _stats_fg(352, 3, "MISS Doncic Free Throw 2 of 2", team_id=1610612742, player_id=1629029, action_type=12, clock="0:03"),
+        _stats_sub(348, "SUB: Harrell FOR Zubac", team_id=1610612746, out_player_id=1627826, in_player_id=1626149, clock="0:03"),
+        _stats_sub(349, "SUB: Kidd-Gilchrist FOR Finney-Smith", team_id=1610612742, out_player_id=1627827, in_player_id=203077, clock="0:03"),
+        _stats_rebound(353, "Harrell REBOUND (Off:1 Def:3)", team_id=1610612746, player_id=1626149, clock="0:01"),
+    ]
+    for row in processor.data:
+        row["PERIOD"] = 2
+    processor._rebound_deletions_list = []
+
+    error = EventOrderError(
+        "rebound event: <StatsRebound EventNum: 353> previous event: <StatsSubstitution EventNum: 349> is not a missed free throw or field goal",
+        rebound_event_num=353,
+        previous_event_num=349,
+    )
+
+    processor._fix_event_order(error)
+
+    assert [row["EVENTNUM"] for row in processor.data] == [347, 348, 349, 352, 353]
+
 def test_fix_event_order_moves_stranded_same_team_rebound_behind_future_same_clock_miss():
     processor = object.__new__(PbpProcessor)
     processor.game_id = "0029600561"
@@ -1261,6 +1304,73 @@ def test_repair_silent_ft_rebound_windows_reorders_reversed_two_shot_ft_block():
 
     assert [row["EVENTNUM"] for row in processor.data] == [393, 394, 395, 396, 397]
 
+
+def test_repair_silent_ft_rebound_windows_moves_subs_before_terminal_ft_for_subbed_in_rebounder():
+    processor = object.__new__(PbpProcessor)
+    processor.game_id = "0041900155"
+    processor.data = [
+        _stats_fg(347, 3, "Doncic Free Throw 1 of 2 (12 PTS)", team_id=1610612742, player_id=1629029, action_type=11, clock="0:03"),
+        _stats_fg(352, 3, "MISS Doncic Free Throw 2 of 2", team_id=1610612742, player_id=1629029, action_type=12, clock="0:03"),
+        _stats_rebound(353, "Harrell REBOUND (Off:1 Def:3)", team_id=1610612746, player_id=1626149, clock="0:01"),
+        _stats_sub(348, "SUB: Harrell FOR Zubac", team_id=1610612746, out_player_id=1627826, in_player_id=1626149, clock="0:03"),
+        _stats_sub(349, "SUB: Kidd-Gilchrist FOR Finney-Smith", team_id=1610612742, out_player_id=1627827, in_player_id=203077, clock="0:03"),
+    ]
+    for row in processor.data:
+        row["PERIOD"] = 2
+
+    processor._repair_silent_ft_rebound_windows()
+
+    assert [row["EVENTNUM"] for row in processor.data] == [347, 348, 349, 352, 353]
+
+
+def test_repair_silent_ft_rebound_windows_moves_sub_block_before_live_one_shot_ft():
+    processor = object.__new__(PbpProcessor)
+    processor.game_id = "0029600204"
+    processor.data = [
+        {
+            "GAME_ID": "0029600204",
+            "EVENTNUM": 147,
+            "PERIOD": 2,
+            "PCTIMESTRING": "9:06",
+            "EVENTMSGACTIONTYPE": 2,
+            "EVENTMSGTYPE": 6,
+            "PLAYER1_ID": 679,
+            "PLAYER1_TEAM_ID": 1610612741,
+            "PLAYER2_ID": 423,
+            "PLAYER2_TEAM_ID": 1610612742,
+            "PLAYER3_ID": None,
+            "PLAYER3_TEAM_ID": None,
+            "HOMEDESCRIPTION": "",
+            "VISITORDESCRIPTION": "Caffey S.FOUL (P1.T2)",
+        },
+        _stats_fg(148, 3, "MISS Gatling Free Throw 1 of 1", team_id=1610612742, player_id=423, action_type=10, clock="9:06"),
+        _stats_sub(149, "SUB: Jackson FOR McCloud", team_id=1610612742, out_player_id=45, in_player_id=754, clock="9:06"),
+        _stats_sub(150, "SUB: Jordan FOR Kukoc", team_id=1610612741, out_player_id=389, in_player_id=893, clock="9:06"),
+        _stats_sub(151, "SUB: Pippen FOR Rodman", team_id=1610612741, out_player_id=23, in_player_id=937, clock="9:06"),
+        _stats_sub(152, "SUB: Dumas FOR Kidd", team_id=1610612742, out_player_id=467, in_player_id=434, clock="9:06"),
+        _stats_rebound(153, "Pippen REBOUND (Off:0 Def:3)", team_id=1610612741, player_id=937, clock="9:05"),
+    ]
+
+    processor._repair_silent_ft_rebound_windows()
+
+    assert [row["EVENTNUM"] for row in processor.data] == [147, 149, 150, 151, 152, 148, 153]
+
+
+def test_repair_silent_ft_rebound_windows_leaves_sub_block_when_rebounder_not_subbed_in():
+    processor = object.__new__(PbpProcessor)
+    processor.game_id = "0041900155"
+    processor.data = [
+        _stats_fg(347, 3, "Doncic Free Throw 1 of 2 (12 PTS)", team_id=1610612742, player_id=1629029, action_type=11, clock="0:03"),
+        _stats_fg(352, 3, "MISS Doncic Free Throw 2 of 2", team_id=1610612742, player_id=1629029, action_type=12, clock="0:03"),
+        _stats_rebound(353, "Harrell REBOUND (Off:1 Def:3)", team_id=1610612746, player_id=1626149, clock="0:01"),
+        _stats_sub(348, "SUB: Mann FOR Zubac", team_id=1610612746, out_player_id=1627826, in_player_id=1629611, clock="0:03"),
+    ]
+    for row in processor.data:
+        row["PERIOD"] = 2
+
+    processor._repair_silent_ft_rebound_windows()
+
+    assert [row["EVENTNUM"] for row in processor.data] == [347, 352, 353, 348]
 
 def test_processor_uses_expanded_retry_budget(monkeypatch):
     called = []

@@ -166,9 +166,174 @@ class PbpProcessor(NbaEnhancedPbpLoader, NbaPossessionLoader):
             except (TypeError, ValueError):
                 return None
 
+        def event_num(idx: int) -> Optional[int]:
+            if 0 <= idx < len(rows):
+                return int_value(rows[idx].get("EVENTNUM"))
+            return None
+
+        def player1_id(idx: int) -> Optional[int]:
+            if 0 <= idx < len(rows):
+                return int_value(rows[idx].get("PLAYER1_ID"))
+            return None
+
+        def player2_id(idx: int) -> Optional[int]:
+            if 0 <= idx < len(rows):
+                return int_value(rows[idx].get("PLAYER2_ID"))
+            return None
+
+        def is_real_player_rebound(idx: int) -> bool:
+            return et(idx) == 4 and not is_team_rebound(idx)
+
+        def same_period(idx: int, period) -> bool:
+            return 0 <= idx < len(rows) and rows[idx].get("PERIOD") == period
+
+        def rebound_clock_follows_ft(ft_idx: int, rebound_idx: int) -> bool:
+            ft_clock = clock_seconds(ft_idx)
+            rebound_clock = clock_seconds(rebound_idx)
+            if ft_clock is None or rebound_clock is None:
+                return True
+            return 0 <= ft_clock - rebound_clock <= 5
+
+        def sub_block_puts_rebounder_on_floor(sub_indices: List[int], rebound_idx: int) -> bool:
+            rebounder = player1_id(rebound_idx)
+            if rebounder is None:
+                return False
+            return any(player2_id(sub_idx) == rebounder for sub_idx in sub_indices)
+
+        def move_indices_before(anchor_idx: int, move_indices: List[int]) -> None:
+            move_indices = sorted(move_indices)
+            moved_rows = [rows[move_idx] for move_idx in move_indices]
+            for move_idx in reversed(move_indices):
+                rows.pop(move_idx)
+            adjusted_anchor = anchor_idx - sum(1 for move_idx in move_indices if move_idx < anchor_idx)
+            rows[adjusted_anchor:adjusted_anchor] = moved_rows
+
         changed = True
         while changed:
             changed = False
+
+            # Same-clock FT clusters can arrive as:
+            #   FT1_A -> MISS_FT2_A -> REBOUND_B -> SUB(S)_B
+            # or:
+            #   FT1_A -> MISS_FT2_A -> SUB(S)_B -> REBOUND_B
+            # when the substitution event numbers show the subs happened before
+            # the missed terminal FT. Move only those sub rows, and only when one
+            # of them brings the rebounder onto the floor.
+            for terminal_ft_idx in range(len(rows)):
+                if not is_missed_ft(terminal_ft_idx):
+                    continue
+
+                terminal_ft_event_num = event_num(terminal_ft_idx)
+                if terminal_ft_event_num is None:
+                    continue
+
+                period = rows[terminal_ft_idx].get("PERIOD")
+                ft_player = player1_id(terminal_ft_idx)
+                prior_ft_idx = None
+                prior_ft_event_num = None
+                for scan_idx in range(max(0, terminal_ft_idx - 8), terminal_ft_idx):
+                    if not same_period(scan_idx, period):
+                        continue
+                    if et(scan_idx) != 3 or player1_id(scan_idx) != ft_player:
+                        continue
+                    candidate_event_num = event_num(scan_idx)
+                    if candidate_event_num is None or candidate_event_num >= terminal_ft_event_num:
+                        continue
+                    if prior_ft_event_num is None or candidate_event_num > prior_ft_event_num:
+                        prior_ft_idx = scan_idx
+                        prior_ft_event_num = candidate_event_num
+
+                if prior_ft_idx is None or prior_ft_event_num is None:
+                    continue
+
+                rebound_idx = None
+                sub_indices: List[int] = []
+                terminal_clock = rows[terminal_ft_idx].get("PCTIMESTRING")
+                for scan_idx in range(terminal_ft_idx + 1, min(len(rows), terminal_ft_idx + 8)):
+                    if not same_period(scan_idx, period):
+                        break
+                    scan_event_num = event_num(scan_idx)
+                    if (
+                        et(scan_idx) == 8
+                        and scan_event_num is not None
+                        and prior_ft_event_num < scan_event_num < terminal_ft_event_num
+                        and rows[scan_idx].get("PCTIMESTRING") == terminal_clock
+                    ):
+                        sub_indices.append(scan_idx)
+                    elif (
+                        is_real_player_rebound(scan_idx)
+                        and scan_event_num == terminal_ft_event_num + 1
+                        and rebound_clock_follows_ft(terminal_ft_idx, scan_idx)
+                    ):
+                        rebound_idx = scan_idx
+
+                if rebound_idx is None or not sub_indices:
+                    continue
+                ft_team = effective_team_id(terminal_ft_idx)
+                rebound_team = effective_team_id(rebound_idx)
+                if ft_team is None or rebound_team is None or ft_team == rebound_team:
+                    continue
+                if not sub_block_puts_rebounder_on_floor(sub_indices, rebound_idx):
+                    continue
+
+                move_indices_before(terminal_ft_idx, sub_indices)
+                changed = True
+                break
+
+            if changed:
+                continue
+
+            # If a substitution block is recorded between a missed one-shot FT
+            # and the rebound, the ball could not have been live yet. Put the
+            # substitution block before the FT when it contains the rebounder.
+            for missed_ft_idx in range(len(rows) - 2):
+                if not is_missed_ft(missed_ft_idx):
+                    continue
+
+                period = rows[missed_ft_idx].get("PERIOD")
+                ft_event_num = event_num(missed_ft_idx)
+                if ft_event_num is None:
+                    continue
+
+                sub_indices: List[int] = []
+                scan_idx = missed_ft_idx + 1
+                ft_clock = rows[missed_ft_idx].get("PCTIMESTRING")
+                while (
+                    scan_idx < len(rows)
+                    and same_period(scan_idx, period)
+                    and et(scan_idx) == 8
+                    and rows[scan_idx].get("PCTIMESTRING") == ft_clock
+                ):
+                    sub_indices.append(scan_idx)
+                    scan_idx += 1
+
+                if not sub_indices or scan_idx >= len(rows) or not is_real_player_rebound(scan_idx):
+                    continue
+                if not same_period(scan_idx, period) or not rebound_clock_follows_ft(missed_ft_idx, scan_idx):
+                    continue
+
+                rebound_event_num = event_num(scan_idx)
+                if rebound_event_num is None:
+                    continue
+                sub_event_nums = [event_num(sub_idx) for sub_idx in sub_indices]
+                if any(sub_event_num is None for sub_event_num in sub_event_nums):
+                    continue
+                if not all(ft_event_num < sub_event_num < rebound_event_num for sub_event_num in sub_event_nums):
+                    continue
+
+                ft_team = effective_team_id(missed_ft_idx)
+                rebound_team = effective_team_id(scan_idx)
+                if ft_team is None or rebound_team is None or ft_team == rebound_team:
+                    continue
+                if not sub_block_puts_rebounder_on_floor(sub_indices, scan_idx):
+                    continue
+
+                move_indices_before(missed_ft_idx, sub_indices)
+                changed = True
+                break
+
+            if changed:
+                continue
 
             # Reversed and-one / 1-of-1 block:
             #   REBOUND_B -> MISS_FT_A -> FOUL_B -> MADE_A
@@ -415,6 +580,17 @@ class PbpProcessor(NbaEnhancedPbpLoader, NbaPossessionLoader):
             player = int(player)
             return player == 0 or player >= 1610000000
 
+        def player_id(idx: int, key: str) -> Optional[int]:
+            if not (0 <= idx < len(rows)):
+                return None
+            player = rows[idx].get(key)
+            if player is None or pd.isna(player):
+                return None
+            try:
+                return int(player)
+            except (TypeError, ValueError):
+                return None
+
         rebound_period = None
         if rebound_event_index is not None and 0 <= rebound_event_index < len(rows):
             rebound_period = rows[rebound_event_index].get("PERIOD")
@@ -544,6 +720,28 @@ class PbpProcessor(NbaEnhancedPbpLoader, NbaPossessionLoader):
                         or rebound_team == missed_ft_team
                     ):
                         continue
+
+                    sub_indices = [
+                        block_idx
+                        for block_idx in block_range
+                        if et(block_idx) == 8
+                    ]
+                    rebounder_id = player_id(rebound_event_index, "PLAYER1_ID")
+                    if (
+                        sub_indices
+                        and rebounder_id is not None
+                        and any(
+                            player_id(sub_idx, "PLAYER2_ID") == rebounder_id
+                            for sub_idx in sub_indices
+                        )
+                    ):
+                        sub_rows = [rows[sub_idx] for sub_idx in sub_indices]
+                        for sub_idx in reversed(sub_indices):
+                            rows.pop(sub_idx)
+                        candidate_idx -= sum(1 for sub_idx in sub_indices if sub_idx < candidate_idx)
+                        rows[candidate_idx:candidate_idx] = sub_rows
+                        self.data = rows
+                        return
 
                     rebound_row = rows.pop(rebound_event_index)
                     if rebound_event_index < candidate_idx:
