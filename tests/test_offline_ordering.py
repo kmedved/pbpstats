@@ -81,3 +81,36 @@ def test_patch_start_of_periods_leaves_existing_q1_start_unchanged():
 
     assert patched["EVENTNUM"].tolist() == [55, 56, 57, 58]
     assert (patched["EVENTMSGTYPE"] == 12).sum() == 1
+
+
+def test_patch_start_of_periods_moves_existing_start_before_start_clock_live_action():
+    game_df = pd.DataFrame(
+        [
+            _row(344, 2, msg_type=13, clock="0:00"),
+            _row(346, 3, msg_type=2, clock="12:00"),
+            _row(345, 3, msg_type=12, clock="12:00"),
+            _row(347, 3, msg_type=4, clock="11:51"),
+            _row(348, 3, msg_type=2, clock="11:50"),
+        ]
+    )
+
+    patched = patch_start_of_periods(game_df, "0021700394", fetch_pbp_v3_fn=None)
+
+    assert patched["EVENTNUM"].tolist() == [344, 345, 346, 347, 348]
+    assert patched.iloc[1]["EVENTMSGTYPE"] == 12
+
+
+def test_patch_start_of_periods_leaves_period_start_after_exact_start_technical_cluster():
+    game_df = pd.DataFrame(
+        [
+            _row(200, 2, msg_type=6, clock="12:00"),
+            _row(201, 2, msg_type=12, clock="12:00"),
+            _row(202, 2, msg_type=3, clock="12:00"),
+            _row(203, 2, msg_type=1, clock="11:44"),
+        ]
+    )
+    game_df.loc[0, "EVENTMSGACTIONTYPE"] = 11
+
+    patched = patch_start_of_periods(game_df, "0021700394", fetch_pbp_v3_fn=None)
+
+    assert patched["EVENTNUM"].tolist() == [200, 201, 202, 203]

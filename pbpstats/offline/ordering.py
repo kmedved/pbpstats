@@ -138,6 +138,74 @@ def _insert_row_before_period(
     )
 
 
+def _period_start_clock(period: int) -> str:
+    return "12:00" if int(period) <= 4 else "5:00"
+
+
+def _move_existing_period_start_before_initial_live_action(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Move an existing StartOfPeriod marker ahead of malformed live action at the
+    exact period-start clock, without changing other intra-period ordering.
+
+    Some feeds can place a real 12:00 live action before the StartOfPeriod row.
+    Leaving that shape intact can double-count the period-opening interval:
+    both the pre-start live action and the first post-start action point back to
+    a 12:00 predecessor.  Technical/foul clusters are deliberately excluded
+    because those exact-start cases can be scorer-convention boundary disputes.
+    """
+    required_cols = {"PERIOD", "EVENTMSGTYPE", "PCTIMESTRING"}
+    if not required_cols.issubset(df.columns):
+        return df.reset_index(drop=True)
+
+    result = df.reset_index(drop=True)
+    live_action_types = {1, 2, 4, 5, 10}
+
+    while True:
+        period_values = pd.to_numeric(result["PERIOD"], errors="coerce")
+        event_types = pd.to_numeric(result["EVENTMSGTYPE"], errors="coerce")
+        moved = False
+
+        for period in sorted(period_values.dropna().astype(int).unique()):
+            period_indices = result.index[period_values == period].tolist()
+            if not period_indices:
+                continue
+            start_indices = [
+                idx for idx in period_indices if event_types.loc[idx] == 12
+            ]
+            if not start_indices:
+                continue
+
+            first_period_idx = period_indices[0]
+            first_start_idx = start_indices[0]
+            if first_start_idx == first_period_idx:
+                continue
+
+            prior_period_indices = [
+                idx for idx in period_indices if idx < first_start_idx
+            ]
+            start_clock = _period_start_clock(period)
+            prior_clocks = result.loc[
+                prior_period_indices, "PCTIMESTRING"
+            ].astype(str).str.strip()
+            if not prior_clocks.eq(start_clock).all():
+                continue
+
+            prior_types = event_types.loc[prior_period_indices].dropna().astype(int)
+            if not prior_types.isin(live_action_types).any():
+                continue
+
+            order = result.index.tolist()
+            order.remove(first_start_idx)
+            insert_at = order.index(first_period_idx)
+            order.insert(insert_at, first_start_idx)
+            result = result.loc[order].reset_index(drop=True)
+            moved = True
+            break
+
+        if not moved:
+            return result
+
+
 def patch_start_of_periods(
     game_df: pd.DataFrame,
     game_id: str,
@@ -173,7 +241,7 @@ def patch_start_of_periods(
     all_periods_in_game = set(df["PERIOD"].dropna().astype(int).unique())
     missing_periods = all_periods_in_game - existing_periods
     if not missing_periods or fetch_pbp_v3_fn is None:
-        return df.reset_index(drop=True)
+        return _move_existing_period_start_before_initial_live_action(df)
 
     df_v3 = fetch_pbp_v3_fn(game_id)
     if (
@@ -182,7 +250,7 @@ def patch_start_of_periods(
         or "actionType" not in df_v3.columns
         or "subType" not in df_v3.columns
     ):
-        return df.reset_index(drop=True)
+        return _move_existing_period_start_before_initial_live_action(df)
 
     mask = (
         df_v3["actionType"].astype(str).str.lower().eq("period")
@@ -190,7 +258,7 @@ def patch_start_of_periods(
     )
     starts = df_v3.loc[mask]
     if starts.empty:
-        return df.reset_index(drop=True)
+        return _move_existing_period_start_before_initial_live_action(df)
 
     period_to_eventnum: Dict[int, int] = {}
     for _, row in starts.iterrows():
@@ -215,7 +283,7 @@ def patch_start_of_periods(
         )
         df = _insert_row_before_period(df, start_row, period)
 
-    return df.reset_index(drop=True)
+    return _move_existing_period_start_before_initial_live_action(df)
 
 
 def enrich_clocks_with_v3(
