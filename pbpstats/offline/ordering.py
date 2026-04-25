@@ -75,7 +75,13 @@ def dedupe_with_v3(
     df_v3 = df_v3.dropna(subset=["actionNumber"])
     valid_nums = set(df_v3["actionNumber"].astype(int).tolist())
 
-    df = df[df["EVENTNUM"].isin(valid_nums)].copy()
+    explicit_override_mask = pd.Series(False, index=df.index)
+    if "PBP_ROW_OVERRIDE_ACTION" in df.columns:
+        explicit_override_mask = (
+            df["PBP_ROW_OVERRIDE_ACTION"].fillna("").astype(str).str.strip() != ""
+        )
+
+    df = df[df["EVENTNUM"].isin(valid_nums) | explicit_override_mask].copy()
     df = df.drop_duplicates(subset=["GAME_ID", "EVENTNUM"], keep="first")
     return df
 

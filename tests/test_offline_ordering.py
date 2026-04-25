@@ -1,6 +1,6 @@
 import pandas as pd
 
-from pbpstats.offline.ordering import patch_start_of_periods
+from pbpstats.offline.ordering import dedupe_with_v3, patch_start_of_periods
 
 
 def _row(eventnum, period, msg_type=1, clock="11:59"):
@@ -114,3 +114,26 @@ def test_patch_start_of_periods_leaves_period_start_after_exact_start_technical_
     patched = patch_start_of_periods(game_df, "0021700394", fetch_pbp_v3_fn=None)
 
     assert patched["EVENTNUM"].tolist() == [200, 201, 202, 203]
+
+
+def test_dedupe_with_v3_preserves_explicit_pbp_row_override_rows():
+    game_df = pd.DataFrame(
+        [
+            _row(147, 2, msg_type=6, clock="7:59"),
+            {
+                **_row(148, 2, msg_type=8, clock="7:59"),
+                "PBP_ROW_OVERRIDE_ACTION": "insert_sub_before",
+            },
+            _row(149, 2, msg_type=8, clock="7:59"),
+        ]
+    )
+    v3_df = pd.DataFrame(
+        [
+            {"actionNumber": 147},
+            {"actionNumber": 149},
+        ]
+    )
+
+    deduped = dedupe_with_v3(game_df, "0020400335", fetch_pbp_v3_fn=lambda _: v3_df)
+
+    assert deduped["EVENTNUM"].tolist() == [147, 148, 149]
