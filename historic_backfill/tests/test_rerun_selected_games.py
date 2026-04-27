@@ -7,8 +7,8 @@ import pandas as pd
 
 sys.path.append(str(Path(__file__).resolve().parents[1]))
 
-import rerun_selected_games as rerun
-from rerun_selected_games import _expand_game_id_tokens, _load_game_ids
+import historic_backfill.runners.rerun_selected_games as rerun
+from historic_backfill.runners.rerun_selected_games import _expand_game_id_tokens, _load_game_ids
 
 
 def test_expand_game_id_tokens_supports_comma_and_space_separated_values() -> None:

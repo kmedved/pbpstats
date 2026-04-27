@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from build_fork_repair_catalog import build_catalog
+from historic_backfill.runners.build_fork_repair_catalog import build_catalog
 
 
 def test_catalog_contains_turnover_gate_and_processor_patterns() -> None:

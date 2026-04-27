@@ -7,7 +7,7 @@ import pandas as pd
 
 sys.path.append(str(Path(__file__).resolve().parents[1]))
 
-from trace_player_stints_game import (
+from historic_backfill.audits.cross_source.trace_player_stints_game import (
     _build_player_stints,
     _classify_largest_discrepancy_cause,
 )

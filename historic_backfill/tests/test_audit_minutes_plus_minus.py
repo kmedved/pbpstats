@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from audit_minutes_plus_minus import (
+from historic_backfill.audits.core.minutes_plus_minus import (
     build_minutes_plus_minus_audit,
     load_official_boxscore_batch_df,
     load_official_boxscore_df,

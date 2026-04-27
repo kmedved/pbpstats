@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 
-from summarize_opening_cluster_pass0 import _delta_metrics, _extract_metrics
+from historic_backfill.runners.summarize_opening_cluster_pass0 import _delta_metrics, _extract_metrics
 
 
 def test_extract_metrics_reads_lineup_and_boxscore_fields() -> None:

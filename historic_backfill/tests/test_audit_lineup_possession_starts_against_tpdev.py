@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pandas as pd
 
-from audit_lineup_possession_starts_against_tpdev import (
+from historic_backfill.audits.cross_source.lineup_possession_starts import (
     _lineup_match_disposition,
     _load_tpdev_team_rows,
     _parser_lineup_at_possession_start,

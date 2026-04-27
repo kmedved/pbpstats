@@ -5,7 +5,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from build_minutes_cross_source_report import (
+from historic_backfill.audits.cross_source.build_minutes_cross_source_report import (
     MINUTE_MATCH_TOLERANCE,
     build_minutes_cross_source_report,
     summarize_minutes_cross_source_report,

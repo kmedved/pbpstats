@@ -23,9 +23,8 @@ Starting `pbpstats` commit: `e53dab5ac6ad12e4d6fc59d634c4bbc89d6be6ee`.
 | `replace_tpdev/audit_lineup_possession_starts_against_tpdev.py` | `historic_backfill/audits/cross_source/lineup_possession_starts.py` | Cross-source diagnostic. |
 | `replace_tpdev/bbr_*.py` | `historic_backfill/audits/cross_source/` | Optional BBR diagnostics. |
 | `replace_tpdev/cautious_rerun.py` | `historic_backfill/runners/cautious_rerun.py` | Bulk orchestration. |
-| `replace_tpdev/0c2_build_tpdev_box_stats_version_v9b.py` | `historic_backfill/runners/0c2_build_tpdev_box_stats_version_v9b.py` | Runtime companion script. |
+| `replace_tpdev/0c2_build_tpdev_box_stats_version_v9b.py` | `historic_backfill/runners/build_tpdev_box_stats_v9b.py` | Runtime companion script renamed to an importable module name. |
 | `replace_tpdev/phase7_mechanics_fullrun_v4_release_explainer_20260425.md` | `historic_backfill/releases/v4_1997_2020_20260424_mechanics_fullrun/closure_note.md` | Immutable v4 release note. |
 | `replace_tpdev/reviewed_frontier_policy_overlay_20260424_mechanics_fullrun_v4.csv` | `historic_backfill/releases/v4_1997_2020_20260424_mechanics_fullrun/policy/` | Immutable v4 release policy. |
 | `replace_tpdev/phase7_open_blocker_inventory_20260424_mechanics_fullrun_v4.csv` | `historic_backfill/releases/v4_1997_2020_20260424_mechanics_fullrun/inventories/` | Immutable v4 release inventory. |
 | `replace_tpdev/phase7_true_blocker_shortlist_20260424_mechanics_fullrun_v4.csv` | `historic_backfill/releases/v4_1997_2020_20260424_mechanics_fullrun/inventories/` | Immutable v4 release inventory. |
-

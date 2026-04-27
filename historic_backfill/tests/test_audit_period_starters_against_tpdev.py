@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from audit_period_starters_against_tpdev import build_period_starter_audit
+from historic_backfill.audits.cross_source.period_starters import build_period_starter_audit
 
 
 def test_build_period_starter_audit_handles_missing_tpdev_rows(monkeypatch, tmp_path: Path):

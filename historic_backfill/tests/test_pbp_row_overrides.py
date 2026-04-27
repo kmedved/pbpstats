@@ -5,7 +5,7 @@ import pandas as pd
 
 sys.path.append(str(Path(__file__).resolve().parents[1]))
 
-from pbp_row_overrides import (
+from historic_backfill.catalogs.pbp_row_overrides import (
     apply_pbp_row_overrides,
     _resolve_default_pbp_row_overrides_path,
 )

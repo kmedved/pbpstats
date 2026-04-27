@@ -11,7 +11,7 @@ REPO_ROOT = TESTS_DIR.parent
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from lineup_correction_manifest import (
+from historic_backfill.catalogs.lineup_correction_manifest import (
     DEFAULT_DB_PATH,
     DEFAULT_FILE_DIRECTORY,
     DEFAULT_OVERRIDES_DIR,

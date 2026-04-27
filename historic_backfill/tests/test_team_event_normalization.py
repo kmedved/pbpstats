@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pandas as pd
 
-from team_event_normalization import normalize_single_game_team_events
+from historic_backfill.common.team_event_normalization import normalize_single_game_team_events
 
 
 def test_home_side_team_rebound_becomes_real_team_row() -> None:

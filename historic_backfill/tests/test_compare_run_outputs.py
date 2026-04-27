@@ -4,7 +4,7 @@ import json
 
 import pandas as pd
 
-from compare_run_outputs import (
+from historic_backfill.runners.compare_run_outputs import (
     INVALID_TEAM_TECH_NORMALIZATION,
     compare_runs,
     summarize_output_dir,

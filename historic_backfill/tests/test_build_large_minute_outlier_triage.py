@@ -4,7 +4,7 @@ import json
 
 import pandas as pd
 
-from build_large_minute_outlier_triage import (
+from historic_backfill.audits.cross_source.build_large_minute_outlier_triage import (
     _build_candidate_rows_for_game,
     _build_later_sub_in_map,
     _diff_bucket_seconds,

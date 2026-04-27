@@ -5,8 +5,8 @@ from pathlib import Path
 
 import pandas as pd
 
-from bbr_boxscore_loader import load_bbr_boxscore_df
-from bbr_pbp_lookup import BbrGameMatch, NbaGameContext
+from historic_backfill.audits.cross_source.bbr_boxscore_loader import load_bbr_boxscore_df
+from historic_backfill.audits.cross_source.bbr_pbp_lookup import BbrGameMatch, NbaGameContext
 
 
 def _create_player_basic_db(path: Path, rows: list[tuple]) -> None:

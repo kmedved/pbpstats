@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pandas as pd
 
-from player_id_normalization import normalize_single_game_player_ids
+from historic_backfill.common.player_id_normalization import normalize_single_game_player_ids
 
 
 def _official_boxscore(players: list[dict[str, object]]) -> pd.DataFrame:

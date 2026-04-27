@@ -1,7 +1,7 @@
 import pandas as pd
 
-from check_pbp_row_override_necessity import _compare_boxes, _result_row
-from override_necessity_utils import GameVariantMetrics, diff_pipeline_metrics
+from historic_backfill.runners.check_pbp_row_override_necessity import _compare_boxes, _result_row
+from historic_backfill.common.override_necessity_utils import GameVariantMetrics, diff_pipeline_metrics
 
 
 def _box_row(player_id: int, team_id: int, **stats: int) -> dict:

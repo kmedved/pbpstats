@@ -9,7 +9,7 @@ REPO_ROOT = TESTS_DIR.parent
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-import run_lineup_correction_probe as probe
+import historic_backfill.runners.run_lineup_correction_probe as probe
 
 
 def test_set_correction_statuses_activates_by_episode() -> None:

@@ -1,6 +1,6 @@
 import pandas as pd
 
-from recheck_overrides_against_bbr_pbp import _load_player_crosswalk, _row_override_game_rows
+from historic_backfill.audits.cross_source.recheck_overrides_against_bbr_pbp import _load_player_crosswalk, _row_override_game_rows
 
 
 class _StubContext:

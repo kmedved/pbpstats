@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from audit_fork_repair_usage import (
+from historic_backfill.audits.core.fork_repair_usage import (
     _load_game_ids_from_file,
     _instrument_fix_event_order_source,
     _instrument_silent_ft_source,

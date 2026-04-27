@@ -4,7 +4,7 @@ import json
 
 import pandas as pd
 
-from build_fork_repair_disposition_report import build_report
+from historic_backfill.runners.build_fork_repair_disposition_report import build_report
 
 
 def test_build_report_classifies_turnover_gate_and_manualization_candidates(tmp_path):

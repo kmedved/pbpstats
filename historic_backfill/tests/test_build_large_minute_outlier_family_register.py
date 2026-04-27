@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pandas as pd
 
-from build_large_minute_outlier_family_register import (
+from historic_backfill.audits.cross_source.build_large_minute_outlier_family_register import (
     _choose_primary_family,
     _classify_large_outlier_row,
     _consensus_label,

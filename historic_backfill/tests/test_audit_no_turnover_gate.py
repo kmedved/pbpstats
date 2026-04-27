@@ -1,5 +1,5 @@
-from audit_no_turnover_gate import _comparison_label
-from override_necessity_utils import GameVariantMetrics
+from historic_backfill.audits.core.no_turnover_gate import _comparison_label
+from historic_backfill.common.override_necessity_utils import GameVariantMetrics
 
 
 def test_comparison_label_marks_variant_worse_when_audit_rows_increase():

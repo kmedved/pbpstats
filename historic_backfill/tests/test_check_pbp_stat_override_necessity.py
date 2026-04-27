@@ -1,7 +1,7 @@
 import pandas as pd
 
-from check_pbp_stat_override_necessity import _result_row
-from override_necessity_utils import GameVariantMetrics
+from historic_backfill.runners.check_pbp_stat_override_necessity import _result_row
+from historic_backfill.common.override_necessity_utils import GameVariantMetrics
 
 
 def _box_row(player_id=1, team_id=2, **stats):

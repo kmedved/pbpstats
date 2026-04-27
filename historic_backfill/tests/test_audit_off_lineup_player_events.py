@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 
-from audit_off_lineup_player_events import _find_off_lineup_player_rows, _nearest_substitution_context
+from historic_backfill.audits.core.off_lineup_player_events import _find_off_lineup_player_rows, _nearest_substitution_context
 
 
 class _BaseEvent:

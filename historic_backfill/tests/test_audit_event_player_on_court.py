@@ -3,7 +3,7 @@ from pathlib import Path
 
 sys.path.append(str(Path(__file__).resolve().parents[1]))
 
-from audit_event_player_on_court import _check_event_players
+from historic_backfill.audits.core.event_player_on_court import _check_event_players
 
 
 TEAM_ID = 1610612744

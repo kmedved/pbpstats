@@ -8,7 +8,7 @@ REPO_ROOT = TESTS_DIR.parent
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-import cautious_rerun as runner
+import historic_backfill.runners.cautious_rerun as runner
 
 
 def _write_runtime_sources(base_dir: Path) -> dict[str, Path]:

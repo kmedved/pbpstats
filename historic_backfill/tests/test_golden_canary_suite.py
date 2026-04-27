@@ -2,8 +2,8 @@ import argparse
 import json
 from pathlib import Path
 
-import run_golden_canary_suite as golden
-from run_golden_canary_suite import _case_expectations, _case_fail_reasons
+import historic_backfill.runners.run_golden_canary_suite as golden
+from historic_backfill.runners.run_golden_canary_suite import _case_expectations, _case_fail_reasons
 
 
 def test_positive_canary_defaults_to_clean_expectations() -> None:

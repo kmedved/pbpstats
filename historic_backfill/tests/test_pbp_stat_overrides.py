@@ -1,6 +1,6 @@
 import pandas as pd
 
-from pbp_stat_overrides import apply_pbp_stat_overrides, load_pbp_stat_overrides
+from historic_backfill.catalogs.pbp_stat_overrides import apply_pbp_stat_overrides, load_pbp_stat_overrides
 
 
 def test_load_pbp_stat_overrides_normalizes_rows(tmp_path):

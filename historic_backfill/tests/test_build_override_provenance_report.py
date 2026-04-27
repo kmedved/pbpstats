@@ -1,6 +1,6 @@
 import pandas as pd
 
-from build_override_provenance_report import _tpdev_basic_value
+from historic_backfill.audits.cross_source.build_override_provenance_report import _tpdev_basic_value
 
 
 def test_tpdev_basic_value_reads_direct_stat():

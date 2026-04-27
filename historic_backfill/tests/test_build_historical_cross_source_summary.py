@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from build_historical_cross_source_summary import build_summary
+from historic_backfill.audits.cross_source.build_historical_cross_source_summary import build_summary
 
 
 def test_build_summary_aggregates_key_counts(tmp_path: Path):

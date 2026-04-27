@@ -3,7 +3,7 @@ import json
 import pandas as pd
 import pbpstats
 
-from boxscore_audit import (
+from historic_backfill.audits.core.boxscore import (
     build_game_boxscore_audit,
     build_pbp_boxscore_from_stat_rows,
     write_boxscore_audit_outputs,

@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pandas as pd
 
-import run_phase7_full_history_validation as phase7
+import historic_backfill.runners.run_phase7_full_history_validation as phase7
 
 
 TEST_COMPILE_SUMMARY = {

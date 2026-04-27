@@ -1,6 +1,6 @@
 import pandas as pd
 
-from bbr_pbp_stats import aggregate_bbr_player_stats, normalize_person_name
+from historic_backfill.audits.cross_source.bbr_pbp_stats import aggregate_bbr_player_stats, normalize_person_name
 
 
 def test_aggregate_bbr_player_stats_counts_made_shots_assists_and_rebounds():

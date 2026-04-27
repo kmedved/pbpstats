@@ -3,7 +3,7 @@ from __future__ import annotations
 import sqlite3
 from datetime import date
 
-from bbr_pbp_lookup import (
+from historic_backfill.audits.cross_source.bbr_pbp_lookup import (
     BbrGameMatch,
     candidate_bbr_team_codes,
     load_bbr_play_by_play_rows,

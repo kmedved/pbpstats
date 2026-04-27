@@ -1,6 +1,6 @@
 import pandas as pd
 
-from boxscore_source_overrides import (
+from historic_backfill.catalogs.boxscore_source_overrides import (
     BOXSCORE_SOURCE_COLUMNS,
     apply_boxscore_response_overrides,
 )
