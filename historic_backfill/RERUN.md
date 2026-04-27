@@ -7,7 +7,7 @@ cd /Users/konstantinmedvedovsky/migrate_tpdev/pbpstats
 ```
 
 Use Python 3.10 or newer; `pyproject.toml` intentionally no longer advertises
-Python 3.8 compatibility for this private fork.
+pre-3.10 compatibility for this private fork.
 
 ## 1. Verify Imports And Unit Tests
 
