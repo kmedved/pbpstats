@@ -7,8 +7,13 @@ from typing import Any, Dict, Iterable, List
 
 import pandas as pd
 
-from historic_backfill.audits.cross_source.period_starters import DEFAULT_DB_PATH, DEFAULT_PARQUET_PATH, _normalize_game_id
-from historic_backfill.audits.cross_source.trace_player_stints_game import _collect_game_events, _load_game_context, _normalize_lineups
+from historic_backfill.common.game_context import (
+    DEFAULT_DB_PATH,
+    DEFAULT_PARQUET_PATH,
+    _load_game_context,
+    _normalize_game_id,
+)
+from historic_backfill.common.lineups import _collect_game_events, _normalize_lineups
 
 
 IGNORED_EVENT_CLASSES = {"StatsJumpBall", "StatsSubstitution"}

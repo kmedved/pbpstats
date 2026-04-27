@@ -8,17 +8,17 @@ from typing import Any, Dict, Iterable, List
 
 import pandas as pd
 
-from historic_backfill.audits.cross_source.period_starters import (
+from historic_backfill.common.game_context import (
     DEFAULT_DB_PATH,
+    DEFAULT_FILE_DIRECTORY,
     DEFAULT_PARQUET_PATH,
     _normalize_game_id,
 )
-from historic_backfill.audits.cross_source.trace_player_stints_game import (
-    DEFAULT_FILE_DIRECTORY,
+from historic_backfill.common.lineups import (
     _collect_game_events,
-    _load_game_context,
     _normalize_lineups,
 )
+from historic_backfill.common.game_context import _load_game_context
 
 
 TEAM_ID_FLOOR = 1000000000
