@@ -26,8 +26,11 @@ Core backfill uses NBA-only local data:
 ```text
 historic_backfill/data/nba_raw.db
 historic_backfill/data/playbyplayv2.parq
-historic_backfill/data/playbyplayv3.parq
 ```
+
+The bulk runner reads v3 `pbpv3` actions from `nba_raw.db`. A separate
+`playbyplayv3.parq` can live under `historic_backfill/data/` for parquet-direct
+experiments, but it is not a required `cautious_rerun.py` input.
 
 Optional evidence diagnostics use:
 
@@ -70,10 +73,9 @@ PYTHONPATH=. python -m historic_backfill.runners.validate --scope=provenance
 
 `historic_backfill/runners/cautious_rerun.py` remains the bulk orchestration
 entrypoint. Its defaults resolve under `historic_backfill/data/` and
-`historic_backfill/catalogs/`.
-The runner snapshots `nba_raw.db`, `playbyplayv2.parq`, and
-`playbyplayv3.parq` into each run cache; use `--pbp-v3-path` if the v3 source
-lives somewhere else.
+`historic_backfill/catalogs/`. The runner snapshots `nba_raw.db` and
+`playbyplayv2.parq` into each run cache; v3 actions are fetched from the
+`pbpv3` endpoint stored inside `nba_raw.db`.
 
 Check its current CLI before a full run:
 

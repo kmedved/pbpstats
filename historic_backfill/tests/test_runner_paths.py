@@ -14,7 +14,6 @@ def test_cautious_rerun_defaults_point_to_historic_backfill_data_and_catalogs():
     assert cautious_rerun.NOTEBOOK_DUMP == HISTORIC_ROOT / "runners" / "build_tpdev_box_stats_v9b.py"
     assert cautious_rerun.DEFAULT_DB == HISTORIC_ROOT / "data" / "nba_raw.db"
     assert cautious_rerun.DEFAULT_PARQUET == HISTORIC_ROOT / "data" / "playbyplayv2.parq"
-    assert cautious_rerun.DEFAULT_PBP_V3 == HISTORIC_ROOT / "data" / "playbyplayv3.parq"
     assert cautious_rerun.DEFAULT_OVERRIDES == HISTORIC_ROOT / "catalogs" / "validation_overrides.csv"
 
 

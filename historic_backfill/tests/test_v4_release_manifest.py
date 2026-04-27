@@ -105,3 +105,18 @@ def test_v4_release_sidecar_validation_rejects_bad_summary_counts(tmp_path):
     errors = validate_manifest(release_copy / "release_manifest.json")
 
     assert any("row_count does not match" in error for error in errors)
+
+
+def test_v4_release_sidecar_validation_recomputes_summary_count_dictionaries(tmp_path):
+    release_copy = tmp_path / "release"
+    shutil.copytree(RELEASE_DIR, release_copy)
+    summary_path = release_copy / "sidecar" / "summary.json"
+    summary_text = summary_path.read_text(encoding="utf-8")
+    summary_path.write_text(
+        summary_text.replace('"reviewed_override": 13', '"reviewed_override": 12'),
+        encoding="utf-8",
+    )
+
+    errors = validate_manifest(release_copy / "release_manifest.json")
+
+    assert any("policy_source_counts do not match" in error for error in errors)

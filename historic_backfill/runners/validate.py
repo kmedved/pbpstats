@@ -9,6 +9,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Iterable
 
+from historic_backfill.catalogs.lineup_correction_manifest import validate_manifest_schema
 from historic_backfill.catalogs.loader import validate_historic_pbp_row_override_catalog
 
 
@@ -17,7 +18,6 @@ ROOT = Path(__file__).resolve().parents[1]
 CORE_INPUTS = (
     "data/nba_raw.db",
     "data/playbyplayv2.parq",
-    "data/playbyplayv3.parq",
 )
 OPTIONAL_CROSS_SOURCE_INPUTS = (
     "data/bbr/bbref_boxscores.db",
@@ -111,7 +111,10 @@ def _validate_core_catalogs(root: Path) -> list[str]:
         ),
         (
             root / "catalogs" / "overrides" / "correction_manifest.json",
-            lambda path: _validate_json_keys(path, CORRECTION_MANIFEST_REQUIRED_KEYS),
+            lambda path: (
+                _validate_json_keys(path, CORRECTION_MANIFEST_REQUIRED_KEYS),
+                validate_manifest_schema(path),
+            ),
         ),
     ]
     errors: list[str] = []

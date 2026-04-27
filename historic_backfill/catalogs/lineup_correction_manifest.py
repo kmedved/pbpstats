@@ -263,6 +263,68 @@ def write_manifest(manifest: dict[str, Any], path: Path = DEFAULT_MANIFEST_PATH)
     _write_json(path.resolve(), manifest)
 
 
+def validate_manifest_schema(path: Path = DEFAULT_MANIFEST_PATH) -> None:
+    """Validate correction manifest structure without loading NBA runtime data."""
+    manifest = load_manifest(path)
+    seen_ids: set[str] = set()
+    seen_period_keys: set[tuple[str, int, int]] = set()
+    seen_window_ranges: dict[tuple[str, int, int], list[tuple[int, int, str]]] = {}
+
+    for correction in sorted(manifest.get("corrections", []), key=_correction_sort_key):
+        _validate_correction_record(correction, seen_ids)
+        if correction.get("status") != "active":
+            continue
+
+        correction_id = str(correction["correction_id"])
+        game_id = str(correction["game_id"])
+        period = int(correction["period"])
+        team_id = int(correction["team_id"])
+        scope_type = str(correction["scope_type"])
+
+        if correction.get("authoring_mode") == "explicit":
+            lineup = correction.get("lineup_player_ids")
+            if not isinstance(lineup, list):
+                raise ManifestValidationError(
+                    f"Correction {correction_id} is explicit but missing lineup_player_ids"
+                )
+            try:
+                parsed_lineup = [int(player_id) for player_id in lineup]
+            except (TypeError, ValueError) as exc:
+                raise ManifestValidationError(
+                    f"Correction {correction_id} has non-integer lineup_player_ids"
+                ) from exc
+            _validate_lineup_shape(parsed_lineup, correction_id)
+
+        if scope_type == "period_start":
+            period_key = (game_id, period, team_id)
+            if period_key in seen_period_keys:
+                raise ManifestValidationError(
+                    f"Duplicate active period_start correction for {game_id} P{period} T{team_id}"
+                )
+            seen_period_keys.add(period_key)
+            continue
+
+        if scope_type in {"window", "event"}:
+            start_event_num = int(correction["start_event_num"])
+            end_event_num = int(correction["end_event_num"])
+            if end_event_num < start_event_num:
+                raise ManifestValidationError(
+                    f"Correction {correction_id} has end_event_num < start_event_num"
+                )
+            range_key = (game_id, period, team_id)
+            for prior_start, prior_end, prior_id in seen_window_ranges.get(range_key, []):
+                if max(prior_start, start_event_num) <= min(prior_end, end_event_num):
+                    raise ManifestValidationError(
+                        f"Correction {correction_id} overlaps active correction {prior_id} "
+                        f"for {game_id} P{period} T{team_id}"
+                    )
+            seen_window_ranges.setdefault(range_key, []).append(
+                (start_event_num, end_event_num, correction_id)
+            )
+
+    _validate_residual_annotations(manifest)
+
+
 def _load_raw_boxscore_response(db_path: Path, game_id: str) -> dict[str, Any]:
     conn = sqlite3.connect(db_path)
     try:

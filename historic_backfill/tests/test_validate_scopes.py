@@ -39,7 +39,6 @@ def test_core_validation_requires_nba_inputs_without_checking_cross_source(tmp_p
     for rel_path in (
         "data/nba_raw.db",
         "data/playbyplayv2.parq",
-        "data/playbyplayv3.parq",
     ):
         _touch(tmp_path, rel_path)
     _write_core_catalogs(tmp_path)
@@ -57,7 +56,6 @@ def test_core_validation_reports_invalid_catalogs(tmp_path):
     for rel_path in (
         "data/nba_raw.db",
         "data/playbyplayv2.parq",
-        "data/playbyplayv3.parq",
     ):
         _touch(tmp_path, rel_path)
     _write_core_catalogs(tmp_path)
@@ -101,7 +99,6 @@ def test_core_validation_reports_invalid_non_pbp_row_catalogs(tmp_path, rel_path
     for input_path in (
         "data/nba_raw.db",
         "data/playbyplayv2.parq",
-        "data/playbyplayv3.parq",
     ):
         _touch(tmp_path, input_path)
     _write_core_catalogs(tmp_path)
@@ -111,6 +108,46 @@ def test_core_validation_reports_invalid_non_pbp_row_catalogs(tmp_path, rel_path
 
     assert result.ok is False
     assert result.validation_errors
+
+
+def test_core_validation_reports_invalid_correction_manifest_semantics(tmp_path):
+    for input_path in (
+        "data/nba_raw.db",
+        "data/playbyplayv2.parq",
+    ):
+        _touch(tmp_path, input_path)
+    _write_core_catalogs(tmp_path)
+    (tmp_path / "catalogs" / "overrides" / "correction_manifest.json").write_text(
+        """
+{
+  "manifest_version": "test",
+  "corrections": [
+    {
+      "correction_id": "bad_lineup",
+      "status": "active",
+      "domain": "lineup",
+      "scope_type": "period_start",
+      "authoring_mode": "explicit",
+      "game_id": "0029700001",
+      "period": 1,
+      "team_id": 1610612740,
+      "lineup_player_ids": [1, 2, 3, 4],
+      "reason_code": "test",
+      "evidence_summary": "test",
+      "source_primary": "manual_trace",
+      "preferred_source": "manual_trace"
+    }
+  ],
+  "residual_annotations": []
+}
+""",
+        encoding="utf-8",
+    )
+
+    result = validate_scope("core", root=tmp_path)
+
+    assert result.ok is False
+    assert any("does not resolve to 5 players" in error for error in result.validation_errors)
 
 
 def test_cross_source_validation_skips_missing_optional_inputs(tmp_path):

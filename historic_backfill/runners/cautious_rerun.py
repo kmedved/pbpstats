@@ -30,7 +30,6 @@ DATA_ROOT = ROOT / "data"
 NOTEBOOK_DUMP = RUNNERS_ROOT / "build_tpdev_box_stats_v9b.py"
 DEFAULT_DB = DATA_ROOT / "nba_raw.db"
 DEFAULT_PARQUET = DATA_ROOT / "playbyplayv2.parq"
-DEFAULT_PBP_V3 = DATA_ROOT / "playbyplayv3.parq"
 DEFAULT_OVERRIDES = CATALOGS_ROOT / "validation_overrides.csv"
 DEFAULT_BOXSCORE_SOURCE_OVERRIDES = CATALOGS_ROOT / "boxscore_source_overrides.csv"
 DEFAULT_FILE_DIRECTORY = DATA_ROOT
@@ -383,7 +382,6 @@ def prepare_local_runtime_inputs(
     cache_dir: Path,
     db_path: Path = DEFAULT_DB,
     parquet_path: Path = DEFAULT_PARQUET,
-    pbp_v3_path: Path = DEFAULT_PBP_V3,
     overrides_path: Path = DEFAULT_OVERRIDES,
     boxscore_source_overrides_path: Path = DEFAULT_BOXSCORE_SOURCE_OVERRIDES,
     period_starter_parquet_paths: Iterable[Path] = DEFAULT_PERIOD_STARTERS_PARQUETS,
@@ -401,7 +399,6 @@ def prepare_local_runtime_inputs(
         "build_tpdev_box_stats_v9b.py",
         "nba_raw.db",
         "playbyplayv2.parq",
-        "playbyplayv3.parq",
         "boxscore_source_overrides.csv",
         "period_starters_v6.parquet",
         "period_starters_v5.parquet",
@@ -418,9 +415,16 @@ def prepare_local_runtime_inputs(
         else {"entries": {}}
     )
 
-    def _hydrate_or_fallback(source_path: Path, *, allow_empty_fallback: bool) -> tuple[Path, Dict[str, Any]]:
+    def _hydrate_or_fallback(
+        source_path: Path,
+        *,
+        allow_empty_fallback: bool,
+        required: bool = True,
+    ) -> tuple[Path, Dict[str, Any]]:
         source_path = Path(source_path).resolve()
         cached_path = cache_dir / source_path.name
+        if required and not source_path.exists():
+            raise FileNotFoundError(f"Required runtime input not found: {source_path}")
         if (
             runtime_input_cache_mode == "reuse-latest-global-cache"
             and source_path.name in reuse_cached_names
@@ -491,10 +495,6 @@ def prepare_local_runtime_inputs(
         parquet_path,
         allow_empty_fallback=False,
     )
-    hydrated_pbp_v3_path, runtime_input_provenance["inputs"]["pbp_v3_path"] = _hydrate_or_fallback(
-        pbp_v3_path,
-        allow_empty_fallback=False,
-    )
     hydrated_notebook_dump_path, runtime_input_provenance["inputs"]["notebook_dump_path"] = _hydrate_or_fallback(
         NOTEBOOK_DUMP,
         allow_empty_fallback=False,
@@ -527,7 +527,11 @@ def prepare_local_runtime_inputs(
 
     hydrated_period_starter_paths: list[Path] = []
     for path in period_starter_parquet_paths:
-        hydrated_path, record = _hydrate_or_fallback(Path(path), allow_empty_fallback=False)
+        hydrated_path, record = _hydrate_or_fallback(
+            Path(path),
+            allow_empty_fallback=False,
+            required=False,
+        )
         hydrated_period_starter_paths.append(hydrated_path)
         runtime_input_provenance["period_starter_parquet_inputs"].append(record)
 
@@ -544,7 +548,6 @@ def prepare_local_runtime_inputs(
     return {
         "db_path": hydrated_db_path,
         "parquet_path": hydrated_parquet_path,
-        "pbp_v3_path": hydrated_pbp_v3_path,
         "notebook_dump_path": hydrated_notebook_dump_path,
         "preload_module_paths": hydrated_preload_module_paths,
         "overrides_path": hydrated_overrides_path,
@@ -975,7 +978,6 @@ def parse_args(argv: Iterable[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--db-path", type=Path, default=DEFAULT_DB)
     parser.add_argument("--parquet-path", type=Path, default=DEFAULT_PARQUET)
-    parser.add_argument("--pbp-v3-path", type=Path, default=DEFAULT_PBP_V3)
     parser.add_argument("--overrides-path", type=Path, default=DEFAULT_OVERRIDES)
     parser.add_argument("--file-directory", type=Path, default=DEFAULT_FILE_DIRECTORY)
     parser.add_argument("--strict-mode", action="store_true", default=False)
@@ -1003,7 +1005,6 @@ def main(argv: Iterable[str] | None = None) -> int:
         output_dir / "_local_runtime_cache",
         db_path=args.db_path.resolve(),
         parquet_path=args.parquet_path.resolve(),
-        pbp_v3_path=args.pbp_v3_path.resolve(),
         overrides_path=args.overrides_path.resolve(),
         allow_unreadable_csv_fallback=args.allow_unreadable_csv_fallback,
         file_directory=args.file_directory.resolve(),

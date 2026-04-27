@@ -32,9 +32,7 @@ def test_runtime_backfill_modules_do_not_import_cross_source_modules():
     for root in NO_CROSS_SOURCE_DIRS:
         for path in root.rglob("*.py"):
             for module in _imported_modules(path):
-                if module.startswith("historic_backfill.audits.cross_source"):
-                    offenders.append((path.relative_to(HISTORIC_ROOT).as_posix(), module))
-                if module.startswith("..cross_source") or module.startswith(".cross_source"):
+                if "cross_source" in module:
                     offenders.append((path.relative_to(HISTORIC_ROOT).as_posix(), module))
                 if "audit_period_starters_against_tpdev" in module:
                     offenders.append((path.relative_to(HISTORIC_ROOT).as_posix(), module))

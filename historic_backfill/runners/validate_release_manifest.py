@@ -6,6 +6,7 @@ import argparse
 import csv
 import hashlib
 import json
+from collections import Counter
 from pathlib import Path
 from typing import Any
 
@@ -119,6 +120,15 @@ def _validate_sidecar_contract(release_dir: Path) -> list[str]:
         errors.append("sidecar release_blocking_game_count does not match rows")
     if summary.get("research_open_game_count") != len(research_open_ids):
         errors.append("sidecar research_open_game_count does not match rows")
+    for field in (
+        "execution_lane",
+        "policy_source",
+        "release_gate_status",
+    ):
+        expected_counts = dict(Counter(row.get(field, "") for row in rows))
+        summary_key = f"{field}_counts"
+        if summary.get(summary_key) != expected_counts:
+            errors.append(f"sidecar {summary_key} do not match CSV rows")
 
     overlay_rows = _load_csv(
         release_dir

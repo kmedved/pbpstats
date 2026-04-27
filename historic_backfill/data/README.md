@@ -8,11 +8,16 @@ are large local data products.
 
 | File | Required for | Notes |
 | --- | --- | --- |
-| `nba_raw.db` | core backfill and NBA official boxscore lookups | Local SQLite cache of NBA stats endpoint payloads. |
+| `nba_raw.db` | core backfill, NBA official boxscore lookups, and v3 `pbpv3` actions | Local SQLite cache of NBA stats endpoint payloads. The bulk runner's `fetch_pbp_v3` reads the `pbpv3` endpoint from this DB. |
 | `playbyplayv2.parq` | v2 play-by-play DataFrame input | Historical NBA PBP source used by the backfill runner. |
-| `playbyplayv3.parq` | v3 companion rows for `fetch_pbp_v3_fn` | If an equivalent v3 source is used instead, document it here and pass it through runner options. |
 
 Missing required NBA files should make core validation fail clearly.
+
+## Optional NBA Companion Inputs
+
+| File | Used by | Notes |
+| --- | --- | --- |
+| `playbyplayv3.parq` | parquet-direct experiments or one-off `fetch_pbp_v3_fn` workflows | Not required by `cautious_rerun.py`; the bulk runner gets v3 actions from `nba_raw.db`. |
 
 ## Optional Cross-Source Diagnostics
 
@@ -38,7 +43,7 @@ Expected shape:
 historic_backfill/data/
   nba_raw.db
   playbyplayv2.parq
-  playbyplayv3.parq
+  playbyplayv3.parq          # optional parquet-direct companion
   bbr/
     bbref_boxscores.db
   tpdev/
@@ -47,4 +52,3 @@ historic_backfill/data/
     tpdev_box_new.parq
     tpdev_box_cdn.parq
 ```
-

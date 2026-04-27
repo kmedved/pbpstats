@@ -68,6 +68,32 @@ def test_patch_start_of_periods_inserts_later_period_start_before_first_period_e
     assert patched.iloc[2]["PERIOD"] == 3
 
 
+def test_patch_start_of_periods_inserts_overtime_start_with_five_minute_clock():
+    game_df = pd.DataFrame(
+        [
+            _row(501, 5, msg_type=1, clock="4:55"),
+        ]
+    )
+    v3_df = pd.DataFrame(
+        [
+            {
+                "actionType": "period",
+                "subType": "start",
+                "period": 5,
+                "actionNumber": 500,
+            }
+        ]
+    )
+
+    patched = patch_start_of_periods(game_df, "0029700001", fetch_pbp_v3_fn=lambda _: v3_df)
+
+    inserted = patched[patched["EVENTNUM"] == 500].iloc[0]
+    assert patched["EVENTNUM"].tolist() == [500, 501]
+    assert inserted["EVENTMSGTYPE"] == 12
+    assert inserted["PERIOD"] == 5
+    assert inserted["PCTIMESTRING"] == "5:00"
+
+
 def test_patch_start_of_periods_leaves_existing_q1_start_unchanged():
     game_df = pd.DataFrame(
         [

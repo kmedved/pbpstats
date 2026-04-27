@@ -90,6 +90,10 @@ def dedupe_with_v3(
     return df
 
 
+def _period_start_clock(period: int) -> str:
+    return "12:00" if int(period) <= 4 else "5:00"
+
+
 def _build_start_of_period_row(
     cols: List[str],
     game_id: str,
@@ -109,7 +113,7 @@ def _build_start_of_period_row(
     if "PERIOD" in cols:
         row["PERIOD"] = period
     if "PCTIMESTRING" in cols:
-        row["PCTIMESTRING"] = "12:00"
+        row["PCTIMESTRING"] = _period_start_clock(period)
 
     for fld in [
         "PLAYER1_ID",
@@ -146,10 +150,6 @@ def _insert_row_before_period(
         ],
         ignore_index=True,
     )
-
-
-def _period_start_clock(period: int) -> str:
-    return "12:00" if int(period) <= 4 else "5:00"
 
 
 def _move_existing_period_start_before_initial_live_action(df: pd.DataFrame) -> pd.DataFrame:
