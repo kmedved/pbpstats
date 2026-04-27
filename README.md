@@ -48,10 +48,26 @@ Install pre-commit:
 
 `pre-commit install`
 
-# `replace_tpdev` Compatibility Smoke
-This fork is consumed by the sibling historical pipeline at `../replace_tpdev`, so runtime refactors should be checked against its Golden Canary suite before being treated as safe.
+# Historic Backfill Pipeline
+This repo also hosts the in-tree historic backfill pipeline at `historic_backfill/`. It is the corpus-scale correction, audit, and release overlay for historic NBA games (mainly 1997-2020). It depends on `pbpstats` but is not part of the parser package; live/CDN-fed games go through `pbpstats` alone.
 
-Run the local compatibility smoke gate from the `pbpstats` repo root:
+Quick links:
+- `historic_backfill/README.md` for orientation and directory map
+- `historic_backfill/RERUN.md` for the operational runbook
+- `historic_backfill/releases/v4_1997_2020_20260424_mechanics_fullrun/` for the immutable v4 release record
+
+Scoped validation entrypoints:
+
+```
+PYTHONPATH=. python -m historic_backfill.runners.validate --scope=core
+PYTHONPATH=. python -m historic_backfill.runners.validate --scope=cross-source
+PYTHONPATH=. python -m historic_backfill.runners.validate --scope=provenance
+```
+
+`--scope=core` is the NBA-only input/catalog preflight and never touches BBR/tpdev paths. `--scope=cross-source` reports skipped diagnostics when optional BBR/tpdev inputs are absent. `--scope=provenance` is stricter and fails clearly when evidence files needed for re-review are missing.
+
+# Legacy `replace_tpdev` Compatibility Smoke
+A legacy compatibility gate at `scripts/run_replace_tpdev_compatibility_smoke.py` runs the Golden Canary suite from the standalone `replace_tpdev` workspace (the migration source) against the current editable `pbpstats` checkout. It defaults to `../replace_tpdev` and remains usable as long as that backup workspace is present.
 
 `python scripts/run_replace_tpdev_compatibility_smoke.py --replace-tpdev-root ../replace_tpdev`
 
@@ -60,3 +76,4 @@ Notes:
 - It exits non-zero if `failed_games`, `event_stats_errors`, or the Golden Canary suite pass flags are not clean.
 - If `--output-dir` is omitted, it writes to a temporary directory and prints the resolved path.
 - This is a local data-dependent gate; it is not part of GitHub Actions because CI does not have the sibling repo and historical runtime inputs.
+- For new work, prefer the in-tree `historic_backfill.runners.validate` workflow above.

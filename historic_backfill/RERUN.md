@@ -6,6 +6,9 @@ Run commands from the repo root:
 cd /Users/konstantinmedvedovsky/migrate_tpdev/pbpstats
 ```
 
+Use Python 3.10 or newer; `pyproject.toml` intentionally no longer advertises
+Python 3.8 compatibility for this private fork.
+
 ## 1. Verify Imports And Unit Tests
 
 ```bash
@@ -40,8 +43,10 @@ See `data/README.md` for the canonical local data layout.
 
 ## 3. Run Scoped Validation
 
-Core validation should fail clearly when required NBA data is missing. It should
-not require or inspect BBR/tpdev paths.
+Core validation is an input/catalog preflight. It should fail clearly when
+required NBA data is missing, and it should validate committed catalogs such as
+the PBP row override synthetic-sub canary. It should not require or inspect
+BBR/tpdev paths. A successful preflight is not a full corpus rerun.
 
 ```bash
 PYTHONPATH=. python -m historic_backfill.runners.validate --scope=core

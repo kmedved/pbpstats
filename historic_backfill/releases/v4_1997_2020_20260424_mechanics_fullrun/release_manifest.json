@@ -52,6 +52,8 @@
   },
   "path_policy": {
     "summary_files": "original_absolute_paths_preserved",
+    "policy_overlay_evidence_artifact": "original_absolute_paths_preserved_not_runtime_inputs",
+    "sidecar_summary_residual_dirs": "original_absolute_paths_preserved_not_runtime_inputs",
     "original_workspace_root": "/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev"
   },
   "authoritative_files": {

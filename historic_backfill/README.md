@@ -8,6 +8,8 @@ package. Live/CDN-fed games should be able to use `pbpstats` alone. Historic
 reruns use `pbpstats` plus the committed catalogs here, then validate through
 the NBA-only core audits.
 
+This private fork targets Python 3.10+.
+
 ## Runtime Model
 
 ```text
@@ -69,9 +71,9 @@ python -m historic_backfill.runners.validate --scope=provenance
 ```
 
 `core` checks required NBA runtime inputs and never checks BBR/tpdev paths.
-`cross-source` reports missing optional BBR/tpdev inputs as skipped diagnostics.
-`provenance` is stricter and fails when evidence files needed for re-review are
-missing.
+It is an input/catalog preflight, not a full corpus rerun. `cross-source`
+reports missing optional BBR/tpdev inputs as skipped diagnostics. `provenance`
+is stricter and fails when evidence files needed for re-review are missing.
 
 See `RERUN.md` for operational commands.
 

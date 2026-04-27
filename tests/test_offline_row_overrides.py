@@ -1,9 +1,11 @@
 import pandas as pd
+import pytest
 
 import pbpstats.offline.row_overrides as row_overrides
 from pbpstats.offline.row_overrides import (
     PBP_ROW_OVERRIDE_ACTION_COLUMN,
     apply_pbp_row_overrides,
+    load_pbp_row_overrides,
 )
 
 
@@ -37,6 +39,78 @@ def test_apply_pbp_row_overrides_moves_and_drops_rows():
     )
 
     assert result["EVENTNUM"].tolist() == [1, 2, 3, 5]
+
+
+def test_load_pbp_row_overrides_missing_path_raises(tmp_path):
+    with pytest.raises(FileNotFoundError):
+        load_pbp_row_overrides(tmp_path / "missing.csv")
+
+
+def test_load_pbp_row_overrides_missing_path_can_be_optional(tmp_path):
+    assert load_pbp_row_overrides(tmp_path / "missing.csv", missing_ok=True) == {}
+
+
+def test_load_pbp_row_overrides_rejects_unknown_action(tmp_path):
+    path = tmp_path / "overrides.csv"
+    path.write_text(
+        "game_id,action,event_num,anchor_event_num,notes\n"
+        "0029600442,teleport,3,2,nope\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="unknown override action"):
+        load_pbp_row_overrides(path)
+
+
+def test_load_pbp_row_overrides_rejects_missing_synthetic_fields(tmp_path):
+    path = tmp_path / "overrides.csv"
+    path.write_text(
+        "game_id,action,event_num,anchor_event_num,notes,player_out_id,player_out_name,player_in_id,player_in_name\n"
+        "0020400335,insert_sub_before,148,149,missing player in,2747,JR Smith,,\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="requires player_in_id"):
+        load_pbp_row_overrides(path)
+
+
+def test_load_pbp_row_overrides_rejects_self_anchor_move(tmp_path):
+    path = tmp_path / "overrides.csv"
+    path.write_text(
+        "game_id,action,event_num,anchor_event_num,notes\n"
+        "0029600442,move_before,3,3,self anchor\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="cannot anchor to itself"):
+        load_pbp_row_overrides(path)
+
+
+def test_apply_pbp_row_overrides_requires_single_game_frame():
+    df = pd.DataFrame(
+        {
+            "GAME_ID": ["0029600442", "0029600443"],
+            "EVENTNUM": [1, 2],
+            "EVENTMSGTYPE": [4, 4],
+        }
+    )
+
+    with pytest.raises(ValueError, match="single-game DataFrame"):
+        apply_pbp_row_overrides(df, overrides={})
+
+
+def test_apply_pbp_row_overrides_normalizes_float_like_game_ids():
+    df = _game_df([1, 3, 2]).assign(GAME_ID="29600442.0")
+    result = apply_pbp_row_overrides(
+        df,
+        {
+            "0029600442": [
+                {"action": "move_before", "event_num": 2, "anchor_event_num": 3},
+            ]
+        },
+    )
+
+    assert result["EVENTNUM"].tolist() == [1, 2, 3]
 
 
 def test_apply_pbp_row_overrides_marks_synthetic_sub_rows():

@@ -2,7 +2,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pandas as pd
+
 import historic_backfill.runners.cautious_rerun as runner
+from pbpstats.offline.row_overrides import PBP_ROW_OVERRIDE_ACTION_COLUMN
 
 
 def _write_runtime_sources(base_dir: Path) -> dict[str, Path]:
@@ -251,3 +254,41 @@ def test_prepare_local_runtime_inputs_reuse_validated_cache_refreshes_stale_entr
         refreshed_runtime_inputs["runtime_input_provenance"]["inputs"]["db_path"]["resolution_kind"]
         == "validated_run_cache_refresh"
     )
+
+
+def test_v9b_namespace_uses_historic_pbp_row_override_catalog():
+    namespace = runner.load_v9b_namespace()
+    game_df = pd.DataFrame(
+        {
+            "GAME_ID": ["0020400335"] * 2,
+            "EVENTNUM": [147, 149],
+            "EVENTMSGTYPE": [6, 8],
+            "EVENTMSGACTIONTYPE": [3, 0],
+            "PERIOD": [2, 2],
+            "PCTIMESTRING": ["7:59", "7:59"],
+            "WCTIMESTRING": ["8:59 PM", "8:59 PM"],
+            "HOMEDESCRIPTION": ["Baxter L.B.FOUL (P2.T2)", ""],
+            "NEUTRALDESCRIPTION": ["", ""],
+            "VISITORDESCRIPTION": ["", "SUB: Barry FOR Udrih"],
+            "SCORE": ["", ""],
+            "SCOREMARGIN": ["", ""],
+            "PLAYER1_ID": [2437, 2757],
+            "PLAYER1_NAME": ["Lonny Baxter", "Beno Udrih"],
+            "PLAYER1_TEAM_ID": [1610612740, 1610612759],
+            "PLAYER2_ID": [0, 699],
+            "PLAYER2_NAME": ["", "Brent Barry"],
+            "PLAYER2_TEAM_ID": ["", 1610612759],
+            "PLAYER3_ID": [0, 0],
+            "PLAYER3_NAME": ["", ""],
+            "PLAYER3_TEAM_ID": ["", ""],
+            "event_num": [147, 149],
+            "period": [2, 2],
+            "clock_seconds_remaining": [479.0, 479.0],
+            "description": ["Baxter L.B.FOUL (P2.T2)", "SUB: Barry FOR Udrih"],
+        }
+    )
+
+    result = namespace["apply_pbp_row_overrides"](game_df)
+    inserted = result[result["EVENTNUM"] == 148].iloc[0]
+
+    assert inserted[PBP_ROW_OVERRIDE_ACTION_COLUMN] == "insert_sub_before"

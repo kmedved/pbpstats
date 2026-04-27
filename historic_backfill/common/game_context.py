@@ -16,7 +16,7 @@ ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_PARQUET_PATH = ROOT / "data" / "playbyplayv2.parq"
 DEFAULT_PBP_V3_PATH = ROOT / "data" / "playbyplayv3.parq"
 DEFAULT_DB_PATH = ROOT / "data" / "nba_raw.db"
-DEFAULT_FILE_DIRECTORY = ROOT
+DEFAULT_FILE_DIRECTORY = ROOT / "data"
 
 _GAME_CONTEXT_NAMESPACE_CACHE: Dict[Tuple[Path, Path, int], Dict[str, Any]] = {}
 _GAME_CONTEXT_SEASON_PBP_CACHE: Dict[Tuple[Path, int], pd.DataFrame] = {}

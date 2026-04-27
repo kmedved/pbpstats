@@ -7,6 +7,7 @@ Documentation
 
    pbpstats.data_loader
    pbpstats.objects
+   pbpstats.offline
    pbpstats.resources
 
 Client

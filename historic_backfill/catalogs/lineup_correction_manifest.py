@@ -7,15 +7,18 @@ import zlib
 from pathlib import Path
 from typing import Any
 
-from historic_backfill.audits.cross_source.trace_player_stints_game import _collect_game_events, _load_game_context, _normalize_lineups
+from historic_backfill.common.game_context import _load_game_context
+from historic_backfill.common.lineups import _collect_game_events, _normalize_lineups
 
 
-ROOT = Path(__file__).resolve().parent
-DEFAULT_OVERRIDES_DIR = ROOT / "overrides"
+ROOT = Path(__file__).resolve().parents[1]
+CATALOGS_ROOT = ROOT / "catalogs"
+DATA_ROOT = ROOT / "data"
+DEFAULT_OVERRIDES_DIR = CATALOGS_ROOT / "overrides"
 DEFAULT_MANIFEST_PATH = DEFAULT_OVERRIDES_DIR / "correction_manifest.json"
-DEFAULT_DB_PATH = ROOT / "nba_raw.db"
-DEFAULT_PARQUET_PATH = ROOT / "playbyplayv2.parq"
-DEFAULT_FILE_DIRECTORY = ROOT
+DEFAULT_DB_PATH = DATA_ROOT / "nba_raw.db"
+DEFAULT_PARQUET_PATH = DATA_ROOT / "playbyplayv2.parq"
+DEFAULT_FILE_DIRECTORY = DATA_ROOT
 
 PERIOD_STARTERS_JSON = "period_starters_overrides.json"
 PERIOD_STARTERS_NOTES_CSV = "period_starters_override_notes.csv"

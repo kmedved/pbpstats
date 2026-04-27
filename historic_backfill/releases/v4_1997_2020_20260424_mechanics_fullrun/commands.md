@@ -14,11 +14,13 @@ PYTHONPATH=. python -m historic_backfill.runners.validate --scope=cross-source
 PYTHONPATH=. python -m historic_backfill.runners.validate --scope=provenance
 ```
 
-`--scope=core` is the frozen-runtime gate: NBA data plus committed catalogs.
-It may require the NBA runtime inputs under `historic_backfill/data/`, but it
-must not require BBR or tpdev data. `--scope=cross-source` is optional and
-skips missing BBR/tpdev sources. `--scope=provenance` is for re-review and
-fails clearly when requested evidence sources are absent.
+`--scope=core` is the frozen-runtime input/catalog preflight: NBA data plus
+committed catalogs. It may require the NBA runtime inputs under
+`historic_backfill/data/`, and it validates committed catalog shape/canaries, but
+it must not require BBR or tpdev data. It is not a full corpus rerun.
+`--scope=cross-source` is optional and skips missing BBR/tpdev sources.
+`--scope=provenance` is for re-review and fails clearly when requested evidence
+sources are absent.
 
 ## Release Tag
 

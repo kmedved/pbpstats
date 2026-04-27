@@ -5,6 +5,7 @@ import pandas as pd
 from historic_backfill.catalogs.loader import (
     DEFAULT_HISTORIC_PBP_ROW_OVERRIDES_PATH,
     load_historic_pbp_row_overrides,
+    validate_historic_pbp_row_override_catalog,
 )
 from pbpstats.offline.row_overrides import (
     PBP_ROW_OVERRIDE_ACTION_COLUMN,
@@ -200,3 +201,7 @@ def test_historic_pbp_row_override_catalog_contains_synthetic_canary():
     assert canaries[0]["anchor_event_num"] == 149
     assert canaries[0]["player_out_id"] == "2747"
     assert canaries[0]["player_in_id"] == "2454"
+
+
+def test_historic_pbp_row_override_catalog_validates_strictly():
+    validate_historic_pbp_row_override_catalog()
