@@ -1,0 +1,2 @@
+game_id,action,tolerance,notes
+29600370,allow,5,"PBP missing 2 FGM (Scheffler 1, McCloud 1) that exist in boxscore. NBA source data incomplete. https://www.basketball-reference.com/boxscores/199612220SEA.html"

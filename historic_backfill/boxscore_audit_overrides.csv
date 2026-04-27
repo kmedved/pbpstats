@@ -1,0 +1,64 @@
+game_id,team_id,player_id,stat,action,notes
+0021600006,1610612738,202340,AST,accept_pbp,BBR play-by-play and raw NBA PBP both credit Bradley with 5 assists while the official and BBR boxscores credit 6
+0021600006,1610612738,202738,AST,accept_pbp,BBR play-by-play and raw NBA PBP both credit Thomas with 9 assists while the official and BBR boxscores credit 8
+0021600056,1610612755,204456,TOV,accept_pbp,BBR play-by-play and raw NBA PBP both credit McConnell with 3 turnovers while the official and BBR boxscores credit 2
+0021600056,1610612755,1626143,TOV,accept_pbp,BBR play-by-play and raw NBA PBP do not show an Okafor turnover even though the official and BBR boxscores credit him with 1
+0029700014,1610612763,248,OREB,accept_pbp,BBR play-by-play matches parser split; official box split differs
+0029700014,1610612763,248,DRB,accept_pbp,BBR play-by-play matches parser split; official box split differs
+0029700014,1610612763,735,OREB,accept_pbp,BBR play-by-play matches parser split; official box split differs
+0029700014,1610612763,735,DRB,accept_pbp,BBR play-by-play matches parser split; official box split differs
+0029700014,1610612763,898,OREB,accept_pbp,BBR play-by-play matches parser split; official box split differs
+0029700014,1610612763,898,DRB,accept_pbp,BBR play-by-play matches parser split; official box split differs
+0029700015,1610612748,469,OREB,accept_pbp,Dead-ball missed-FT placeholder rebound is non-live in PBP
+0029700291,1610612738,969,OREB,accept_pbp,Dead-ball missed-FT placeholder rebound is non-live in PBP
+0029700929,1610612766,462,OREB,accept_pbp,Dead-ball missed-FT placeholder rebound is non-live in PBP
+0029700969,1610612745,165,OREB,accept_pbp,Dead-ball missed-FT placeholder rebound is non-live in PBP
+0049700054,1610612747,965,OREB,accept_pbp,Dead-ball missed-FT placeholder rebound is non-live in PBP
+0029700064,1610612750,339,OREB,accept_pbp,Official split treats opponent missed-FT rebound as offensive; parser side is semantically correct
+0029700064,1610612750,339,DRB,accept_pbp,Official split treats opponent missed-FT rebound as offensive; parser side is semantically correct
+0029700070,1610612749,911,OREB,accept_pbp,Official split treats opponent missed-FT rebound as offensive; parser side is semantically correct
+0029700070,1610612749,911,DRB,accept_pbp,Official split treats opponent missed-FT rebound as offensive; parser side is semantically correct
+0029700087,1610612746,1508,OREB,accept_pbp,Official split treats opponent missed-FT rebound as offensive; parser side is semantically correct
+0029700087,1610612746,1508,DRB,accept_pbp,Official split treats opponent missed-FT rebound as offensive; parser side is semantically correct
+0029700422,1610612763,735,OREB,accept_pbp,Official split treats opponent missed-FT rebound as offensive; parser side is semantically correct
+0029700422,1610612763,735,DRB,accept_pbp,Official split treats opponent missed-FT rebound as offensive; parser side is semantically correct
+0029700861,1610612743,724,OREB,accept_pbp,Official split treats opponent missed-FT rebound as offensive; parser side is semantically correct
+0029700861,1610612743,724,DRB,accept_pbp,Official split treats opponent missed-FT rebound as offensive; parser side is semantically correct
+0029701011,1610612753,128,OREB,accept_pbp,Official split treats same-team missed-FT rebound as defensive; parser side is semantically correct
+0029701011,1610612753,128,DRB,accept_pbp,Official split treats same-team missed-FT rebound as defensive; parser side is semantically correct
+0029701032,1610612746,1134,OREB,accept_pbp,Official split treats opponent missed-FT rebound as offensive; parser side is semantically correct
+0029701032,1610612746,1134,DRB,accept_pbp,Official split treats opponent missed-FT rebound as offensive; parser side is semantically correct
+0029701078,1610612750,417,OREB,accept_pbp,Official split treats opponent missed-FT rebound as offensive; parser side is semantically correct
+0029701078,1610612750,417,DRB,accept_pbp,Official split treats opponent missed-FT rebound as offensive; parser side is semantically correct
+0029701120,1610612747,406,OREB,accept_pbp,Official split treats same-team missed-FT rebound as defensive; parser side is semantically correct
+0029701120,1610612747,406,DRB,accept_pbp,Official split treats same-team missed-FT rebound as defensive; parser side is semantically correct
+0029800075,1610612748,297,DRB,accept_pbp,Official split keeps an impossible second Mourning rebound; parser side is semantically correct after dropping the bad row
+0029800075,1610612748,297,REB,accept_pbp,Official split keeps an impossible second Mourning rebound; parser side is semantically correct after dropping the bad row
+0029800075,1610612751,423,OREB,accept_pbp,Official split follows corrupted rebound counters; parser side is semantically correct
+0029800075,1610612751,423,DRB,accept_pbp,Official split follows corrupted rebound counters; parser side is semantically correct
+0029800135,1610612743,1711,OREB,accept_pbp,Official split treats an opponent missed-and-one free throw rebound as offensive; parser side is semantically correct
+0029800135,1610612743,1711,DRB,accept_pbp,Official split treats an opponent missed-and-one free throw rebound as offensive; parser side is semantically correct
+0029800330,1610612738,952,OREB,accept_pbp,Official split treats an opponent missed-and-one free throw rebound as offensive; parser side is semantically correct
+0029800330,1610612738,952,DRB,accept_pbp,Official split treats an opponent missed-and-one free throw rebound as offensive; parser side is semantically correct
+0029800425,1610612749,911,OREB,accept_pbp,Official split treats an opponent missed-and-one free throw rebound as offensive; parser side is semantically correct
+0029800425,1610612749,911,DRB,accept_pbp,Official split treats an opponent missed-and-one free throw rebound as offensive; parser side is semantically correct
+0029800433,1610612764,901,OREB,accept_pbp,Official split treats an opponent missed-and-one free throw rebound as offensive; parser side is semantically correct
+0029800433,1610612764,901,DRB,accept_pbp,Official split treats an opponent missed-and-one free throw rebound as offensive; parser side is semantically correct
+0029800487,1610612764,1872,OREB,accept_pbp,Official split treats an opponent missed-and-one free throw rebound as offensive; parser side is semantically correct
+0029800487,1610612764,1872,DRB,accept_pbp,Official split treats an opponent missed-and-one free throw rebound as offensive; parser side is semantically correct
+0029800512,1610612737,87,OREB,accept_pbp,Official split contains semantically impossible Mutombo rebound-side assignments; parser side is semantically correct
+0029800512,1610612737,87,DRB,accept_pbp,Official split contains semantically impossible Mutombo rebound-side assignments; parser side is semantically correct
+0029900144,1610612745,787,OREB,accept_pbp,Official split treats Barkley's rebound after an opponent missed and-one free throw as offensive; parser side is semantically correct
+0029900144,1610612745,787,DRB,accept_pbp,Official split treats Barkley's rebound after an opponent missed and-one free throw as offensive; parser side is semantically correct
+0029900508,1610612764,1134,OREB,accept_pbp,Official split treats Austin's rebound after an opponent missed and-one free throw as offensive; parser side is semantically correct
+0029900508,1610612764,1134,DRB,accept_pbp,Official split treats Austin's rebound after an opponent missed and-one free throw as offensive; parser side is semantically correct
+0029900517,1610612765,966,OREB,accept_pbp,Official split treats a Pistons rebound after an opponent missed free throw as offensive; parser side is semantically correct
+0029900517,1610612765,966,DRB,accept_pbp,Official split treats a Pistons rebound after an opponent missed free throw as offensive; parser side is semantically correct
+0029900646,1610612741,389,OREB,accept_pbp,Official split treats Kukoc's rebound after an opponent missed free throw as offensive; parser side is semantically correct
+0029900646,1610612741,389,DRB,accept_pbp,Official split treats Kukoc's rebound after an opponent missed free throw as offensive; parser side is semantically correct
+0029900671,1610612755,1477,OREB,accept_pbp,Official split treats Bowen's rebound after a Kings missed three as offensive; parser side is semantically correct
+0029900671,1610612755,1477,DRB,accept_pbp,Official split treats Bowen's rebound after a Kings missed three as offensive; parser side is semantically correct
+0029900754,1610612759,764,OREB,accept_pbp,Official boxscore keeps an impossible Robinson rebound between opponent free throws; parser side is semantically correct
+0029900754,1610612759,764,REB,accept_pbp,Official boxscore keeps an impossible Robinson rebound between opponent free throws; parser side is semantically correct
+0021000288,1610612737,201143,OREB,accept_pbp,Official and BBR boxscore keep Horford's missed-FT rebound as offensive even though the raw play-by-play sequence makes it defensive
+0021000288,1610612737,201143,DRB,accept_pbp,Official and BBR boxscore keep Horford's missed-FT rebound as offensive even though the raw play-by-play sequence makes it defensive

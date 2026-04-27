@@ -1,0 +1,2672 @@
+# Resume Notes
+
+If you opened the repo directly, this is the quickest local handoff.
+
+- Bundle landing page: `../START_HERE.md`
+- Detailed handoff: `../docs/resume_notes.md`
+
+## Current project
+- We are in lineup-derived repair, not counting-stat reconstruction.
+- Counting stats are locked clean across `1997-2020`.
+- Working rule: fix who is on court first, then minutes; treat plus-minus as downstream evidence.
+
+## Accepted vs rejected fixes
+- Accepted: opening-cluster carryover fix in the `pbpstats` fork.
+- Rejected: same-clock lineup propagation carryover and broad same-clock scoring overlay attempts.
+- Rejected on March 21, 2026: narrow non-opening same-clock pending-sub handling for foul / FT boundaries. It improved focused canaries but regressed Block A at season scale and is no longer part of the active fork baseline.
+
+## Current live corrections
+- `overrides/period_starters_overrides.json` remains active and should be treated as the live period-start correction surface.
+- `overrides/lineup_window_overrides.json` currently contains active windows for:
+  - `0029700159`
+  - `0029700367`
+  - `0049700045`
+- `overrides/correction_manifest.json` is now the canonical authoring surface for lineup corrections.
+- Runtime still consumes the compiled JSON/CSV views, not the manifest directly.
+- The no-op registry migration is complete and documented in `registry_migration_noop_20260321_v1/summary.json`.
+
+## Migration correction
+- Runtime inputs intentionally live in `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev` because `cautious_rerun.py` expects them in the repo root.
+- Sibling paths are preserved at:
+  - `/Users/konstantinmedvedovsky/migrate_tpdev/fixed_data/raw_input_data/tpdev_data`
+  - `/Users/konstantinmedvedovsky/migrate_tpdev/calculated_data/pbpstats`
+  - `/Users/konstantinmedvedovsky/migrate_tpdev/33_wowy_rapm`
+- Set `PBPSTATS_REPO=/Users/konstantinmedvedovsky/migrate_tpdev/pbpstats` when running from the migrated repo.
+
+## First smoke commands
+```bash
+cd /Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev
+export PBPSTATS_REPO=/Users/konstantinmedvedovsky/migrate_tpdev/pbpstats
+python -c 'import cautious_rerun; print("ok")'
+python -c 'import rerun_selected_games; print("ok")'
+```
+
+## Immediate next validation step
+```bash
+cd /Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev
+export PBPSTATS_REPO=/Users/konstantinmedvedovsky/migrate_tpdev/pbpstats
+python cautious_rerun.py --seasons 2013 2014 2015 2019 --output-dir pass0_opening_cluster_2013_2014_2015_2019 --run-boxscore-audit
+```
+
+## Then
+1. Compare the four season summaries against the locked baseline summaries and fail on any counting-stat regression or new severe minute outlier.
+2. Only if that Pass 0 gate is clean, proceed to Block A closure through the canonical correction manifest.
+3. Keep pending-sub cases as anti-canaries only.
+
+## Latest checkpoint (March 22, 2026)
+- Pass 0 is complete and green:
+  - `pass0_opening_cluster_2013_2014_2015_2019_20260321_v1_summary/summary.json`
+  - `2013`, `2014`, `2015`, and `2019` all passed with no counting-stat regressions and no minute regressions
+- Current manifest state:
+  - `53` active corrections
+  - `0` proposed corrections
+  - `10` rejected corrections
+- Block A current queue state:
+  - `0029700438` P2 dual-team starter episode: rejected after scratch validation; full no-op vs live baseline
+  - `0029800075` Q2 Jones-over-Gill window package: rejected after scratch validation; introduced counting-stat mismatches, `1` minute outlier, and `6` event-on-court rows
+  - `0029800063` P4 `E511` A.C. Green single-event delta: rejected after isolated one-game A/B validation against the current live manifest
+    - baseline game: `event_on_court 2`, `minutes_mismatches 1`, `plus_minus_mismatches 0`
+    - candidate game: `event_on_court 1`, `minutes_mismatches 3`, `plus_minus_mismatches 0`
+    - candidate leaves Dirk `P2 E211` open and adds two new sub-`0.1` minute mismatches for Bradley and Green, so it fails blocker-first policy
+  - `0029700141` P4 Farmer event-order case: rejected for the current cycle; keep the shape documented only in case it reappears in the live actionable queue
+- Useful artifact paths:
+  - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/_tmp_validate_0029800063_live_baseline_20260322_v1`
+  - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/_tmp_validate_0029800063_candidate_20260322_v1`
+  - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/block_A_exception_queue_20260321_v1.md`
+
+## Latest checkpoint (March 22, 2026, later)
+- Clean live Block A rerun is complete:
+  - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/block_A_live_postqueue_20260322_v1`
+  - residual bundle:
+    - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/block_A_live_postqueue_20260322_v1_residual/summary.json`
+- Residual summary versus the old Block A baseline:
+  - actionable event rows: `50 -> 39`
+  - actionable residual rows: `83 -> 72`
+  - material minute rows: `33 -> 33`
+  - severe minute rows: `7 -> 8`
+  - open games: `13 -> 12`
+  - boundary-difference games: `67 -> 68`
+  - raw event rows: `50 -> 39`
+  - raw minute mismatches: `59 -> 60`
+  - raw minute outliers: `7 -> 8`
+- Season shape:
+  - `1998` differs from the old frontier because of the already-live manual corrections (`0029700159`, `0029700367`)
+  - `1999` and `2000` are exact-match to the old frontier block artifacts
+- Notable game-level status change:
+  - `0029700367` moved from `open` to `boundary_difference`
+- Current interpretation:
+  - there are no remaining straightforward manual override promotions in the Block A queue
+  - `0029800661` remains the only obvious non-rejected follow-up on the old baseline, but current evidence points to `starter-complex` / boundary-state investigation rather than a manual window/starter override
+  - `0029800462`, `0029800606`, `0029900342`, `0029900517`, and much of `0029700438` now look more like annotation/source-limited work than new override work
+
+## Latest checkpoint (March 22, 2026, annotation batch)
+- Landed first sparse `source_limited_upstream_error` batch in `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/overrides/correction_manifest.json` for:
+  - `0029800063` Dirk Nowitzki
+  - `0029800462` Tony Battie
+  - `0029800606` Vinny Del Negro
+  - `0029900342` Doug West team-foul miscredit
+  - `0029900517` Michael Curry shot miscredit
+- Recompiled runtime views and rebuilt the live Block A residual bundle.
+- New Block A residual summary:
+  - actionable event rows: `33`
+  - actionable residual rows: `64`
+  - material minute rows: `31`
+  - severe minute rows: `8`
+  - source-limited rows: `9`
+  - open games: `8`
+  - source-limited games: `4`
+- Compared with the pre-annotation live Block A residual bundle:
+  - actionable event rows: `39 -> 33`
+  - actionable residual rows: `72 -> 64`
+  - material minute rows: `33 -> 31`
+  - open games: `12 -> 8`
+- Tests still pass after the manifest edit:
+  - `9 passed`
+
+## Latest checkpoint (March 22, 2026, later annotation batch)
+- Landed second sparse annotation batch in `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/overrides/correction_manifest.json` for:
+  - `0029800075` Kendall Gill / Damon Jones as `source_limited_upstream_error`
+  - `0029700438` Schrempf / McIlvaine / Jackson / Ratliff / Coleman as `source_limited_upstream_error`
+  - `0029700452` Wingate plus Schrempf `P4 E402` as `source_limited_upstream_error`
+  - `0029701075` as game-level `candidate_systematic_defect`
+  - `0029800661` as game-level `candidate_systematic_defect`
+- Recompiled runtime views and rebuilt the live Block A residual bundle again.
+- Current Block A residual summary:
+  - actionable event rows: `18`
+  - actionable residual rows: `42`
+  - material minute rows: `24`
+  - severe minute rows: `4`
+  - open games: `5`
+  - source-limited games: `7`
+  - boundary-difference games: `68`
+- Compared with the first post-annotation residual bundle:
+  - actionable event rows: `33 -> 18`
+  - actionable residual rows: `64 -> 42`
+  - material minute rows: `31 -> 24`
+  - severe minute rows: `8 -> 4`
+  - open games: `8 -> 5`
+- Current true open tail:
+  - `0029700159`: documented-unresolved broken sub row at `P3 E349`; do not source-limit yet
+  - `0029701075`: `candidate_systematic_defect`
+  - `0029800063`: only `A.C. Green P4 E511` remains open; local flip still rejected
+  - `0029800661`: `candidate_systematic_defect`
+  - `0049700045`: keep open; PM-only rows already sit in `candidate_boundary_difference`, but the remaining 3 event rows are not source-limited
+- `0029700452` note:
+  - keep the new source-limited treatment in place
+  - the one-event Schrempf probe only trades `E402` for broken sub row `E403` and does not improve the minute profile enough to justify promotion
+- Tests still pass after the later manifest edits:
+  - `9 passed`
+
+## Latest checkpoint (March 22, 2026, final Block A tail pass)
+- Landed one more sparse `source_limited_upstream_error` annotation for:
+  - `0029800063` `P4 E511` A.C. Green rebound
+- Recompiled runtime views and rebuilt the live Block A residual bundle again.
+- Current Block A residual summary:
+  - actionable event rows: `17`
+  - actionable residual rows: `41`
+  - material minute rows: `24`
+  - severe minute rows: `4`
+  - open games: `4`
+  - source-limited games: `8`
+- Compared with the prior live residual bundle:
+  - actionable event rows: `18 -> 17`
+  - actionable residual rows: `42 -> 41`
+  - open games: `5 -> 4`
+- Current true open Block A tail:
+  - `0029700159`
+    - keep open / documented-unresolved
+    - live Denver P3 windows are already the least-bad validated state
+    - remaining blocker is the broken `P3 E349` sub row plus downstream Stith/Lauderdale/Garrett minute tradeoff
+  - `0029701075`
+    - keep open as `candidate_systematic_defect`
+    - no narrower safe NYK/BOS correction survived validation
+  - `0029800661`
+    - keep open as `candidate_systematic_defect`
+    - whole-game boundary-state/starter-complex minute pattern, no narrow source-limited/manual path
+  - `0049700045`
+    - keep open as same-clock boundary tail
+    - PM-only rows can stay in `candidate_boundary_difference`, but the 3 event rows do not have a safe live correction
+- `0029800063` note:
+  - the game is no longer open
+  - Dirk `P2 E211` and Green `P4 E511` are both now treated as `source_limited_upstream_error`
+  - the single-event Green flip remains rejected because it worsens the minute profile
+- Tests still pass after the final manifest edit:
+  - `9 passed`
+
+## Latest checkpoint (March 22, 2026, row-grain cleanup)
+- Landed one more event-level `source_limited_upstream_error` annotation for:
+  - `0029700159` `P3 E349` broken Garrett sub-out row
+- Recompiled runtime views and rebuilt the live Block A residual bundle again.
+- Current Block A residual summary:
+  - actionable event rows: `16`
+  - actionable residual rows: `40`
+  - material minute rows: `24`
+  - severe minute rows: `4`
+  - open games: `4`
+  - source-limited games: `8`
+- Compared with the prior live residual bundle:
+  - actionable event rows: `17 -> 16`
+  - actionable residual rows: `41 -> 40`
+  - open games: `4 -> 4`
+- Current true open Block A tail:
+  - `0029700159`
+    - still open / documented-unresolved on minutes
+    - no actionable event rows remain after the `E349` source-limited split
+  - `0029701075`
+    - open as `candidate_systematic_defect`
+    - keep the whole game as one blocking cluster; no safe row-grain split survived
+  - `0029800661`
+    - open as `candidate_systematic_defect`
+    - whole-game boundary-state / starter-complex minute pattern
+
+## Latest checkpoint (March 22, 2026, source-limited consolidation)
+- Reclassified two more Block A survivors out of the open blocker lane in `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/overrides/correction_manifest.json`:
+  - `0029800661` from game-level `candidate_systematic_defect` to game-level `source_limited_upstream_error`
+  - `0049700045` row-grain same-clock boundary tails:
+    - `P2 E172` Toni Kukoc
+    - `P2 E185` B.J. Armstrong
+    - `P4 E376` Steve Kerr
+- Recompiled runtime views with `/opt/anaconda3/envs/darko311/bin/python` and rebuilt the live residual bundle.
+- Current Block A residual summary:
+  - actionable event rows: `13`
+  - actionable residual rows: `20`
+  - material minute rows: `7`
+  - severe minute rows: `4`
+  - open games: `2`
+  - source-limited games: `10`
+  - boundary-difference games: `68`
+- Compared with the prior live residual bundle:
+  - actionable event rows: `16 -> 13`
+  - actionable residual rows: `40 -> 20`
+  - material minute rows: `24 -> 7`
+  - open games: `4 -> 2`
+- Current true open Block A tail:
+  - `0029700159`
+    - still open / documented-unresolved on minutes only
+    - live Denver P3 windows remain the least-bad validated state
+  - `0029701075`
+    - still open as `candidate_systematic_defect`
+    - late-quarter P3 chronology/source split remains contradictory rather than promotable
+- Reclassified-now-closed notes:
+  - `0029800661`
+    - treat as source-limited whole-game minute source conflict
+    - live output aligns with BBR on `18/20` player-minute rows, and the two misses still sit closer to `tpdev_pbp` than to BBR
+  - `0049700045`
+    - treat the three remaining event rows as same-clock upstream boundary conflicts
+    - current live state already keeps the minute profile exact-to-near-exact, and tested local fixes worsen minutes
+- Validation after the manifest edit:
+  - `/opt/anaconda3/envs/darko311/bin/python -m pytest -q tests/test_lineup_correction_manifest.py tests/test_golden_canary_suite.py tests/test_summarize_opening_cluster_pass0.py`
+  - result: `9 passed`
+  - `0049700045`
+    - open same-clock boundary tail
+    - 3 actionable event rows remain, but no safe local correction survived on the current live baseline
+- Tests still pass after the row-grain manifest edit:
+  - `9 passed`
+
+## Latest checkpoint (March 22, 2026, source-limited `0029800661`)
+- Reclassified `0029800661` from `candidate_systematic_defect` to game-level `source_limited_upstream_error`.
+- Basis:
+  - no event-on-court rows remain for the game
+  - live output matches BBR minutes on `18/20` players
+  - the only two BBR minute misses are a single Vaughn/Hendrickson swap, and `tpdev_pbp` stays much closer to the live output than to BBR on that pair
+  - official minutes match only `1/20` player rows
+- Recompiled runtime views and rebuilt the live Block A residual bundle again.
+- Current Block A residual summary:
+  - actionable event rows: `16`
+  - actionable residual rows: `23`
+  - material minute rows: `7`
+  - severe minute rows: `4`
+  - open games: `3`
+  - source-limited games: `9`
+- Compared with the prior live residual bundle:
+  - actionable residual rows: `40 -> 23`
+  - material minute rows: `24 -> 7`
+  - open games: `4 -> 3`
+  - source-limited games: `8 -> 9`
+- Current true open Block A tail:
+  - `0029700159`
+    - open / documented-unresolved on minutes only
+  - `0029701075`
+    - open as `candidate_systematic_defect`
+    - late-quarter P3 chronology split still has both event-on-court rows and severe minute drift
+  - `0049700045`
+    - open same-clock boundary tail
+    - the existing P1 bootstrap windows remain the least-bad validated state
+- Tests still pass after the `0029800661` manifest edit:
+  - `9 passed`
+
+## Latest checkpoint (March 22, 2026, authoritative current frontier)
+- This is the current Block A state after the `0029800661` source-limited promotion and the `0049700045` same-clock row-grain source-limited annotations.
+- Current live residual summary:
+  - actionable event rows: `13`
+  - actionable residual rows: `20`
+  - material minute rows: `7`
+  - severe minute rows: `4`
+  - open games: `2`
+  - source-limited games: `10`
+  - boundary-difference games: `68`
+- Current true open Block A tail:
+  - `0029700159`
+    - open / documented-unresolved on minutes only
+    - no actionable event rows remain
+  - `0029701075`
+    - open as `candidate_systematic_defect`
+    - late-quarter P3 chronology/source split remains contradictory rather than promotable
+- Reclassified-out-of-open this pass:
+  - `0029800661`
+    - source-limited whole-game minute source conflict
+  - `0049700045`
+    - source-limited same-clock event-boundary tail at `P2 E172`, `P2 E185`, `P4 E376`
+- Validation status:
+  - runtime views recompiled cleanly with `/opt/anaconda3/envs/darko311/bin/python`
+  - `/opt/anaconda3/envs/darko311/bin/python -m pytest -q tests/test_lineup_correction_manifest.py tests/test_golden_canary_suite.py tests/test_summarize_opening_cluster_pass0.py`
+  - result: `9 passed`
+
+## Latest checkpoint (March 22, 2026, `0029700159` opening-cluster theory check)
+- Investigated the claim that the new Bryant Stith severe minute row in `0029700159` was introduced by the opening-cluster carryover fix.
+- Conclusion: that theory is not mechanically plausible for this game.
+- Evidence:
+  - the opening-cluster gate only runs when strict period starters disagree with an exact local `v6` starter row
+  - `0029700159` has no rows at all in `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/period_starters_v6.parquet`
+  - the game only has `v5` fallback rows for periods `2-4`
+  - the raw `12:00` rows in `playbyplayv2.parq` are plain `Start of Period` events, not the technical/flagrant/ejection opening-cluster shape that the fork patch targets
+- Current interpretation:
+  - the remaining Bryant Stith / Priest Lauderdale / Dean Garrett minute drift is still the existing Denver `P3` override tradeoff
+  - `P3 E349` remains correctly annotated as a source-limited broken source substitution row
+  - `0029700159` stays open, but it is not evidence that the opening-cluster fix fired on Block A
+- Process note:
+  - a dedicated early-era non-regression pass for opening-cluster would still be useful if we want full ladder symmetry
+  - this specific `0029700159` case is not a reason to revert or blame the opening-cluster fork change
+
+## Latest checkpoint (March 22, 2026, Phase 4 reporting contract hardened)
+- Investigated the critique that Phase 4 deliverables were not clearly complete.
+- Conclusion:
+  - the critique was partially fair on proof and documentation
+  - it was not correct as a claim that the reporting layer was missing
+- Verified the live residual bundle at `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/block_A_live_postqueue_20260322_v1_residual` already contains:
+  - `actionable_queue.csv`
+  - `source_limited_residuals.csv`
+  - `boundary_difference_residuals.csv`
+  - `residual_annotations.csv`
+  - `plus_minus_reference_delta_register.csv`
+  - `game_quality.csv`
+  - `summary.json` with both `raw_counts` and `blocker_counts`
+- Hardened the residual-builder proof:
+  - expanded `tests/test_build_lineup_residual_outputs.py`
+  - empty-run path now checks the full artifact inventory and top-level summary shape
+  - added a non-empty synthetic fixture that proves:
+    - actionable queue emission
+    - source-limited emission
+    - boundary-difference emission
+    - plus-minus register emission
+    - `game_quality.csv` status/flag shape
+    - blocker-vs-raw count math
+- Aligned `AGENTS.md` with the implemented reporting contract:
+  - Phase 4 now names `boundary_difference_residuals.csv`, `plus_minus_reference_delta_register.csv`, and `game_quality.csv`
+  - `residual_annotations.csv` is now described as the full residual row table with computed/manual/effective columns
+  - Phase 7 now refers to using `game_quality.csv` as the companion table, rather than introducing it as a new artifact
+- Validation status after the reporting-contract patch:
+  - `/opt/anaconda3/envs/darko311/bin/python -m pytest -q tests/test_build_lineup_residual_outputs.py tests/test_lineup_correction_manifest.py tests/test_golden_canary_suite.py tests/test_summarize_opening_cluster_pass0.py`
+  - result: `11 passed`
+
+## Latest checkpoint (March 22, 2026, `0029700159` confirmed not opening-cluster-driven)
+- Re-ran and tightened the Bryant Stith regression investigation instead of leaving it as an unsupported suspicion.
+- Conclusion:
+  - the opening-cluster carryover fix is **not** the cause of the `0029700159` Denver P3 severe minute tail
+  - keep `0029700159` open / documented-unresolved
+  - only `P3 E349` should stay source-limited; do **not** promote the remaining Stith / Lauderdale / Garrett minute rows out of the blocker lane
+- Evidence:
+  - the opening-cluster gate only applies when strict starters disagree with an exact local `v6` starter row
+  - `0029700159` still has no local `v6` starter rows and its raw `12:00` events are plain period starts, not the technical/flagrant/ejection opening-cluster shape
+  - the live Block A residual bundle still shows the Denver blocker tail as:
+    - Bryant Stith `1.85` minutes / `+2` PM
+    - Priest Lauderdale `0.7183333333` minutes / `+1` PM
+    - Dean Garrett `0.30` minutes / `0` PM
+  - the only surviving event-row issue is the already-annotated broken `P3 E349` Garrett sub-out row
+- Important reproducibility note:
+  - the saved Block A residual bundle and a fresh single-game Golden Canary rerun do **not** currently reproduce the same `0029700159` dirty envelope
+  - saved Block A residual bundle:
+    - `4` minute mismatch rows
+    - `2` minute outlier rows
+    - `3` plus-minus mismatch rows
+    - `max_abs_minute_diff = 1.85`
+  - fresh Golden Canary single-game rerun:
+    - `5` minute mismatch rows
+    - `3` minute outlier rows
+    - `4` plus-minus mismatch rows
+    - `max_abs_minute_diff = 11.8666666667`
+  - that discrepancy is now explicitly documented in the Golden Canary manifest notes instead of being silently absorbed
+
+## Latest checkpoint (March 22, 2026, Golden Canary manifest completed and green)
+- Filled the previously empty Golden Canary control lanes in `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/golden_canary_manifest_20260321_v1.json`:
+  - `source_limited_negative_controls`: `5` cases
+    - `0029800063`
+    - `0029800462`
+    - `0029800606`
+    - `0029900342`
+    - `0029900517`
+  - `pm_only_boundary_controls`: `10` cases
+- Tightened/clarified canary notes:
+  - `0029700159` now explicitly says the opening-cluster fix is not implicated
+  - `0029800606` now explicitly uses the reproducible fresh-rerun control envelope
+- Fresh suite run is clean:
+  - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/golden_canary_suite_20260322_v2/summary.json`
+  - totals:
+    - `27` cases
+    - `27` games
+    - `0` failed games
+    - `0` event-stats errors
+    - `0` unexpected case failures
+    - `suite_pass = true`
+- Category counts in the clean suite:
+  - `positive_canaries = 4`
+  - `fixed_dirty_games = 3`
+  - `failed_patch_anti_canaries = 5`
+  - `source_limited_negative_controls = 5`
+  - `pm_only_boundary_controls = 10`
+- Validation after the manifest completion:
+  - `PYTHONPATH=. /opt/anaconda3/envs/darko311/bin/python -m pytest -q tests/test_build_plus_minus_reference_report.py tests/test_golden_canary_suite.py tests/test_lineup_correction_manifest.py tests/test_build_lineup_residual_outputs.py tests/test_summarize_opening_cluster_pass0.py`
+  - result: `12 passed`
+
+## Latest checkpoint (March 22, 2026, Phase 5 scaffold started)
+- Landed a first Phase 5 report builder:
+  - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/build_plus_minus_reference_report.py`
+- Added a focused unit test:
+  - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/tests/test_build_plus_minus_reference_report.py`
+- Built the first report artifact on the current Block A residual bundle:
+  - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/block_A_pm_reference_report_20260322_v1/summary.json`
+  - companion sample:
+    - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/block_A_pm_reference_report_20260322_v1/candidate_boundary_difference_sample.csv`
+- Current Block A PM-reference characterization:
+  - total PM-reference rows: `217`
+  - class counts:
+    - `candidate_boundary_difference = 195`
+    - `source_limited_upstream_error = 20`
+    - `lineup_related = 2`
+  - sample rows emitted: `5`
+- Scope note:
+  - this is a **Phase 5 scaffold / Block A artifact**, not the final full-history PM characterization report
+  - next in-order Phase 5 step is to run the same report over a wider residual bundle once the broader proving outputs are materialized
+
+## Latest checkpoint (March 22, 2026, Phase 5 widened to A+B-E)
+- Widened the Phase 5 PM-characterization tooling instead of leaving it Block-A-only.
+- `build_plus_minus_reference_report.py` now:
+  - accepts multiple `--residual-dir` inputs
+  - dedupes overlapping PM rows with **later-bundle-wins** semantics
+  - joins game-quality metadata on `(residual_bundle, game_id)` so block residual bundles do not leak manifest-only active-correction rows into the wrong game status
+  - restricts the stratified boundary sample to true `boundary_difference` games only
+- Built fresh residual bundles for the wider proving blocks:
+  - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/phase5_block_residuals_20260322_v1/B_2001-2005`
+  - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/phase5_block_residuals_20260322_v1/C_2006-2010`
+  - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/phase5_block_residuals_20260322_v1/D_2011-2016`
+  - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/phase5_block_residuals_20260322_v1/E_2017-2020`
+- Built the first combined current-baseline PM characterization artifact across:
+  - current live Block A residual bundle
+  - proving blocks B-E
+  - artifact path:
+    - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/phase5_pm_reference_report_ABCDE_20260322_v1/summary.json`
+  - clean stratified sample:
+    - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/phase5_pm_reference_report_ABCDE_20260322_v1/candidate_boundary_difference_sample.csv`
+- Current combined PM-reference characterization:
+  - total PM-reference rows: `1860`
+  - class counts:
+    - `candidate_boundary_difference = 1742`
+    - `lineup_related = 82`
+    - `source_limited_upstream_error = 36`
+  - bundle-level counts:
+    - Block A live residual: `178 boundary`, `3 lineup_related`, `36 source_limited`
+    - Block B: `430 boundary`, `25 lineup_related`
+    - Block C: `375 boundary`, `12 lineup_related`
+    - Block D: `296 boundary`, `2 lineup_related`
+    - Block E: `463 boundary`, `40 lineup_related`
+  - game-type counts:
+    - playoffs: `126 boundary`, `4 lineup_related`, `12 source_limited`
+    - regular season: `1616 boundary`, `78 lineup_related`, `24 source_limited`
+- Sample-quality result:
+  - the stratified PM-only boundary sample is now clean
+  - `22/22` sample rows are from `primary_quality_status = boundary_difference`
+  - the prior contamination from `0029700159` and `0049700045` is no longer present in the sample
+- Current top lineup-related PM follow-up queue from the widened report:
+  - `0020300778` (`2004`, Block B): `23` PM-reference rows, `open`
+  - `0020900445` (`2010`, Block C): `10` rows, `open`
+  - `0021700886` (`2018`, Block E): `6` rows, `open`
+  - `0021700653` (`2018`, Block E): `4` rows, `open`
+  - `0021900487` (`2020`, Block E): `4` rows, `open`
+  - `0021900920` (`2020`, Block E): `4` rows, `open`
+  - `0029700159` now contributes only `3` lineup-related PM rows in the widened report
+- Interpretation:
+  - the widened Phase 5 pass supports the core project claim that the remaining universe is dominated by PM-only boundary/reference behavior
+  - the true PM-with-lineup-integrity tail is much smaller (`82` rows) and is concentrated in a limited set of still-open games
+  - the next in-order Phase 5 step should be to review the `candidate_boundary_difference` sample and separately inspect the top lineup-related PM games above, starting with `0020300778` and `0020900445`
+- Validation after widening Phase 5:
+  - `PYTHONPATH=. /opt/anaconda3/envs/darko311/bin/python -m pytest -q tests/test_build_plus_minus_reference_report.py tests/test_golden_canary_suite.py tests/test_lineup_correction_manifest.py tests/test_build_lineup_residual_outputs.py tests/test_summarize_opening_cluster_pass0.py`
+  - result: `12 passed`
+
+## Latest checkpoint (March 22, 2026, Phase 5 queue review after widened PM characterization)
+- Reviewed the widened `candidate_boundary_difference` sample in:
+  - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/phase5_pm_reference_report_ABCDE_20260322_v1/candidate_boundary_difference_sample.csv`
+- Sample result remains clean and usable as Phase 5 supporting evidence:
+  - `22/22` sampled rows are true `primary_quality_status = boundary_difference`
+  - the sample spans every era bucket / game-type bucket now in the widened report
+  - no `open` or `source_limited` games leaked back into the teaching sample
+
+## Latest checkpoint (March 22, 2026, Phase 5 queue refined after first game reviews)
+- Reviewed the widened PM-only boundary sample at:
+  - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/phase5_pm_reference_report_ABCDE_20260322_v1/candidate_boundary_difference_sample.csv`
+- Boundary sample result:
+  - `22/22` sampled rows are `effective_residual_class = candidate_boundary_difference`
+  - `22/22` sampled rows come from `primary_quality_status = boundary_difference` games
+  - the sample is balanced across the widened baseline:
+    - Block A live residual: `5`
+    - Block B: `4`
+    - Block C: `4`
+    - Block D: `4`
+    - Block E: `5`
+  - caveat:
+    - `0029700367` appears in the sample and still has an active correction on the game, but its PM rows remain boundary-only and the game has no open actionable residual, no event-on-court issue, and no material minute issue
+    - keep this as a footnote rather than calling the sample a perfectly untreated population
+- Reviewed the widened `lineup_related` PM queue and confirmed it is **not** one undifferentiated bucket.
+- Current widened `lineup_related` population from:
+  - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/phase5_pm_reference_report_ABCDE_20260322_v1/pm_reference_characterization.csv`
+  - totals:
+    - `82` rows
+    - `21` games
+  - current reviewed split:
+    - `19` games are event-on-court survivors with **no** material minute issue
+    - `1` game remains mixed material-minute + event-on-court:
+      - `0029700159`
+    - `1` game (`0020300778`) is still `open` in the saved widened artifact, but cross-source review says it is better treated as a game-specific PM-reference context case rather than the lead broad lineup blocker
+- `0020300778` (`2004`, Block B):
+  - current artifact paths:
+    - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/phase5_block_residuals_20260322_v1/B_2001-2005/game_quality.csv`
+    - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/phase5_pm_reference_report_ABCDE_20260322_v1/pm_reference_characterization.csv`
+    - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/intraperiod_proving_1998_2020_postpatch_20260321_v1/blocks/B_2001-2005/cross_source/minutes_cross_source_report.csv`
+    - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/intraperiod_proving_1998_2020_postpatch_20260321_v1/blocks/B_2001-2005/cross_source/plus_minus_cross_source_mismatches.csv`
+  - raw bundle status stays `open` because the game carries `23` PM-reference rows and small material-minute drift (`max_abs_minute_diff = 0.466666666666665`)
+  - however, cross-source review points to a **game-specific PM-reference limitation** rather than a new recurring lineup-integrity defect:
+    - no event-on-court blocker rows
+    - output minutes match `pbpstats_box` and matched BBR rows exactly; the official minute drift is small and looks like source granularity rather than broken stints
+    - official / `tpdev_pbp` / `pbpstats_box` plus-minus is effectively zero-filled for this game, so BBR is the only meaningful PM comparator
+    - the remaining PM disagreement matches the already-documented Jared Jeffries `0:00` phantom-three history
+  - interpretation:
+    - keep the saved widened artifact counts as-is
+    - do **not** treat `0020300778` as the lead open lineup-related PM game
+    - carry it forward as a source-limited / PM-reference-context note when narrating the Phase 5 queue
+- `0020900445` (`2010`, Block C):
+  - stays open because of one actionable lineup blocker, not because the PM rows prove a new PM family
+  - current game-quality shape:
+    - `primary_quality_status = open`
+    - `has_event_on_court_issue = true`
+    - `has_material_minute_issue = false`
+    - `max_abs_minute_diff = 0.0066666666666677`
+    - `n_pm_reference_delta_rows = 10`
+  - blocker:
+    - `P2 E126`, `sub_out_player_missing_from_previous_lineup`
+  - interpretation:
+    - boundary-adjacent, but still correctly `open`
+    - the PM rows themselves look like the known same-clock foul / FT boundary family, not a new PM bug class
+    - the true blocker is the unresolved `P2 E126` phantom-sub / bad-boundary-source defect
+- `0021700886`, `0021700653`, `0021900487`, and `0021900920` fit the same smaller survivor family:
+  - each is `open`
+  - each has `0` material minute issue
+  - each has `1-2` actionable `event_on_court` blocker rows
+  - each has only `4-6` PM-reference rows
+  - representative blocker shapes:
+    - `0021700886`: `P3 E482`, Emmanuel Mudiay `off_court_event_credit`
+    - `0021700653`: `P4 E589-E590`, player `2730`, `off_court_event_credit`
+    - `0021900487`: `P2 E246`, player `1628991`, `off_court_event_credit`
+    - `0021900920`: `P2 E312`, player `201229`, `off_court_event_credit`
+  - interpretation:
+    - these are real lineup-integrity blockers under current policy, not PM-only baseline rows
+    - but they look like a narrow **event-on-court survivor micro-family**, not broad minute-lineup drift
+    - none currently has manual annotations or source-limited evidence strong enough for manual override promotion
+- Refined Phase 5 follow-up framing after this review:
+  - boundary sample is strong enough to use as supportive evidence for the benign PM-only bucket, with the `0029700367` active-correction footnote
+  - `0020300778` should drop out of the “top open lineup-related PM queue” narrative and move into the source-limited / PM-reference-context note set
+  - the true next open-game queue should start with:
+    - `0020900445`
+    - `0021700886`
+    - `0021700653`
+    - then the remaining `2020` small-count open games (`0021900487`, `0021900920`)
+  - `0029700159` remains separately documented as the mixed minute + event-row case and should not be silently absorbed into the PM-only baseline
+- No code changes were needed for this checkpoint; this was a classification / queue-prioritization pass over the widened Phase 5 artifact set.
+
+## Latest checkpoint (March 22, 2026, Phase 5 event-survivor families reviewed and one source-limited promotion landed)
+- Moved one Phase 5 game from narrative-only suspicion into an explicit sparse residual annotation:
+  - added `source_limited__0020300166__p2__t1610612750__player708__e102__20260322` to:
+    - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/overrides/correction_manifest.json`
+  - rationale:
+    - `0020300166 P2 E102` is the phantom `Gary Trent FOR Kevin Garnett` row even though the validated Minnesota Q2 lineup already has Trent active and Garnett off
+    - keep the runtime lineup unchanged and mark the impossible event row as `source_limited_upstream_error`
+- Rebuilt the affected Block B residual bundle:
+  - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/phase5_block_residuals_20260322_v2/B_2001-2005/summary.json`
+  - key result:
+    - Block B `quality_status_counts` now include `source_limited = 1`
+    - Block B `source_limited_residual_rows = 1`
+- Rebuilt the combined widened PM characterization with the promoted Block B annotation:
+  - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/phase5_pm_reference_report_ABCDE_20260322_v2/summary.json`
+  - combined counts now shift from the prior `1742 / 82 / 36` split to:
+    - `candidate_boundary_difference = 1742`
+    - `lineup_related = 80`
+    - `source_limited_upstream_error = 38`
+  - open lineup-related PM games drop:
+    - `21 -> 20`
+  - `0020300166` now appears as:
+    - `primary_quality_status = source_limited` in `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/phase5_block_residuals_20260322_v2/B_2001-2005/game_quality.csv`
+    - one accepted source-limited event row in `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/phase5_block_residuals_20260322_v2/B_2001-2005/source_limited_residuals.csv`
+    - two PM rows reclassified to `pm_characterization = source_limited_upstream_error` in `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/phase5_pm_reference_report_ABCDE_20260322_v2/pm_reference_characterization.csv`
+- Reviewed the remaining open event-survivor tail by family rather than as disconnected one-offs.
+- Phantom-sub / period-start-boundary family:
+  - `0020300166`:
+    - promoted to documented `source_limited`
+    - this is no longer part of the open lineup-related PM queue
+  - `0020900189`:
+    - stays `open`
+    - `P2 E217` (`Lawson FOR Billups`) is a real Q2 starter/boundary disagreement across `period_starters_v6`, `full_pbp_new`, and cached `pbpv3`, not a clean phantom row
+    - no manual override and not source-limited yet
+  - `0021300593`:
+    - stays `open`
+    - `P2 E96-E99` is an exact-start cluster disagreement (`Cole` foul then `Mason Jr. FOR Cole`) with contradictory source signals
+    - no manual override and not source-limited yet
+- Known same-clock control / review infrastructure already covers several survivors:
+  - `0021700337`:
+    - keep as the main negative tripwire / guardrail from `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/same_clock_canary_manifest_non_opening_ft_sub_20260320_v1.json`
+    - not an override candidate
+  - `0021700514`:
+    - keep as an active same-clock teaching / review case
+    - already lives in the `foul_free_throw_sub_same_clock_ordering` review lane
+  - `0021900333`:
+    - keep as a companion canary in that same family
+    - not an override candidate
+  - `0021700377`:
+    - keep frozen as a scorer/sub negative tripwire per `AGENTS.md`
+    - not an override candidate
+  - `0021801067`:
+    - keep in the same-clock boundary-review / control lane
+    - not a generic override target
+- Generic off-court-event-credit survivor tail:
+  - `0021700813` stays a generic single-event open survivor
+  - the remaining `2020` cluster:
+    - `0021900201`
+    - `0021900419`
+    - `0021900487`
+    - `0021900622`
+    - `0021900920`
+    - `0041900155`
+    - behaves as one consistent micro-family:
+      - exactly one actionable `off_court_event_credit` row each
+      - no material minute issue
+      - tiny minute drift only (`0` to `0.0067`)
+      - only `2` or `4` PM-reference rows, otherwise `candidate_boundary_difference`
+    - cross-source minutes stay aligned with `pbpstats_box` / BBR
+    - there is no current evidence for manual override or source-limited promotion
+- Current override-decision summary after this pass:
+  - promoted to `source_limited_upstream_error`:
+    - `0020300166 P2 E102`
+  - kept open as unresolved period-start boundary disagreements:
+    - `0020900189`
+    - `0021300593`
+  - kept in same-clock control / guardrail / review lanes, not override lanes:
+    - `0021700337`
+    - `0021700514`
+    - `0021700377`
+    - `0021801067`
+    - `0021900333`
+  - kept open as small off-court-event-credit survivors with no current promotion evidence:
+    - `0021700813`
+    - `0021900201`
+    - `0021900419`
+    - `0021900487`
+    - `0021900622`
+    - `0021900920`
+    - `0041900155`
+- Focused validation after the manifest promotion and report rebuild:
+  - `PYTHONPATH=. /opt/anaconda3/envs/darko311/bin/python -m pytest -q tests/test_lineup_correction_manifest.py tests/test_build_lineup_residual_outputs.py tests/test_build_plus_minus_reference_report.py`
+  - result: `7 passed`
+
+## Latest checkpoint (March 22, 2026, Phase 5 post-promotion open queue collapsed into five lanes)
+- After promoting `0020300166` to `source_limited`, the widened `v2` PM report leaves `20` open lineup-related PM games:
+  - source:
+    - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/phase5_pm_reference_report_ABCDE_20260322_v2/pm_reference_characterization.csv`
+  - lane summary:
+    - mixed minute + event-row holdout: `1` game / `3` PM rows
+      - `0029700159`
+    - PM-reference-context note with raw artifact still open: `1` game / `23` PM rows
+      - `0020300778`
+    - period-start / exact-start boundary disagreements: `3` games / `14` PM rows
+      - `0020900445`
+      - `0020900189`
+      - `0021300593`
+    - same-clock control / review / guardrail lane: `5` games / `10` PM rows
+      - `0021700337`
+      - `0021700377`
+      - `0021700514`
+      - `0021801067`
+      - `0021900333`
+    - generic small off-court-credit survivors: `10` games / `30` PM rows
+      - `0021700813`
+      - `0021700653`
+      - `0021700886`
+      - `0021900201`
+      - `0021900419`
+      - `0021900487`
+      - `0021900622`
+      - `0021900920`
+      - `0041700117`
+      - `0041900155`
+- Period-start / exact-start boundary lane decisions are now explicit:
+  - `0020900189` stays `open`
+    - keep as unresolved Q2 Denver period-start boundary disagreement (`Billups` vs `Lawson` at `12:00`)
+    - the game is otherwise near-clean (`1` blocker row, `2` PM rows, tiny minute drift), but it is **not** a clean phantom-sub case like `0020300166`
+    - do not promote to `source_limited` and do not add a manual override
+    - main supporting files:
+      - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/phase5_block_residuals_20260322_v1/C_2006-2010/actionable_queue.csv`
+      - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/phase5_block_residuals_20260322_v1/C_2006-2010/game_quality.csv`
+      - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/intraperiod_proving_1998_2020_postpatch_20260321_v1/blocks/C_2006-2010/event_player_on_court_issues_2010.csv`
+  - `0021300593` stays `open`
+    - keep as unresolved exact-start cluster disagreement
+    - `period_starters_v6` favors `Lewis`, while `full_pbp_new` and cached `pbpv3` show `Cole` on the first `12:00` event and then an immediate flip, leaving `P2 E96-E99` too contradictory for either `source_limited` or override promotion
+    - main supporting files:
+      - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/phase5_block_residuals_20260322_v1/D_2011-2016/actionable_queue.csv`
+      - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/phase5_block_residuals_20260322_v1/D_2011-2016/game_quality.csv`
+      - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/intraperiod_proving_1998_2020_postpatch_20260321_v1/blocks/D_2011-2016/event_player_on_court_issues_2014.csv`
+    - do not promote to `source_limited` and do not add a manual override
+  - lane-level read:
+    - there are **no new safe `source_limited` promotions in this lane right now**
+    - `0020900445` remains the closest source-side phantom-sub shape, but it still stays `open` for now because the blocker row has not yet been promoted into a sparse residual annotation
+    - `0020900189` and `0021300593` are both stronger examples of true unresolved boundary disagreement and should remain open comparison cases
+- Same-clock control / review / guardrail lane is now explicitly separated from generic survivors:
+  - `0021700337` remains the non-opening FT/sub main negative guardrail
+  - `0021700514` remains an active same-clock teaching / review case
+  - `0021900333` remains a companion canary in that same family
+  - `0021700377` remains frozen as a scorer/sub negative tripwire
+  - `0021801067` remains in the registered same-clock boundary-review lane (`foul_free_throw_sub_same_clock_ordering`)
+  - none of these should be treated as new override candidates
+- Generic small off-court-credit survivor lane is now better defined:
+  - all `10` games are still `open`
+  - all have no material minute issue
+  - all have only `1-2` actionable `off_court_event_credit` rows
+  - the lane contains both:
+    - the already-reviewed larger survivors:
+      - `0021700886`
+      - `0021700653`
+      - `0021900487`
+      - `0021900920`
+    - and the smaller `2`-row survivors:
+      - `0021700813`
+      - `0021900201`
+      - `0021900419`
+      - `0021900622`
+      - `0041700117`
+      - `0041900155`
+  - `0041700117` now has an explicit lane decision:
+    - it looks closer to the generic small `off_court_event_credit` survivor lane than to an already-registered same-clock control lane
+    - keep it open, non-promoted, and not an override candidate
+- Practical queue consequence after this pass:
+  - the Phase 5 tail is now structured enough that the next in-order work should focus on one lane at a time, rather than continuing to review single games in descending PM-row count order
+  - recommended next lane order:
+    - `1.` period-start / exact-start boundary disagreements (`0020900445`, `0020900189`, `0021300593`)
+    - `2.` generic small off-court-credit survivors
+    - `3.` only then revisit the two special holdouts:
+      - `0020300778` as PM-reference-context note
+      - `0029700159` as the mixed minute + event-row case
+
+## Latest checkpoint (March 22, 2026, Phase 5 lane refinement after period-start and survivor subfamily review)
+- Re-reviewed the current first-priority lane:
+  - period-start / exact-start boundary disagreements:
+    - `0020900445`
+    - `0020900189`
+    - `0021300593`
+- Current conclusion for that lane stays conservative:
+  - **none of the three is safely promotable to `source_limited` yet**
+  - **none of the three has enough evidence for a manual override**
+- `0020900445` remains the closest source-limited candidate in the lane, but it still stays `open` for now:
+  - current shape:
+    - `1` actionable blocker row: `P2 E126`
+    - `status_detail = sub_out_player_missing_from_previous_lineup`
+    - no material minute issue
+    - `10` PM-reference rows, otherwise boundary-like `+/-2` residue
+  - interpretation:
+    - this still looks like a source-side phantom-sub style case rather than a broad lineup bug
+    - but until that row is explicitly promoted into a sparse residual annotation, keep the game in the `open` lane
+  - main supporting files:
+    - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/phase5_block_residuals_20260322_v1/C_2006-2010/actionable_queue.csv`
+    - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/phase5_block_residuals_20260322_v1/C_2006-2010/game_quality.csv`
+    - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/intraperiod_proving_1998_2020_postpatch_20260321_v1/blocks/C_2006-2010/event_player_on_court_issues_2010.csv`
+- `0020900189` remains `open`:
+  - unresolved Q2 Denver period-start boundary disagreement (`Billups` vs `Lawson` at `12:00`)
+  - near-clean game profile, but not a clean impossible phantom row like `0020300166`
+  - do not promote to `source_limited` and do not add a manual override
+- `0021300593` remains `open`:
+  - unresolved exact-start cluster disagreement (`Cole` / `Lewis` at the first `12:00` sequence)
+  - contradictory source picture remains too strong for either `source_limited` or override promotion
+  - do not promote to `source_limited` and do not add a manual override
+- Re-reviewed the generic small `off_court_event_credit` survivor lane and split it into useful sublabels:
+  - rebound-credit survivors:
+    - `0021900201`
+    - `0021900419`
+    - `0021900487`
+    - `0021900920`
+    - `0041900155`
+  - FT/foul-credit survivors:
+    - `0021700653`
+    - `0021700813`
+    - `0021900622`
+    - `0041700117`
+  - field-goal-credit singleton:
+    - `0021700886`
+- Important interpretation:
+  - these are **tracking subfamilies only**, not promotable buckets
+  - across the whole lane, the shared shape still dominates:
+    - `primary_quality_status = open`
+    - no material minute issue
+    - only `1-2` actionable `off_court_event_credit` rows
+    - tiny minute drift only
+    - paired `+/-1` or `+/-2` PM residue
+  - none of these subfamilies currently has evidence strong enough for `source_limited` or manual override promotion
+- `0041700117` now has an explicit placement inside that lane:
+  - keep it in the generic FT/foul-credit survivor subfamily
+  - it is **not** currently part of an already-registered same-clock control lane
+  - it is **not** an override or source-limited candidate
+- Practical next-step consequence after this pass:
+  - the next highest-value work is still inside the period-start / exact-start lane
+  - specifically:
+    - either promote `0020900445 P2 E126` with a sparse residual annotation once the evidence threshold is judged sufficient
+    - or explicitly document why it still falls short, so the lane can be considered fully triaged without an ambiguous “closest case” hanging open
+
+## Latest checkpoint (March 22, 2026, `0020900445` promoted to source-limited after raw-source trace)
+- Resolved the prior “closest case but still open” ambiguity for `0020900445`.
+- Added a sparse residual annotation:
+  - `source_limited__0020900445__p2__t1610612749__player703__e126__20260322`
+  - path:
+    - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/overrides/correction_manifest.json`
+- Promotion rationale:
+  - `period_starters_v6` resolves Milwaukee Q2 with:
+    - `2294 / 101124 / 201975 / 201601 / 2557`
+    - that is `Charlie Bell / Hakim Warrick / Jodie Meeks / Luc Mbah a Moute / Luke Ridnour`
+    - `Kurt Thomas (703)` is already off
+  - `full_pbp_new` first Q2 possession at `720` shows the same Milwaukee five on court
+  - decoded cached `pbpv3` from `nba_raw.db` still contains the contradictory `P2 12:00` row:
+    - `SUB: Mbah a Moute FOR Thomas`
+  - downstream residual evidence matches the same read:
+    - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/intraperiod_proving_1998_2020_postpatch_20260321_v1/blocks/C_2006-2010/event_player_on_court_issues_2010.csv`
+    - both `current_team_lineup` and `previous_team_lineup` already exclude Thomas at `P2 E126`
+  - interpretation:
+    - `P2 E126` is now documented as an upstream phantom-sub row
+    - keep the runtime lineup unchanged
+    - the remaining Q4 `1:50` PM residue is a separate same-clock boundary effect, not evidence against the P2 promotion
+- Rebuilt the affected `2006-2010` residual bundle:
+  - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/phase5_block_residuals_20260322_v2/C_2006-2010/summary.json`
+  - key result:
+    - C block `quality_status_counts` now include `source_limited = 1`
+    - C block `open = 1`
+    - C block `source_limited_residual_rows = 1`
+- Rebuilt the combined widened PM characterization:
+  - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/phase5_pm_reference_report_ABCDE_20260322_v3/summary.json`
+  - combined counts now shift from the prior `1742 / 70 / 48` split? No:
+    - prior combined `v2`: `candidate_boundary_difference = 1742`, `lineup_related = 80`, `source_limited_upstream_error = 38`
+    - current combined `v3`: `candidate_boundary_difference = 1742`, `lineup_related = 70`, `source_limited_upstream_error = 48`
+  - bundle-level effect:
+    - C block moved from `12 lineup_related / 0 source_limited` to `2 lineup_related / 10 source_limited`
+  - open lineup-related PM games now drop:
+    - `20 -> 19`
+- `0020900445` now materializes cleanly in the rebuilt artifacts:
+  - `primary_quality_status = source_limited` in:
+    - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/phase5_block_residuals_20260322_v2/C_2006-2010/game_quality.csv`
+  - accepted source-limited event row in:
+    - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/phase5_block_residuals_20260322_v2/C_2006-2010/source_limited_residuals.csv`
+  - all `10` PM rows reclassified to `pm_characterization = source_limited_upstream_error` in:
+    - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/phase5_pm_reference_report_ABCDE_20260322_v3/pm_reference_characterization.csv`
+- Lane consequences after this promotion:
+  - period-start / exact-start boundary lane shrinks to two still-open comparison games:
+    - `0020900189`
+    - `0021300593`
+  - `0020900445` moves out of the open queue and into the documented source-limited set
+  - source-limited PM-reference games in the widened report now include:
+    - `0029800661`
+    - `0049700045`
+    - `0029900342`
+    - `0020300166`
+    - `0029800075`
+    - `0020900445`
+- Updated practical queue after this pass:
+  - same-clock control / review / guardrail lane remains unchanged
+  - generic small off-court-credit survivor lane remains unchanged
+  - highest remaining unresolved decision lane is now the two-game period-start / exact-start pair:
+    - `0020900189`
+    - `0021300593`
+  - after that, only the generic survivor lane plus the two special holdouts remain:
+    - `0020300778`
+    - `0029700159`
+- Focused validation after the manifest promotion and report rebuild:
+  - `PYTHONPATH=. /opt/anaconda3/envs/darko311/bin/python -m pytest -q tests/test_lineup_correction_manifest.py tests/test_build_lineup_residual_outputs.py tests/test_build_plus_minus_reference_report.py`
+  - result: `7 passed`
+ 
+## Latest checkpoint (March 22, 2026, Phase 5 small-survivor lane split finalized)
+- Used sub-agents to finish the next queue-shaping pass over the remaining `19` open lineup-related PM games.
+- No new promotion or re-laning cleared the evidence bar in this pass.
+- Durable lane map now looks like:
+  - period-start / exact-start boundary disagreements:
+    - `0020900189`
+    - `0021300593`
+  - same-clock control / review / guardrail lane:
+    - `0021700337`
+    - `0021700377`
+    - `0021700514`
+    - `0021801067`
+    - `0021900333`
+  - rebound-credit survivor micro-family:
+    - `0021900201`
+    - `0021900419`
+    - `0021900487`
+    - `0021900920`
+    - `0041900155`
+  - FT/foul-credit survivor micro-family:
+    - `0021700653`
+    - `0021700813`
+    - `0021900622`
+    - `0041700117`
+  - field-goal-credit singleton:
+    - `0021700886`
+  - special holdouts:
+    - `0020300778`
+    - `0029700159`
+- Rebound-credit family conclusion:
+  - keep all five games open as one generic rebound-credit micro-family
+  - do **not** force them into an existing same-clock review lane just because some appear in earlier selected-lane artifacts
+  - shared shape:
+    - exactly one actionable `off_court_event_credit` rebound row each
+    - no material minute issue
+    - tiny paired PM residue only
+    - `on_current_lineup = False` and `on_previous_lineup = False` with identical current/previous lineups
+  - strongest members remain `0021900487` and `0021900920`, but neither is source-trace grade yet
+- FT/foul-credit family conclusion:
+  - keep all four games open as one generic FT/foul-credit micro-family
+  - none is promotable to `source_limited_upstream_error`
+  - none cleanly belongs in an existing named same-clock control / teaching lane
+  - `0041700117` remains the only plausible re-lane candidate, but still fits the same generic tiny off-court FT/foul-credit shape
+- Field-goal singleton conclusion:
+  - `0021700886` stays open as the lone field-goal-credit survivor
+  - it is not currently a source-limited candidate and not a same-clock control case
+- Practical consequence:
+  - the next in-order Phase 5 decisions should still start with the two-game period-start / exact-start lane
+  - after that, work the generic survivor tail by micro-family, not by PM-row count alone
+- No code or artifact changed in this pass; this was a queue-classification / handoff-tightening update only.
+
+## Latest checkpoint (March 22, 2026, Phase 5 period-start lane fully triaged as contradiction-only)
+- Re-opened the two remaining period-start / exact-start comparison games with parallel sub-agent and local source traces:
+  - `0020900189`
+  - `0021300593`
+- Durable conclusion after direct re-check:
+  - both games stay `open`
+  - neither is promotable to `source_limited_upstream_error`
+  - neither has evidence strong enough for a manual override
+  - this lane is now better described as a **true contradiction lane**, not a lane of “almost-promotable” phantom-sub cases
+- `0020900189` decision:
+  - keep `open` as an unresolved Q2 Denver boundary disagreement
+  - strongest contradiction:
+    - `period_starters_v6` P2 Denver already has `Ty Lawson (201951)` active at the boundary
+    - `full_pbp_new` first Q2 row at `TimeRemainingStart = 720` still has `Chauncey Billups (1497)` on the Denver lineup
+    - `full_pbp_new` only flips to Lawson on the next Q2 row at `702`
+  - cached `pbpv3` also keeps the opening sequence ambiguous rather than resolving it:
+    - `Start of 2nd Period`
+    - technical foul
+    - `SUB: Lawson FOR Billups`
+    - technical FT
+    - all at `12:00`
+  - practical interpretation:
+    - this is not a clean impossible phantom-sub row like `0020300166` or `0020900445`
+    - keep it as a comparison / contradiction case
+- `0021300593` decision:
+  - keep `open` as an unresolved exact-start cluster disagreement
+  - strongest contradiction:
+    - `period_starters_v6` P2 Miami already has `Roger Mason Jr. (2427)` active and no `Norris Cole (202708)`
+    - `full_pbp_new` first Q2 boundary row at `TimeRemainingStart = 720`, `event_id = 42`, still has `Cole` on the Miami lineup
+    - the next Q2 row at the same `720` boundary, `event_id = 43`, flips to `Mason`
+  - cached `pbpv3` shows the same unresolved cluster:
+    - `Cole S.FOUL`
+    - `SUB: Mason Jr. FOR Cole`
+    - both at `12:00`, with the FTs split around them
+  - practical interpretation:
+    - this is a real exact-start ordering conflict, not a safe one-sided upstream-source failure
+    - keep it as a comparison / contradiction case
+- Supporting files for this pass:
+  - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/period_starters_v6.parquet`
+  - `/Users/konstantinmedvedovsky/migrate_tpdev/fixed_data/raw_input_data/tpdev_data/full_pbp_new.parq`
+  - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/nba_raw.db`
+  - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/phase5_block_residuals_20260322_v2/C_2006-2010/game_quality.csv`
+  - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/phase5_block_residuals_20260322_v2/C_2006-2010/actionable_queue.csv`
+  - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/phase5_block_residuals_20260322_v1/D_2011-2016/game_quality.csv`
+  - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/phase5_block_residuals_20260322_v1/D_2011-2016/actionable_queue.csv`
+- Practical queue consequence:
+  - the period-start / exact-start lane is now exhausted for promotion decisions in the current cycle
+  - next in-order Phase 5 work should move to the two special holdouts:
+    - `0020300778`
+    - `0029700159`
+- No code or artifact changed in this pass; this was a source-trace / queue-decision checkpoint only.
+
+## Latest checkpoint (March 22, 2026, special holdout lane re-opened and de-ambiguated)
+- Re-opened the two special holdouts with local artifact checks:
+  - `0020300778`
+  - `0029700159`
+- Durable conclusion after this pass:
+  - neither game gets a new promotion
+  - `0029700159` stays exactly where it already belonged: mixed minute holdout with one accepted source-limited event row and unresolved downstream minute tradeoff
+  - `0020300778` needs a firmer framing correction: it should **not** currently be narrated as only a soft PM-reference/source-context note, because the active Block B residual bundle still shows a broad material-minute profile
+- `0020300778` decision:
+  - keep `open`
+  - do **not** promote to `source_limited_upstream_error`
+  - do **not** demote all the way into a harmless PM-reference-context note set
+  - current active Block B shape is still broad:
+    - `primary_quality_status = open`
+    - `has_material_minute_issue = True`
+    - `n_pm_reference_delta_rows = 23`
+    - `max_abs_minute_diff = 0.466667`
+    - `sum_abs_minute_diff_over_0_1 = 6.716667`
+    - `n_actionable_event_rows = 0`
+  - practical interpretation:
+    - the old Jeffries `0:00` phantom-three history may still explain part of the PM signal
+    - but the current widened `B_2001-2005` residual artifact is not just a tiny Jeffries-context tail; it is a game-wide material-minute holdout touching many players
+    - until a game-specific validation pass proves otherwise, keep `0020300778` in the special holdout lane as a broad unresolved lineup/minute defect
+- `0029700159` decision:
+  - keep `open`
+  - keep the accepted `P3 E349` source-limited split in place
+  - do **not** add a further source-limited promotion in this pass
+  - current live Block A shape remains:
+    - `primary_quality_status = open`
+    - `has_active_correction = True`
+    - `has_source_limited_residual = True`
+    - `has_material_minute_issue = True`
+    - `has_severe_minute_issue = True`
+    - remaining actionable blocker rows are player-game minute mismatches for:
+      - `Bryant Stith`
+      - `Priest Lauderdale`
+      - `Dean Garrett`
+  - practical interpretation:
+    - the accepted event-row annotation cleanly isolates the broken source sub row
+    - the surviving Stith / Lauderdale / Garrett minute tradeoff is still the real blocker and should remain documented-unresolved
+- Supporting files for this pass:
+  - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/phase5_pm_reference_report_ABCDE_20260322_v3/pm_reference_characterization.csv`
+  - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/phase5_block_residuals_20260322_v1/B_2001-2005/game_quality.csv`
+  - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/phase5_block_residuals_20260322_v1/B_2001-2005/actionable_queue.csv`
+  - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/block_A_live_postqueue_20260322_v1_residual/game_quality.csv`
+  - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/block_A_live_postqueue_20260322_v1_residual/actionable_queue.csv`
+  - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/block_A_live_postqueue_20260322_v1_residual/source_limited_residuals.csv`
+  - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/overrides/correction_manifest.json`
+- Practical queue consequence:
+  - special holdouts are now cleaner:
+    - `0020300778` = broad material-minute holdout, not just PM-reference context
+    - `0029700159` = mixed minute holdout with one accepted source-limited event-row split already carved out
+  - next in-order Phase 5 work should start with a direct game-specific validation / source pass on `0020300778`
+  - `0029700159` should only be revisited if new evidence appears for the remaining minute tradeoff, not to relitigate the already-accepted `E349` split
+- No code or artifact changed in this pass; this was a holdout-lane classification checkpoint only.
+
+## Latest checkpoint (March 22, 2026, Golden Canary reproducibility review corrected)
+- Re-opened the two reviewer-flagged Golden Canary discrepancies directly:
+  - `0029700159`
+  - `0029800606`
+- Durable conclusion after this pass:
+  - the original review concern was directionally right, but the two games fail for **different** reasons
+  - `0029700159` is primarily an **override-lineage drift** problem, not a same-input nondeterminism problem
+  - `0029800606` is an **unstable control / parity split** problem; the widened canary threshold should not be narrated as a trustworthy stable baseline
+- `0029700159` reproducibility decision:
+  - the opening-cluster carryover fix is still **not** implicated
+  - the saved narrow Block A lineage and the current live broader Golden Canary lineage were **not** built from the same effective `P3 E349-372` lineup-window state
+  - older narrow artifact lineage:
+    - `block_A_postpatch_20260321_v2`
+    - `intraperiod_proving_1998_2020_postpatch_20260321_v1/blocks/A_1998-2000`
+    - both show the earlier Stith-on-court current lineup at `P3 E349`:
+      - `[1517, 111, 1504, 179, 271]`
+    - those artifacts keep the game in the smaller “open but narrow” shape
+  - current live broader lineage:
+    - `overrides/lineup_window_overrides.json`
+    - `overrides/correction_manifest.json`
+    - `golden_canary_suite_20260322_v2/rerun`
+    - current live payload uses Lauderdale in the prior Stith slot for `P3 E349-366`:
+      - `[1517, 111, 271, 1504, 968]`
+    - Golden Canary reproduces the broader current live shape:
+      - `minutes_mismatch_rows = 5`
+      - `minute_outlier_rows = 3`
+      - `plus_minus_mismatch_rows = 4`
+      - `game_max_minutes_abs_diff = 11.8666666667`
+  - important note-cleanup:
+    - the old evidence text saying “using the Stith slot” was misleading against the live payload
+    - corrected the sidecar / manifest wording to say Lauderdale is being used in the prior Stith slot
+  - practical interpretation:
+    - this is not an unexplained “same inputs, different output” case anymore
+    - it is a changed-override-lineage case, and the broader current envelope is real for the current live repo state
+    - there may still be a smaller secondary run-context difference inside the broader lineage (`block_A_live_postqueue_20260322_v1` vs fresh single-game reruns), but the large `1.85 -> 11.87` jump is now explained by the override-state split
+- `0029800606` control-baseline decision:
+  - keep the accepted row-grain source-limited interpretation:
+    - Vinny Del Negro `P5 E544` foul remains a valid `source_limited_upstream_error`
+  - do **not** keep narrating the widened Golden Canary envelope as a stable source-limited control baseline
+  - saved block-scale artifacts remain consistently narrow:
+    - `block_A_postpatch_20260321_v2/minutes_plus_minus_audit_1999.csv`
+    - `block_A_live_postqueue_20260322_v1/minutes_plus_minus_audit_1999.csv`
+    - both show only the small Del Negro tail:
+      - `Minutes_diff = -0.2000000000`
+      - `Plus_Minus_diff = 0`
+      - no Workman / Tim Thomas blow-up
+  - fresh current reruns reproduce the broader live split:
+    - `golden_canary_suite_20260322_v2/rerun/minutes_plus_minus_audit_1999.csv`
+    - `_tmp_validate_0029800606_single_20260322_v1/minutes_plus_minus_audit_1999.csv`
+    - both show the broader OT swap pattern:
+      - Vinny Del Negro `+4.7733333333` minutes / `-6` PM
+      - Haywoode Workman `-4.4883333333` minutes / `+4` PM
+      - Tim Thomas `-0.4833333333` minutes / `+2` PM
+  - practical interpretation:
+    - current fresh reruns do reproduce the broader shape
+    - but because saved block artifacts remain narrow, this is **not** a clean stable control baseline
+    - reclassify `0029800606` mentally as an unstable control / runner-parity case until the block-vs-fresh split is rooted more deeply
+    - the `golden_canary_suite_20260322_v2` green status should therefore be treated as historically informative, not as a clean accepted gate for this case
+- Runner hardening note:
+  - `prepare_local_runtime_inputs()` still uses global “latest cached runtime copy wins” reuse for core files
+  - for the files checked in this pass (`nba_raw.db`, `playbyplayv2.parq`, `period_starters_v5.parquet`, `period_starters_v6.parquet`), the reused bytes match current live files
+  - so that reuse behavior did **not** explain the concrete `0029800606` split here
+  - but it still weakens provenance and should be hardened before relying on dated canary artifacts as strict reproducibility gates
+- Supporting files for this pass:
+  - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/golden_canary_manifest_20260321_v1.json`
+  - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/golden_canary_suite_20260322_v1/summary.json`
+  - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/golden_canary_suite_20260322_v2/summary.json`
+  - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/golden_canary_suite_20260322_v2/rerun/minutes_plus_minus_audit_1998.csv`
+  - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/golden_canary_suite_20260322_v2/rerun/minutes_plus_minus_audit_1999.csv`
+  - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/golden_canary_suite_20260322_v2/rerun/event_player_on_court_issues_1998.csv`
+  - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/block_A_postpatch_20260321_v2/minutes_plus_minus_audit_1998.csv`
+  - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/block_A_postpatch_20260321_v2/event_player_on_court_issues_1998.csv`
+  - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/block_A_live_postqueue_20260322_v1/minutes_plus_minus_audit_1998.csv`
+  - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/block_A_live_postqueue_20260322_v1/minutes_plus_minus_audit_1999.csv`
+  - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/block_A_live_postqueue_20260322_v1/event_player_on_court_issues_1999.csv`
+  - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/_tmp_validate_0029800606_single_20260322_v1/minutes_plus_minus_audit_1999.csv`
+  - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/overrides/lineup_window_overrides.json`
+  - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/overrides/lineup_window_override_notes.csv`
+  - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/overrides/correction_manifest.json`
+- Practical next step:
+  - before treating Golden Canary as a hard gate again, either:
+    - rebuild the dated suite from a pinned override/runtime snapshot
+    - or harden runner provenance so fresh reruns cannot silently compare against artifact bundles built from older live override states
+
+## Latest checkpoint (March 22, 2026, runner provenance hardened and PM deliverable artifact built)
+- Landed runner provenance hardening in:
+  - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/cautious_rerun.py`
+  - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/rerun_selected_games.py`
+  - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/run_golden_canary_suite.py`
+- Durable provenance change:
+  - fresh reruns now default to `runtime_input_cache_mode = fresh-copy`
+  - core runtime inputs are copied into the current run’s own `_local_runtime_cache` instead of silently pointing at the repo-wide newest old cache by basename
+  - runners now snapshot the live `file_directory/overrides` surface into a per-run `_local_runtime_file_directory`
+  - this directly closes the specific drift path that mattered for `0029700159`, where the live lineup-window override surface was not previously pinned into the run
+  - fresh reruns now emit:
+    - `runtime_input_provenance.json`
+    - `runtime_input_cache_mode` in `summary.json`
+    - `runtime_file_directory` in `summary.json`
+- Live sanity check after the patch:
+  - reran `0029800606` through:
+    - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/_tmp_validate_0029800606_single_20260322_v2_provenance`
+  - confirmed real-run provenance output now shows:
+    - `runtime_input_cache_mode = fresh-copy`
+    - `db_path = copied_to_run_cache`
+    - `parquet_path = copied_to_run_cache`
+    - `notebook_dump_path = copied_to_run_cache`
+    - pinned runtime file directory:
+      - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/_tmp_validate_0029800606_single_20260322_v2_provenance/_local_runtime_file_directory`
+    - override snapshot file count: `6`
+  - the live rerun still reproduces the broader `0029800606` current shape (`3` minute mismatches / `2` outliers / `3` PM mismatches), so the provenance fix improved auditability but did not by itself resolve that game’s narrow-vs-broad lineage split
+- Important usage note:
+  - the old risky reuse path is no longer the default
+  - an explicit `reuse-latest-global-cache` mode still exists only as an operator-controlled escape hatch
+  - do **not** use that explicit reuse mode for validation gates or dated canary acceptance artifacts
+- Focused validation for the hardening pass:
+  - `PYTHONPATH=. /opt/anaconda3/envs/darko311/bin/python -m pytest -q tests/test_cautious_rerun.py tests/test_rerun_selected_games.py tests/test_golden_canary_suite.py tests/test_build_plus_minus_reference_report.py`
+  - result: `11 passed`
+
+## Latest checkpoint (March 22, 2026, Phase 5 PM deliverable bundle published)
+- Built the reviewed no-rerun PM deliverable artifact at:
+  - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/phase5_pm_deliverable_ABCDE_20260322_v1`
+- Supporting reviewed lane map authored for the deliverable:
+  - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/phase5_pm_review_lane_map_20260322_v1.csv`
+- Deliverable outputs now include:
+  - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/phase5_pm_deliverable_ABCDE_20260322_v1/summary.json`
+  - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/phase5_pm_deliverable_ABCDE_20260322_v1/pm_lane_summary.csv`
+  - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/phase5_pm_deliverable_ABCDE_20260322_v1/pm_open_game_queue.csv`
+  - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/phase5_pm_deliverable_ABCDE_20260322_v1/pm_source_limited_games.csv`
+  - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/phase5_pm_deliverable_ABCDE_20260322_v1/pm_reference_only_sample.csv`
+- Deliverable headline counts are now serialized in artifact form instead of living only in prose:
+  - `reference_only_boundary`: `1742` rows / `610` games
+  - `source_limited_upstream`: `48` rows / `6` games
+  - `open_lineup_blocker`: `70` rows / `19` games
+- Open PM queue is now published as a concrete `19`-game reviewed lane map:
+  - `special_holdout_material_minute`: `2` games / `26` rows
+  - `contradiction_period_start_boundary`: `2` / `4`
+  - `same_clock_control_guardrail`: `5` / `10`
+  - `rebound_credit_survivor`: `5` / `14`
+  - `ft_foul_credit_survivor`: `4` / `10`
+  - `field_goal_credit_singleton`: `1` / `6`
+- Current source-limited PM game set is now published explicitly:
+  - `0020300166` (`2` rows)
+  - `0020900445` (`10`)
+  - `0029800075` (`2`)
+  - `0029800661` (`18`)
+  - `0029900342` (`4`)
+  - `0049700045` (`12`)
+- Practical consequence:
+  - the Phase 5 PM characterization / rename gap is materially closed at the artifact layer
+  - the reviewed queue narrative no longer depends only on `resume_notes.md`
+  - next in-order work should move from PM report-shaping back to actual queue reduction:
+    - highest-priority fresh game work remains `0020300778`
+    - `0029700159` should only be revisited if new minute-tradeoff evidence appears
+    - after the special holdouts, work the remaining generic PM survivors by micro-family rather than by PM-row count alone
+
+## Latest checkpoint (March 22, 2026, `0020300778` promoted out of the open PM queue)
+- Re-ran the direct game-specific validation / source pass on `0020300778` using the hardened provenance runner and three independent sub-agent reads.
+- Durable decision after this pass:
+  - `0020300778` should no longer sit in the open Phase 5 lineup-blocker queue
+  - it now meets the repo’s current whole-game `source_limited_upstream_error` standard, similar in shape to the already-accepted `0029800661` precedent
+- Evidence summary:
+  - the Jeffries phantom final event is already a live runtime fix, not an unconsumed historical note:
+    - `pbp_row_overrides.csv` still drops `20300778, event 462`
+    - current rerun provenance shows `pbp_row_overrides` was preloaded on the live path
+    - current boxscore audit is clean at `120-98` with `0` player/team counting-stat mismatches
+  - the remaining residual is broad but not severe:
+    - fresh rerun still has `23` minute mismatches and `23` PM mismatches
+    - `0` minute outliers over `0.5`
+    - `0` event-on-court rows
+    - residual summary shows `22` material-minute rows plus `1` tiny PM-only row
+  - the cross-source pattern now looks like an upstream source split, not a parser-lineup miss:
+    - output minutes match `pbpstats_player_box` on `23 / 23` players
+    - output minutes match BBR on `22 / 23` players
+    - the only BBR miss is the Steven/Steve Smith join artifact, not a real minute contradiction
+    - official and `tpdev_box*` minutes match `0 / 23` player rows
+    - `tpdev_pbp/full_pbp_new` remains a small-drift counter-source, but that does not block source-limited promotion here because the live shape still has no event-on-court evidence, no severe outliers, and the whole-game split mirrors the accepted `0029800661` pattern more than an unresolved parser defect
+  - raw-source trace stays informative but is not the whole story:
+    - raw PBP-style feeds (`playbyplayv2`, cached `pbpv3`, `full_pbp_new`, `pbpstats_player_box`) keep the Jeffries `0:00` three / `101` interpretation
+    - official summary / box and BBR box tables reject that shot and keep Washington at `98`
+    - after the runtime row drop, the counting path is already box-clean, so the surviving queue status is better narrated as a documented source conflict than as an unfixed row-override task
+- Canonical edits / refreshed artifacts:
+  - added a game-level residual annotation in:
+    - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/overrides/correction_manifest.json`
+  - authored the updated open-lane map without `0020300778`:
+    - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/phase5_pm_review_lane_map_20260322_v2.csv`
+  - next step after the manifest edit is to rebuild:
+    - Block B residual bundle
+    - combined PM reference report
+    - PM deliverable bundle
+- Practical queue consequence:
+  - the open PM queue should drop from `19` games to `18`
+  - the special-holdout lane should collapse from two games down to `0029700159` only
+  - the next in-order work after the rebuild should be the remaining true open lanes, not further relitigation of `0020300778`
+
+## Latest checkpoint (March 22, 2026, `0020300778` rebuilds completed)
+- Rebuilt the affected Phase 5 artifacts after the `0020300778` manifest promotion:
+  - Block B residual bundle:
+    - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/phase5_block_residuals_20260322_v3/B_2001-2005`
+  - combined PM characterization report:
+    - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/phase5_pm_reference_report_ABCDE_20260322_v4`
+  - reviewed PM deliverable bundle:
+    - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/phase5_pm_deliverable_ABCDE_20260322_v2`
+- Block B now reflects the new classification cleanly:
+  - `0020300778` now has `primary_quality_status = source_limited`
+  - all `23` residual rows for that game now carry:
+    - `effective_residual_class = source_limited_upstream_error`
+    - `effective_is_blocking = False`
+  - bundle-level status moved from:
+    - `open = 5`, `source_limited = 1`
+    - to `open = 4`, `source_limited = 2`
+  - bundle blocker counts improved from:
+    - `actionable_residual_rows = 34`
+    - to `12`
+  - material-minute blocker rows improved from:
+    - `24`
+    - to `2`
+- Combined PM counts now serialize as:
+  - `reference_only_boundary`: `1742` rows / `610` games
+  - `source_limited_upstream`: `71` rows / `7` games
+  - `open_lineup_blocker`: `47` rows / `18` games
+- The reviewed open-lane queue is now materially cleaner:
+  - `special_holdout_material_minute`: `1` game / `3` rows
+    - only `0029700159` remains
+  - `rebound_credit_survivor`: `5` games / `14` rows
+  - `same_clock_control_guardrail`: `5` / `10`
+  - `ft_foul_credit_survivor`: `4` / `10`
+  - `field_goal_credit_singleton`: `1` / `6`
+  - `contradiction_period_start_boundary`: `2` / `4`
+- The source-limited PM game set is now:
+  - `0020300778` (`23` rows)
+  - `0029800661` (`18`)
+  - `0049700045` (`12`)
+  - `0020900445` (`10`)
+  - `0029900342` (`4`)
+  - `0029800075` (`2`)
+  - `0020300166` (`2`)
+- Validation for this pass:
+  - `python build_lineup_residual_outputs.py --run-dir /Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/intraperiod_proving_1998_2020_postpatch_20260321_v1/blocks/B_2001-2005 --output-dir /Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/phase5_block_residuals_20260322_v3/B_2001-2005`
+  - `python build_plus_minus_reference_report.py ... --output-dir /Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/phase5_pm_reference_report_ABCDE_20260322_v4`
+  - `python build_plus_minus_reference_report.py ... --lane-map-csv /Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/phase5_pm_review_lane_map_20260322_v2.csv --output-dir /Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/phase5_pm_deliverable_ABCDE_20260322_v2`
+  - `correction_manifest.json` parses cleanly
+- Practical next step:
+  - special holdouts are no longer the main Phase 5 blocker family
+  - keep `0029700159` open unless new minute-tradeoff evidence surfaces
+  - work the remaining open queue by family:
+    - `0021700886` field-goal singleton
+    - rebound-credit survivors
+    - FT/foul-credit survivors
+
+## Latest checkpoint (March 22, 2026, next open-lane family pass stayed conservative)
+- Used three parallel sub-agent passes plus local artifact review on the next open Phase 5 families:
+  - `0021700886` field-goal singleton
+  - rebound-credit survivors
+  - FT/foul-credit survivors
+- Durable result:
+  - no new promotions landed from this pass
+  - the remaining `18`-game open queue stays structurally the same after direct family pressure
+- `0021700886` result:
+  - keep `0021700886` open
+  - it is still the cleanest isolated singleton in the queue:
+    - `6` PM rows
+    - `max_abs_pm_diff = 2`
+    - `max_abs_minute_diff = 0`
+    - `1` actionable event-on-court row
+  - but it still falls short of source-limited proof:
+    - `P3 E482` credits Emmanuel Mudiay with a field goal while he is on neither current nor previous Knicks lineup
+    - the local candidate engine still emits a plausible `Mudiay in / Burke out` repair proposal
+    - that proposal is only `ambiguous_runner_up`, has tied local scores, strongly negative external alignment, and the case is already manually reviewed / rejected as ambiguous
+  - practical interpretation:
+    - real isolated blocker, not promotion-ready source-limited evidence
+- Rebound-credit survivor family result:
+  - keep the whole rebound-credit micro-family generic open:
+    - `0021900201`
+    - `0021900419`
+    - `0021900487`
+    - `0021900920`
+    - `0041900155`
+  - strongest members remain `0021900487` and `0021900920`, but neither has reached source-trace grade
+  - current evidence shape remains the same across the family:
+    - one `StatsRebound` off-court-credit row
+    - tiny PM tail only
+    - no material minute issue
+    - no accepted source-limited residuals in Block E
+  - practical interpretation:
+    - unresolved boundary/source-conflict survivors, not promotable source-limited rows
+- FT/foul-credit survivor family result:
+  - keep the whole FT/foul-credit family generic open:
+    - `0021700653`
+    - `0021700813`
+    - `0021900622`
+    - `0041700117`
+  - `0041700117` remains the closest re-lane candidate, but still not enough for either:
+    - source-limited promotion
+    - promotion into a named same-clock control / guardrail lane
+  - all four remain tiny `off_court_event_credit` blockers with event-on-court evidence and no material minute drift
+- Practical queue consequence:
+  - the reviewed `18`-game queue now has one recent real reduction (`0020300778`) and one explicit no-promo family pass behind it
+  - near-term Phase 5 work should not relitigate the rebound or FT/foul families without new source evidence
+  - if continuing queue reduction immediately, the only remaining singled-out case worth a deeper bespoke pass is `0029700159`; otherwise move on to the next plan-phase work rather than repeatedly reclassifying the same micro-families
+
+## Latest checkpoint (March 22, 2026, Phase 6 scouting plus first E-block close)
+- Re-read the post-Phase-5 actionable lineup queue by block from the current residual bundles.
+- Important distinction:
+  - the reviewed PM deliverable queue (`18` games) is still only the PM-linked subset
+  - the broader Lane 1 actionable lineup queue outside Block A is now `22` open games after the E refresh:
+    - Block B `v3`: `4`
+    - Block C `v2`: `1`
+    - Block D `v1`: `1`
+    - Block E `v2`: `16`
+- Block B scouting result:
+  - `0020400335` stays open
+  - treat it as unresolved source-conflict / insufficient-local-context, not source-limited and not a new manual override
+  - current evidence is still:
+    - five P2 Harrington off-court event credits
+    - one severe minute blocker (`1.2167`)
+    - candidate engine only `insufficient_local_context`
+    - cross-source minutes split too widely to anchor a clean repair
+    - prior manual review / canary history already rejects the earlier same-clock attempt
+  - practical consequence:
+    - do not force a promotion here just to shrink the queue
+- Secondary Block B result:
+  - `0020101009` remains the cleanest remaining Block B source-limited candidate, but it still stays open for now
+  - the direct raw-source trace does show a malformed-looking P4 `1:16-1:12` substitution cluster:
+    - `Alexander FOR Robinson`
+    - `Foster FOR Ollie`
+    - both rows name players who are absent on both sides of the local tracked lineup state
+    - `full_pbp_new` supports the settled closing lineups after the cluster
+  - but there is still no candidate-engine or manual-review proof strong enough to promote it without hand-waving, so keep it open rather than over-claiming `source_limited`
+- Holdout result:
+  - `0029700159` stays exactly where it was
+  - keep the accepted `P3 E349` source-limited split and keep the rest of the game open as the mixed minute-tradeoff holdout
+  - do not relitigate it unless we later run the paired hardened rerun of:
+    - current live DEN P3 window state
+    - archived Jackson-out alternative
+- Landed the first concrete Phase 6 E-block close:
+  - added three event-level `source_limited_upstream_error` annotations in `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/overrides/correction_manifest.json` for `0021700482`:
+    - `P5 E738` Tyler Zeller (`player_id = 203092`)
+    - `P5 E738` Rondae Hollis-Jefferson (`player_id = 1626178`)
+    - `P5 E739` Jarrett Allen (`player_id = 1628386`)
+  - rationale:
+    - cached `pbpv3` emits a contradictory Nets `0.9`-second OT cleanup cluster:
+      - `Zeller FOR LeVert`
+      - `Allen FOR Harris`
+      - `Hollis-Jefferson FOR Zeller`
+      - `Harris FOR Allen`
+    - `full_pbp_new` supports only the settled closing Nets state with Hollis-Jefferson and Allen active at `0.0`
+    - the final `Harris FOR Allen` row is not compatible with that supported closing state
+    - this is narrow source bookkeeping noise, not a new live override target
+- Rebuilt Block E residual outputs at:
+  - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/phase5_block_residuals_20260322_v2/E_2017-2020`
+- Block E effect after the rebuild:
+  - `quality_status_counts` moved:
+    - `open: 17 -> 16`
+    - `source_limited: 0 -> 1`
+  - `blocker_counts` moved:
+    - `actionable_event_on_court_rows: 21 -> 18`
+    - `actionable_residual_rows: 31 -> 28`
+  - `0021700482` is now:
+    - `primary_quality_status = source_limited`
+    - `has_open_actionable_residual = False`
+    - `n_actionable_event_rows = 0`
+    - `n_pm_reference_delta_rows = 0`
+    - only tiny remaining minute tails (`max_abs_minute_diff = 0.0233`)
+- Important scope note:
+  - I did **not** rebuild the PM deliverable after this pass
+  - `0021700482` has `0` PM-reference rows, so the reviewed PM queue and Phase 5 PM artifacts are unchanged
+- Clear next target after this E refresh:
+  - `0021700394`
+  - it is now the clearest remaining pure-minute Block E blocker:
+    - `10` player-game minute blocker rows
+    - `max_abs_minute_diff = 0.1533`
+    - `0` event-on-court rows
+    - `0` PM rows
+  - current read:
+    - keep it open for now
+    - official / BBR / `pbpstats_box` mostly align against the current output, so this does **not** meet the repo's current source-limited bar
+    - the right next step is a direct late-game timing / stint trace, not a premature promotion
+- Validation for this pass:
+  - `python build_lineup_residual_outputs.py --run-dir /Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/intraperiod_proving_1998_2020_postpatch_20260321_v1/blocks/E_2017-2020 --output-dir /Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/phase5_block_residuals_20260322_v2/E_2017-2020`
+  - `PYTHONPATH=. /opt/anaconda3/envs/darko311/bin/python -m pytest -q tests/test_lineup_correction_manifest.py tests/test_build_lineup_residual_outputs.py`
+  - result: `6 passed`
+- Next Phase 6 checkpoint after the Block B source-limited cleanup:
+  - first finished the previously investigated `0020400526` close in data:
+    - added the Jeffries `P3 E453` `source_limited_upstream_error` annotation in `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/overrides/correction_manifest.json`
+    - rebuilt Block B at `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/phase5_block_residuals_20260322_v4/B_2001-2005`
+    - Block B moved `open: 4 -> 3`, `source_limited: 2 -> 3`
+    - `0020400526` is now `primary_quality_status = source_limited`
+  - then completed the next real Block B close for `0020101009`:
+    - added three narrow `source_limited_upstream_error` annotations in `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/overrides/correction_manifest.json` for:
+      - `P4 E430` Pistons `player_id = 361` (`Clifford Robinson`)
+      - `P4 E436` Pacers `player_id = 1563` (`Kevin Ollie`)
+      - `P4 E436` Pacers `player_id = 1902` (`Jeff Foster`)
+    - rationale:
+      - raw cached `pbpv3` emits a malformed late `1:16-1:12` timeout / ejection / flagrant cluster:
+        - `Williamson T.FOUL`
+        - `Williamson Ejection`
+        - `O'Neal FLAGRANT.FOUL.TYPE2`
+        - `O'Neal Ejection`
+        - then `SUB: Alexander FOR Robinson`
+        - later `SUB: Foster FOR Ollie`
+      - both named outgoing players had already exited earlier in Q4
+      - local event-on-court audit shows those rows are impossible in the tracked pre-cluster state
+      - `full_pbp_new` only supports the settled closing groups after the cluster
+      - the only surviving minute tail is tiny (`Kevin Ollie = 0.0667`) and matches `pbpstats_box` / BBR rather than implying a runtime repair
+    - rebuilt Block B again at `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/phase5_block_residuals_20260322_v5/B_2001-2005`
+    - Block B effect after the rebuild:
+      - `quality_status_counts` moved:
+        - `open: 3 -> 2`
+        - `source_limited: 3 -> 4`
+      - `blocker_counts` moved:
+        - `actionable_event_on_court_rows: 9 -> 6`
+        - `actionable_residual_rows: 11 -> 8`
+      - Block B open queue is now only:
+        - `0020000628`
+        - `0020400335`
+      - Block B source-limited set is now:
+        - `0020101009`
+        - `0020300166`
+        - `0020300778`
+        - `0020400526`
+  - current conservative keep-open calls after the parallel review pass:
+    - `0020000628` stays open
+      - still best treated as ambiguous / manual-only
+      - only `1` event-on-court row plus a `0.25` minute tail
+      - not enough source evidence to promote safely
+    - `0020400335` stays open
+      - keep treating it as unresolved source-conflict / insufficient-local-context
+      - still the main remaining Block B severe-minute blocker:
+        - `5` P2 Harrington off-court rows
+        - `max_abs_minute_diff = 1.2167`
+      - candidate windows at `5:30` and `4:34` both stayed `insufficient_local_context` and still do not explain the earliest `E162` contradiction
+      - cross-source minutes remain too split to anchor a safe promotion:
+        - output / BBR near `24.95`
+        - official / `tpdev_box*` near `26.1667`
+        - `pbpstats_box` near `31.7333`
+        - `tpdev_pbp` near `32.7`
+      - do not force a `source_limited` promotion here
+    - `0021700394` stays open, but the diagnosis is now sharper:
+      - direct stint trace artifact: `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/_tmp_trace_stints_0021700394_live/0021700394`
+      - keep it out of the source-limited lane
+      - keep it out of the manual lineup-window lane for now
+      - current best read is a broader same-clock minute-accumulator / substitution-clock attribution defect, not a single late-Q4 local overlap
+      - important control:
+        - `Alex Abrines` is one of the `+9s` output-vs-stint rows even though his last traced stint ends in Q3
+      - practical consequence:
+        - next work on this game should be event-level accumulator tracing across the flagged same-clock clusters, not a local override
+  - broader Lane 1 actionable lineup queue outside Block A is now `20` open games:
+    - Block B `v5`: `2`
+    - Block C `v2`: `1`
+    - Block D `v1`: `1`
+    - Block E `v2`: `16`
+  - validation for this pass:
+    - `python /Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/build_lineup_residual_outputs.py --run-dir /Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/intraperiod_proving_1998_2020_postpatch_20260321_v1/blocks/B_2001-2005 --output-dir /Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/phase5_block_residuals_20260322_v5/B_2001-2005`
+    - `PYTHONPATH=. /opt/anaconda3/envs/darko311/bin/python -m pytest -q tests/test_lineup_correction_manifest.py tests/test_build_lineup_residual_outputs.py`
+    - result: `6 passed`
+- Next Phase 6 checkpoint after the Block E FT/foul-credit cleanup:
+  - landed four new event-scope `source_limited_upstream_error` closes in `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/overrides/correction_manifest.json`:
+    - `0021700653`
+      - `P4 E589` Dwight Howard
+      - `P4 E590` Dwight Howard
+    - `0021700813`
+      - `P4 E451` Jodie Meeks
+    - `0021900622`
+      - `P3 E538` John Henson
+    - `0041700117`
+      - `P2 E251` Marcus Smart
+      - `P2 E253` Marcus Smart
+  - rationale for the FT/foul-credit promotions:
+    - all four are local source-stack ordering / credit anomalies rather than live parser defects
+    - `0021700653`:
+      - raw PBP credits Howard's two `4:00` Q4 FTs before the same-clock Howard-for-Carter-Williams substitution
+      - `full_pbp_new` also keeps Howard off the floor at the `4:00` boundary
+    - `0021700813`:
+      - raw PBP places the Meeks technical FT before `Start of 4th Period`
+      - `full_pbp_new` keeps Meeks out of the `12:00` lineup and only brings him in on the next possession
+    - `0021900622`:
+      - raw PBP credits Henson's `2:02` Q3 FT before the same-clock Henson-for-Thompson substitution
+      - `full_pbp_new` keeps Thompson on the floor through the FT possession
+    - `0041700117`:
+      - raw PBP credits Smart as the fouled player / FT shooter before the same-clock `Smart FOR Brown` substitution
+      - `full_pbp_new` also keeps Smart out of the `5:30` possession and only brings him in on the next one
+  - rebuilt Block E residual outputs at:
+    - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/phase5_block_residuals_20260322_v3/E_2017-2020`
+  - Block E effect after the rebuild:
+    - `quality_status_counts` moved:
+      - `open: 16 -> 12`
+      - `source_limited: 1 -> 5`
+    - `blocker_counts` moved:
+      - `actionable_event_on_court_rows: 18 -> 12`
+      - `actionable_residual_rows: 28 -> 22`
+    - Block E source-limited set is now:
+      - `0021700482`
+      - `0021700653`
+      - `0021700813`
+      - `0021900622`
+      - `0041700117`
+    - remaining Block E open queue is now:
+      - `0021700337`
+      - `0021700377`
+      - `0021700394`
+      - `0021700514`
+      - `0021700886`
+      - `0021801067`
+      - `0021900201`
+      - `0021900333`
+      - `0021900419`
+      - `0021900487`
+      - `0021900920`
+      - `0041900155`
+  - broader Lane 1 actionable lineup queue outside Block A is now `16` open games:
+    - Block B `v5`: `2`
+    - Block C `v2`: `1`
+    - Block D `v1`: `1`
+    - Block E `v3`: `12`
+  - also tested the strongest rebound-family manual correction candidate and rejected it:
+    - correction attempt:
+      - `0021900487`
+      - event-only Memphis lineup correction at `P2 E246`
+      - supported lineup used:
+        - `[1628415, 1628991, 1629634, 1626145, 203937]`
+    - scratch validation artifact:
+      - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/_tmp_validate_0021900487_event_20260322_v1`
+    - result:
+      - counting-stat boxscore audit stayed clean
+      - but lineup audit still left `1` event-on-court row alive at `P2 E239` (`SUB: Jones FOR Morant`)
+      - and introduced `6` small minute mismatches
+    - practical consequence:
+      - keep `0021900487` open
+      - preserve the attempted correction in the manifest as `rejected`
+      - do not treat the rebound-family event-only manual lane as auto-acceptable just because the rebound event itself looks supported
+  - current rebound-family read after this scratch rejection:
+    - `0021900487`, `0021900920`, and `0041900155` still look like event-only local correction candidates from raw PBP plus `full_pbp_new`
+    - but they now need isolated scratch reruns one-by-one before any activation, with `0021900487` already failing that bar
+  - validation for this pass:
+    - `python /Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/build_lineup_residual_outputs.py --run-dir /Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/intraperiod_proving_1998_2020_postpatch_20260321_v1/blocks/E_2017-2020 --output-dir /Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/phase5_block_residuals_20260322_v3/E_2017-2020`
+    - `PYTHONPATH=. /opt/anaconda3/envs/darko311/bin/python -m pytest -q tests/test_lineup_correction_manifest.py tests/test_build_lineup_residual_outputs.py`
+    - result: `6 passed`
+
+## Latest checkpoint (March 22, 2026, rebound-family local-window lane tightened again)
+- Continued the Phase 6 manual lane with isolated scratch reruns for the remaining rebound-credit survivor candidates and then restored the runtime to a fully reviewed manifest state.
+- `0041900155` result:
+  - rejected the event-only Clippers correction at `P2 E353`
+  - scratch artifact:
+    - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/_tmp_validate_0041900155_event_20260322_v1`
+  - outcome:
+    - counting-stat boxscore audit stayed clean
+    - but the blocker just moved backward to `P2 E348` (`SUB: Harrell FOR Zubac`)
+    - and the scratch run introduced `2` small Harrell/Zubac minute mismatches
+  - then tested the only coherent widened post-sub window, `P2 E348-E353`
+  - widened-window artifact:
+    - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/_tmp_validate_0041900155_window_20260322_v2`
+  - widened-window outcome:
+    - still left `P2 E348` live
+    - preserved the same `2` small minute mismatches
+  - practical consequence:
+    - keep both `0041900155` proposals in `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/overrides/correction_manifest.json` as `rejected`
+    - do not keep widening this game locally without new source evidence
+- `0021900920` result:
+  - after the already-rejected event-only `P2 E312` attempt, tested the widened Memphis post-sub window `P2 E307-E312`
+  - widened-window artifact:
+    - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/_tmp_validate_0021900920_window_20260322_v2`
+  - outcome:
+    - counting-stat boxscore audit stayed clean
+    - but the exact same blocker survived unchanged at `P2 E312` (`Tolliver REBOUND`)
+    - minute mismatches stayed at `0`, so the widened window was a true no-op rather than an improvement
+  - practical consequence:
+    - keep the widened-window proposal in `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/overrides/correction_manifest.json` as `rejected`
+    - this game should not be treated as "almost fixable" by one more local window tweak
+- Updated rebound-family interpretation after all three scratch passes now on record:
+  - `0021900487` event-only attempt:
+    - clears the rebound row but leaves `P2 E239` alive and introduces `6` small minute mismatches
+  - `0041900155` event-only and widened-window attempts:
+    - trade the rebound row for `P2 E348` and introduce `2` small minute mismatches
+  - `0021900920` event-only and widened-window attempts:
+    - event-only tradeoff already failed earlier
+    - widened window is a no-op on the blocker
+  - durable conclusion:
+    - the rebound-credit micro-family is not currently promotable at local event/window granularity
+    - keep:
+      - `0021900201`
+      - `0021900419`
+      - `0021900487`
+      - `0021900920`
+      - `0041900155`
+      in the generic open rebound-credit lane unless new source-trace evidence appears
+- Runtime / manifest state after cleaning up the scratch candidates:
+  - recompiled live runtime views with:
+    - `python /Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/build_override_runtime_views.py`
+  - current active correction inventory is back to:
+    - `53` active corrections
+    - `48` active period-start corrections
+    - `5` active window/event corrections
+- Also pressure-checked `0021700394` again while the rebound-family reruns were running:
+  - keep `0021700394` open
+  - direct trace artifact remains:
+    - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/_tmp_trace_stints_0021700394_live/0021700394`
+  - refreshed read:
+    - still no event-on-court blocker
+    - still no PM-reference lane
+    - minute residue remains spread across `10` player rows and `20` same-clock substitution-scoring events
+    - `Alex Abrines` still serves as the key control because his `+9s` output-vs-stint gap survives even though his last traced stint ends in Q3
+  - practical consequence:
+    - do not promote `0021700394` to `source_limited_upstream_error`
+    - do not add a narrow manual lineup window
+    - treat it as a broader same-clock minute-accumulator / substitution-clock attribution defect
+- Validation for this pass:
+  - `python /Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/build_override_runtime_views.py`
+  - `PYTHONPATH=. /opt/anaconda3/envs/darko311/bin/python -m pytest -q tests/test_lineup_correction_manifest.py`
+  - result:
+    - manifest compile summary updated cleanly
+    - `4 passed`
+
+## Latest checkpoint (March 23, 2026, Phase 7 v2 frontier expansion + Block 0 triage)
+- Seeded the new Phase 7 v2 reviewed frontier from the March 22 reviewed `17` plus the `3` modern same-clock games:
+  - `0021700236`
+  - `0021700917`
+  - `0021800484`
+- Intermediate seed checkpoint:
+  - artifact:
+    - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/phase7_frontier_seed_checkpoint_20260323_v2.json`
+  - result:
+    - `20` reviewed raw-open games covered
+    - `10` uncovered raw-open games, exactly the Block 0 `1997` set
+    - overlay loader / staleness guard also passed cleanly against the fresh Phase 7 raw-open snapshot
+- Built the dedicated Block 0 residual bundle from the fixed March 22 full-history rerun:
+  - output:
+    - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/phase7_block_residuals_0_1997_20260323_v1`
+  - summary:
+    - `10` raw-open games
+    - `0` failed games
+    - `0` `event_stats_errors`
+    - `15` actionable event-on-court rows
+    - `45` material minute rows
+    - `12` severe minute rows
+- Ran the `1997` triage batch in parallel under the one-pass / best-available-source rule:
+  - catastrophic outliers:
+    - `0029600332`
+    - `0029600370`
+  - severe-minute games:
+    - `0029600171`
+    - `0029600657`
+    - `0029601163`
+  - material-minute / event-only games:
+    - `0029600070`
+    - `0029600175`
+    - `0029600204`
+    - `0029600585`
+    - `0049600063`
+- Block 0 decisions:
+  - `9` games stayed `documented_hold`
+  - `1` game (`0049600063`) moved to reviewed `accepted_boundary_difference` as a same-clock / event-credit survivor
+  - `0` raw `source_limited_upstream_error` promotions
+  - `0` live lineup corrections activated
+  - `0` scratch correction probes launched
+- Wrote the human triage note:
+  - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/phase7_block0_triage_20260323_v1.md`
+- Rebuilt the final authoritative Phase 7 v2 frontier set:
+  - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/phase7_open_blocker_inventory_20260323_v2.csv`
+  - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/phase7_true_blocker_shortlist_20260323_v2.csv`
+  - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/reviewed_frontier_policy_overlay_20260323_v2.csv`
+  - final coverage summary:
+    - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/phase7_frontier_coverage_20260323_v2.json`
+- Final v2 frontier result:
+  - `30` reviewed rows
+  - `30` current raw-open games covered
+  - `0` uncovered raw-open games
+  - `0` release blockers
+  - `14` research-open holds
+  - `0029800606` still remains outside the reviewed overlay and is expected to stay `policy_source = auto_default`
+
+## Latest checkpoint (March 23, 2026, Phase 7 v2 gate passed and March 22 run was promoted)
+- Reran the Phase 7 gate from `post_rerun` against the final v2 frontier set:
+  - orchestration summary:
+    - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/phase7_full_history_validation_20260323_v4/summary.json`
+  - inputs:
+    - candidate run:
+      - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/full_history_1997_2020_20260322_v1`
+    - reviewed overlay:
+      - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/reviewed_frontier_policy_overlay_20260323_v2.csv`
+    - reviewed inventory:
+      - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/phase7_open_blocker_inventory_20260323_v2.csv`
+    - reviewed shortlist:
+      - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/phase7_true_blocker_shortlist_20260323_v2.csv`
+- Gate outcome:
+  - `phase7_passed = true`
+  - compare gate still clean:
+    - only the already-accepted report-only `1997` rebound/team-mismatch delta remained
+  - consolidated parquet compare still clean:
+    - `188` columns match
+    - `0` duplicate keys
+    - `0` shared-key counting-stat diffs
+    - `+87` candidate rows remains report-only
+  - raw frontier diff:
+    - exact match
+    - `30` current reviewed games
+    - `30` fresh raw-open games
+    - `0` joins
+    - `0` departures
+  - reviewed rebuild:
+    - passed
+    - `release_blocking_game_count = 0`
+    - `tier1_release_ready = true`
+    - `tier2_frontier_closed = false`
+    - `research_open_game_count = 14`
+    - `0029800606` remained outside the overlay with `policy_source = auto_default`
+- Fresh reviewed outputs from the passing gate:
+  - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/H_1997-2020_20260323_v4`
+  - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/phase7_reviewed_frontier_inventory_20260323_v4`
+  - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/phase7_reviewed_pm_reference_report_1997_2020_20260323_v4`
+  - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/reviewed_release_quality_sidecar_20260323_v4`
+  - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/reviewed_release_quality_sidecar_join_smoke_20260323_v4`
+- Promotion result:
+  - staged the March 22 candidate as the new locked March 22 baseline under:
+    - `/Users/konstantinmedvedovsky/migrate_tpdev/artifacts/baselines/full_history_1997_2020_20260322_v1/full_history_1997_2020_20260322_v1`
+- Final validator pass on the promoted reviewed-policy outputs:
+  - command:
+    - `python /Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/validate_reviewed_release_policy_outputs.py --overlay-csv /Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/reviewed_frontier_policy_overlay_20260323_v2.csv --overlay-summary-json /Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/phase7_frontier_coverage_20260323_v2.json --frontier-inventory-csv /Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/phase7_open_blocker_inventory_20260323_v2.csv --frontier-summary-json /Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/phase7_reviewed_frontier_inventory_20260323_v4/summary.json --pm-summary-json /Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/phase7_reviewed_pm_reference_report_1997_2020_20260323_v4/summary.json --pm-characterization-csv /Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/phase7_reviewed_pm_reference_report_1997_2020_20260323_v4/pm_reference_characterization.csv --residual-root /Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/H_1997-2020_20260323_v4 --sidecar-summary-json /Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/reviewed_release_quality_sidecar_20260323_v4/summary.json --sidecar-join-contract-json /Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/reviewed_release_quality_sidecar_20260323_v4/join_contract.json`
+  - result:
+    - passed
+
+## Latest checkpoint (March 22, 2026, reviewed release-policy semantics hardening pass completed)
+- Kept this pass strictly reporting-only:
+  - no runtime parser changes
+  - no active-correction changes
+  - no compiled override JSON / CSV changes
+  - no player parquet changes
+  - no rerun-baseline changes
+- Hardened the release-policy code paths:
+  - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/build_reviewed_frontier_policy_overlay.py`
+  - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/build_reviewed_frontier_inventory.py`
+  - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/build_lineup_residual_outputs.py`
+  - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/build_plus_minus_reference_report.py`
+  - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/build_reviewed_release_quality_sidecar.py`
+  - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/validate_reviewed_release_policy_outputs.py`
+  - new helper:
+    - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/build_reviewed_release_policy_bundle.py`
+- Semantics tightened in this pass:
+  - `0029700159` reason code is now the evidence-based `source_limited_tradeoff_hold`
+  - generated summaries now carry:
+    - `reviewed_policy_overlay_version = reviewed_release_policy_20260322_v1`
+    - `frontier_inventory_snapshot_id = phase6_open_blocker_inventory_20260322_v1`
+    - `release_blocking_game_ids`
+    - `research_open_game_ids`
+  - accepted contradictions stay:
+    - `release_gate_status = accepted_unresolvable_contradiction`
+    - `execution_lane = accepted_contradiction`
+    - `research_open = false`
+  - PM release mapping now fails hard on unmapped raw-PM × release-status combinations instead of silently emitting `unknown`
+- Important rebuild note from this pass:
+  - the reviewed PM report should be rebuilt from the authoritative raw PM residual bundles with the reviewed policy overlay applied at report-build time
+  - rebuilding it from the phase-6 reviewed residual tree can drift PM counts because the phase-6 tree is a release-facing game-quality surface, not the authoritative raw PM-row source
+  - current reviewed PM rebuild therefore uses:
+    - `block_A_live_postqueue_20260322_v1_residual`
+    - `phase5_block_residuals_20260322_v5/B_2001-2005`
+    - `phase5_block_residuals_20260322_v2/C_2006-2010`
+    - `phase5_block_residuals_20260322_v1/D_2011-2016`
+    - `phase5_block_residuals_20260322_v4/E_2017-2020`
+    - plus the reviewed overlay
+- Current validated reviewed-policy state remains:
+  - overlay:
+    - `17` rows
+    - `release_blocking_game_ids = []`
+    - research-open set:
+      - `0020000628`
+      - `0020400335`
+      - `0021700394`
+      - `0029700159`
+      - `0029701075`
+  - reviewed frontier:
+    - `17` live raw-open games
+    - `0` release blockers
+    - `5` research-open games
+    - `tier1_release_ready = true`
+    - `tier2_frontier_closed = false`
+  - sparse sidecar:
+    - `row_count = 685`
+    - `reviewed_override_game_count = 17`
+    - `release_blocking_game_ids = []`
+  - reviewed PM report:
+    - raw PM classes remain named by class:
+      - `candidate_boundary_difference = 1744`
+      - `source_limited_upstream_error = 81`
+      - `lineup_related = 31`
+    - release-facing PM classes:
+      - `reference_only_boundary = 1768`
+      - `accepted_contradiction = 4`
+      - `documented_hold = 3`
+      - `source_limited_upstream = 81`
+      - `open_actionable_lineup_blocker = 0`
+  - `0029800606` remains outside the reviewed overlay and keeps `policy_source = auto_default`
+- Human-facing adopted policy doc refreshed:
+  - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/reviewed_release_policy_decision_20260322_v1.md`
+  - changes:
+    - `source_limited_tradeoff_hold` mapping for `0029700159`
+    - explicit `release_blocking_game_ids = []`
+    - explicit note that the reviewed PM report is built from raw PM residual bundles plus overlay
+- Validation for this pass:
+  - `PYTHONPATH=. /opt/anaconda3/envs/darko311/bin/python -m pytest -q tests/test_build_reviewed_release_policy_bundle.py tests/test_build_reviewed_frontier_policy_overlay.py tests/test_build_reviewed_frontier_inventory.py tests/test_build_lineup_residual_outputs.py tests/test_build_plus_minus_reference_report.py tests/test_build_reviewed_release_quality_sidecar.py`
+  - result:
+    - `10 passed`
+  - durable validator:
+    - `python /Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/validate_reviewed_release_policy_outputs.py`
+    - result:
+      - overlay rows = `17`
+      - `release_blocking_game_ids = []`
+      - sidecar rows = `685`
+      - PM raw classes:
+        - `candidate_boundary_difference = 1744`
+        - `source_limited_upstream_error = 81`
+        - `lineup_related = 31`
+      - `0029800606 policy_source = auto_default`
+
+## Latest checkpoint (March 22, 2026, reviewed release-policy overlay pass landed)
+- Landed the reporting-only release-policy layer in code:
+  - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/reviewed_release_policy.py`
+  - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/build_reviewed_frontier_policy_overlay.py`
+  - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/build_reviewed_frontier_inventory.py`
+  - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/build_lineup_residual_outputs.py`
+  - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/build_plus_minus_reference_report.py`
+- This pass is reporting / policy only:
+  - no runtime parser changes
+  - no active-correction changes
+  - no compiled override JSON / CSV changes
+  - no player parquet changes
+  - no rerun-baseline changes
+- New reviewed policy overlay:
+  - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/reviewed_frontier_policy_overlay_20260322_v1.csv`
+  - overlay summary:
+    - `17` reviewed rows
+    - `accepted_boundary_difference = 10`
+    - `accepted_unresolvable_contradiction = 2`
+    - `documented_hold = 5`
+    - execution lanes:
+      - `policy_frontier_non_local = 10`
+      - `accepted_contradiction = 2`
+      - `documented_hold = 5`
+- New release-policy residual bundle set:
+  - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/phase6_reviewed_release_policy_residuals_20260322_v1`
+  - important reconciliation note:
+    - the first pass against raw Block E rerun inputs surfaced one unexpected fall-through:
+      - `0021700886`
+    - root cause was stale source selection, not a policy bug:
+      - the raw `intraperiod_proving_1998_2020_postpatch_20260321_v1/blocks/E_2017-2020` rerun predates the accepted `0021700886` correction
+      - the reviewed frontier inventory was correct to exclude it
+    - fix:
+      - rebuilt the release-policy E snapshot from the later post-acceptance residual bundle:
+        - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/phase5_block_residuals_20260322_v4/E_2017-2020`
+      - recomputed `game_quality.csv` / summary fields there with the reviewed overlay
+- New reviewed frontier inventory:
+  - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/phase6_reviewed_frontier_inventory_20260322_v1`
+  - current authoritative result:
+    - `17` raw-open games
+    - `0` release blockers
+    - `5` research-open games
+    - research-open set:
+      - `0020000628`
+      - `0020400335`
+      - `0021700394`
+      - `0029700159`
+      - `0029701075`
+    - Tier result:
+      - `tier1_release_ready = true`
+      - `tier2_frontier_closed = false`
+- New PM release-facing report:
+  - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/phase6_reviewed_pm_reference_report_ABCDE_20260322_v1`
+  - raw PM taxonomy stayed unchanged:
+    - `candidate_boundary_difference = 1744`
+    - `source_limited_upstream_error = 81`
+    - `lineup_related = 31`
+  - additive release PM result:
+    - `reference_only_boundary = 1768`
+    - `accepted_contradiction = 4`
+    - `documented_hold = 3`
+    - `source_limited_upstream = 81`
+    - `open_actionable_lineup_blocker = 0`
+- `0020000628` wording is now explicit in the release-policy doc:
+  - live state has `0` PM reference rows
+  - the rejected scratch window introduced the small `+/-2` PM drift
+  - the reviewed classification stays `documented_hold` because the `0.25` minute tail persists
+- `0029800606` stays outside the reviewed overlay:
+  - `unstable_control`
+  - infrastructure debt only
+  - not a reviewed frontier override case
+- DARKO export decision for this pass:
+  - do not add a new per-row quality flag column to parquet
+  - downstream consumers should join `game_quality.csv` by `game_id`
+  - decision note:
+    - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/reviewed_release_policy_decision_20260322_v1.md`
+  - canonical sparse sidecar now published at:
+    - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/reviewed_release_quality_sidecar_20260322_v1/game_quality_sparse.csv`
+    - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/reviewed_release_quality_sidecar_20260322_v1/join_contract.json`
+    - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/reviewed_release_quality_sidecar_20260322_v1/integration_notes.md`
+  - sidecar join defaults:
+    - absent `game_id` means treat the game as:
+      - `primary_quality_status = exact`
+      - `release_gate_status = exact`
+      - `execution_lane = exact`
+      - `blocks_release = false`
+      - `research_open = false`
+      - `policy_source = auto_default`
+- Live correction inventory rechecked during this pass:
+  - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/overrides/correction_manifest_compile_summary.json`
+  - current split remains:
+    - `54` active corrections
+    - `48` period-start
+    - `6` window / event
+- Validation for this pass:
+  - `PYTHONPATH=. /opt/anaconda3/envs/darko311/bin/python -m pytest -q tests/test_build_reviewed_frontier_policy_overlay.py tests/test_build_reviewed_frontier_inventory.py tests/test_build_lineup_residual_outputs.py tests/test_build_plus_minus_reference_report.py`
+  - result:
+    - `7 passed`
+  - corpus rebuild / policy assertions:
+    - `phase6_reviewed_frontier_inventory_20260322_v1/summary.json` confirms:
+      - `release_blocking_game_count = 0`
+      - `research_open_game_count = 5`
+    - `0029800606` does not appear in `reviewed_frontier_policy_overlay_20260322_v1.csv`
+  - durable validator:
+    - `python /Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/validate_reviewed_release_policy_outputs.py`
+    - result:
+      - overlay rows = `17`
+      - sidecar rows = `685`
+      - sidecar reviewed overrides = `17`
+      - release blockers = `0`
+      - research-open ids = `0020000628`, `0020400335`, `0021700394`, `0029700159`, `0029701075`
+      - PM raw classes:
+        - `candidate_boundary_difference = 1744`
+        - `source_limited_upstream_error = 81`
+        - `lineup_related = 31`
+      - `0029800606 policy_source = auto_default`
+- Historical doc hygiene:
+  - marked `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/phase6_blocker_policy_frontier_20260322_v1.md` as the pre-adoption memo
+  - marked `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/handoff_for_external_llm_20260322.md` as the pre-adoption decision deck
+  - current adopted status now lives in:
+    - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/reviewed_release_policy_decision_20260322_v1.md`
+    - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/phase6_reviewed_frontier_inventory_20260322_v1/summary.json`
+
+## Correction note (March 22, 2026, stale inventory-count drift clarified)
+- Later references to `53 / 48 / 5` are stale notes drift only, not a real runtime rollback.
+- The live manifest / compile-summary state remains:
+  - `54` active corrections
+  - `48` active period-start corrections
+  - `6` active window/event corrections
+- `0021700886` is still active in the live manifest / compiled runtime views.
+- The reviewed open-blocker inventory is `17` games total:
+  - `15` open games outside Block A across B/C/D/E
+  - `2` open games inside Block A:
+    - `0029700159`
+    - `0029701075`
+- Do **not** treat the outside-Block-A subtotal as the full live open inventory.
+
+## Latest checkpoint (March 22, 2026, consistency and gate-semantics pass implemented)
+- Repaired the reviewed open-blocker inventory artifact and regenerated it as a clean parseable CSV:
+  - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/phase6_open_blocker_inventory_20260322_v1.csv`
+  - current reviewed lane split in that inventory:
+    - `5` `same_clock_control_guardrail`
+    - `5` `rebound_credit_survivor`
+    - `2` `contradiction_period_start_boundary`
+    - `1` each of:
+      - `special_holdout_material_minute`
+      - `candidate_systematic_defect`
+      - `contradiction_mixed_source_case`
+      - `severe_minute_insufficient_local_context`
+      - `same_clock_accumulator_holdout`
+- Refreshed the reviewed PM frontier artifact set without changing blocker policy:
+  - rebuilt:
+    - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/phase5_pm_deliverable_ABCDE_20260322_v6`
+  - added reviewed frontier summary note artifact:
+    - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/phase5_pm_deliverable_ABCDE_20260322_v6/reviewed_frontier_summary.json`
+  - current reviewed PM split remains unchanged:
+    - `reference_only_boundary: 1744 rows / 611 games`
+    - `source_limited_upstream: 81 rows / 11 games`
+    - `open_lineup_blocker: 31 rows / 13 games`
+  - explicit reviewed frontier counts now published:
+    - `15` open games outside Block A
+    - `20` actionable event rows outside Block A
+    - `17` total live open games including Block A
+    - PM-only queue remains narrower than the full open-blocker queue
+- Made the Golden Canary gate semantics explicit for `0029800606` instead of treating it like a normal stable control:
+  - updated manifest case in:
+    - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/golden_canary_manifest_20260321_v1.json`
+  - current `0029800606` manifest state:
+    - `stability_class = unstable_control`
+    - notes now explicitly call it an unresolved block-vs-single-game parity split
+  - updated runner in:
+    - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/run_golden_canary_suite.py`
+  - new suite summary fields now emitted:
+    - `suite_pass_all_cases`
+    - `suite_pass_stable_cases_only`
+    - `unstable_control_case_count`
+    - `unstable_control_failures`
+  - `suite_pass` is preserved and now aliases the all-cases gate
+- Ran a fresh dated Golden Canary suite with the new summary semantics:
+  - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/golden_canary_suite_20260322_v3/summary.json`
+  - fresh suite result:
+    - `27` cases / `27` games
+    - `failed_games = 0`
+    - `event_stats_errors = 0`
+    - `suite_pass = true`
+    - `suite_pass_all_cases = true`
+    - `suite_pass_stable_cases_only = true`
+    - `unstable_control_case_count = 1`
+    - `unstable_control_failures = 0`
+  - interpretation:
+    - the suite still passes under the current dated envelopes
+    - but `0029800606` is now explicitly carried as an unstable control, not implied to be a clean stable gate case
+- Live runtime / validation state after this pass:
+  - recompiled runtime views with:
+    - `python /Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/build_override_runtime_views.py`
+  - current compile-summary state remains:
+    - `54` active corrections
+    - `48` active period-start corrections
+    - `6` active window/event corrections
+  - focused validation:
+    - `PYTHONPATH=. /opt/anaconda3/envs/darko311/bin/python -m pytest -q tests/test_lineup_correction_manifest.py tests/test_golden_canary_suite.py`
+    - pandas parse check on:
+      - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/phase6_open_blocker_inventory_20260322_v1.csv`
+    - PM deliverable rebuild command against current residual dirs and:
+      - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/phase5_pm_review_lane_map_20260322_v3.csv`
+  - result:
+    - reviewed blocker inventory parses cleanly with `17` rows
+    - PM reviewed counts stay named by class:
+      - `candidate_boundary_difference = 1744`
+      - `source_limited_upstream_error = 81`
+      - `lineup_related = 31`
+    - focused pytest returned `9 passed`
+
+## Latest checkpoint (March 22, 2026, RC1 release-candidate closeout frozen)
+- Treated the current March 22 reviewed-policy state as `RC1` instead of reopening the status model.
+- Reused the fresh Golden Canary rerun as the runtime gate:
+  - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/golden_canary_suite_20260322_v4/summary.json`
+  - result remains:
+    - `suite_pass = true`
+    - `suite_pass_all_cases = true`
+    - `suite_pass_stable_cases_only = true`
+- Added a downstream sidecar-join smoke proof against the real historical parquet:
+  - script:
+    - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/smoke_test_reviewed_release_quality_sidecar_join.py`
+  - artifact:
+    - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/reviewed_release_quality_sidecar_join_smoke_20260322_v1/summary.json`
+  - smoke result:
+    - all `17` reviewed overrides survived the join unchanged
+    - absent `game_id` rows defaulted to:
+      - `primary_quality_status = exact`
+      - `release_gate_status = exact`
+      - `release_reason_code = exact`
+      - `execution_lane = exact`
+      - `blocks_release = false`
+      - `research_open = false`
+      - `policy_source = auto_default`
+    - the expected `5` research-open games survived the join
+- Release-facing summary freeze from this pass:
+  - top-level reviewed PM and sidecar summaries now both carry:
+    - `reviewed_policy_overlay_version = reviewed_release_policy_20260322_v1`
+    - `frontier_inventory_snapshot_id = phase6_open_blocker_inventory_20260322_v1`
+  - PM raw counts are now written only by named class in notes / summaries, not as unlabeled tuples
+- Practical release-state consequence:
+  - `RC1` is frozen unless a validation check fails
+  - the `5` research-open games move to a separate non-release backlog:
+    - `0020000628`
+    - `0020400335`
+    - `0021700394`
+    - `0029700159`
+    - `0029701075`
+
+## Latest checkpoint (March 22, 2026, Phase 6 frontier-close evidence pass completed)
+- Finished the only two remaining bespoke investigations in this phase and then stopped reduction work instead of starting new local override churn.
+- `0021700394` bounded confirmation pass:
+  - new artifact:
+    - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/_tmp_trace_stints_0021700394_source_compare_20260322_v1/0021700394`
+  - most useful files:
+    - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/_tmp_trace_stints_0021700394_source_compare_20260322_v1/0021700394/summary.json`
+    - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/_tmp_trace_stints_0021700394_source_compare_20260322_v1/0021700394/cluster_source_summary.csv`
+    - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/_tmp_trace_stints_0021700394_source_compare_20260322_v1/0021700394/cluster_source_details.csv`
+    - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/_tmp_trace_stints_0021700394_source_compare_20260322_v1/0021700394/diagnosis_note.md`
+  - result:
+    - no clearly one-sided bad cluster emerged from the capped four-source comparison
+    - raw `playbyplayv2`, cached `pbpv3`, and `gamerotation_stints_v6` align on the same-clock cluster ordering / boundary shape
+    - the sharpest disagreement is narrower:
+      - `full_pbp_new` is systematically coarser / pre-sub on repeated same-clock FT-sub boundaries rather than isolating one decisive bad row
+    - practical consequence:
+      - keep `0021700394` documented-open as a broader same-clock minute-accumulator / clock-attribution defect
+      - do **not** add a local manual window
+      - do **not** promote `source_limited_upstream_error`
+- `0029700159` paired hardened comparison:
+  - recoverability outcome:
+    - the archived candidate payload was recoverable cleanly from:
+      - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/_tmp_validate_0029700159_kant/run_20260321_1000/candidate_file_directory/overrides/lineup_window_overrides.json`
+  - fresh comparison artifacts:
+    - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/_tmp_phase6_0029700159_live_20260322_v1`
+    - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/_tmp_phase6_0029700159_candidate_20260322_v1`
+    - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/_tmp_phase6_0029700159_paired_compare_20260322_v1/summary.json`
+    - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/_tmp_phase6_0029700159_paired_compare_20260322_v1/diagnosis_note.md`
+  - compared states:
+    - live:
+      - `P3 E349-E366 -> [1517, 111, 271, 1504, 968]`
+      - `P3 E367-E372 -> [1517, 111, 271, 1504, 924]`
+    - archived candidate:
+      - `P3 E351-E366 -> [1517, 111, 271, 1504, 968]`
+      - `P3 E367-E372 -> [1517, 111, 271, 1504, 924]`
+  - result:
+    - both fresh reruns were build-clean:
+      - `failed_games = 0`
+      - `event_stats_errors = 0`
+      - boxscore audit clean
+    - the archived candidate did **not** improve:
+      - `minutes_mismatch_rows` (`5 -> 5`)
+      - `minute_outlier_rows` (`3 -> 3`)
+      - `plus_minus_mismatch_rows` (`4 -> 4`)
+    - it only nudged `game_max_minutes_abs_diff`:
+      - `11.8666666667 -> 11.6666666667`
+    - but it worsened actionable event rows:
+      - `1 -> 2`
+    - practical consequence:
+      - keep the current live DEN P3 state
+      - treat the archived candidate as tradeoff-or-worse, not as a preferred replacement
+      - do **not** relitigate the accepted `P3 E349` source-limited split
+- Intentionally frozen in this pass:
+  - documented holds:
+    - `0020400335`
+    - `0020000628`
+    - `0020900189`
+    - `0021300593`
+    - `0029701075`
+  - policy-frontier / non-local lanes:
+    - same-clock controls:
+      - `0021700337`
+      - `0021700377`
+      - `0021700514`
+      - `0021801067`
+      - `0021900333`
+    - rebound-credit survivors:
+      - `0021900201`
+      - `0021900419`
+      - `0021900487`
+      - `0021900920`
+      - `0041900155`
+  - practical consequence:
+    - no new local window/event scratch runs were attempted for those games
+- Published reviewed frontier artifacts:
+  - blocker shortlist:
+    - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/phase6_true_blocker_shortlist_20260322_v1.csv`
+    - current split after the two bespoke passes:
+      - `7` `documented_hold`
+      - `10` `policy_frontier_non_local`
+      - `0` remaining `investigate_now`
+  - blocker-policy memo:
+    - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/phase6_blocker_policy_frontier_20260322_v1.md`
+    - includes the four numbered policy options:
+      - status quo: `0` reclassified / `17` blockers remain
+      - same-clock controls + rebound survivors: `10` reclassified / `7` blockers remain
+      - also contradiction cases: `12` reclassified / `5` blockers remain
+      - also `0020000628` and `0020400335`: `14` reclassified / `3` blockers remain
+    - also records:
+      - `0029800606` remains infrastructure debt because the Golden Canary gate is not yet a perfect reliability signal for all historical artifacts
+- Gate consequence:
+  - the project is now blocked on blocker-policy choice rather than more local override reduction
+  - Phase 7 proving / finalization work should **not** begin until the user picks a blocker-policy option
+- Runtime / validation state:
+  - no live override or manifest change landed in this pass
+  - current compile-summary state remains:
+    - `54` active corrections
+    - `48` active period-start corrections
+    - `6` active window/event corrections
+  - sanity checks performed:
+    - parsed `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/phase6_true_blocker_shortlist_20260322_v1.csv`
+    - parsed the new JSON temp summaries for:
+      - `0021700394`
+      - `0029700159`
+  - note:
+    - no pytest rerun was necessary because no repo code changed in this pass
+
+## Latest checkpoint (March 22, 2026, `0021700886` moved from open blocker to active correction)
+- Landed a real new active lineup correction in `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/overrides/correction_manifest.json`:
+  - `window__0021700886__p3__t1610612752__e482_482`
+  - scope:
+    - Knicks `P3 E482`
+    - one-event correction only
+    - validated pre-sub five:
+      - `Emmanuel Mudiay`
+      - `Tim Hardaway Jr.`
+      - `Michael Beasley`
+      - `Kyle O'Quinn`
+      - `Frank Ntilikina`
+- Why this was accepted:
+  - raw `pbpv3` and `playbyplayv2` both show:
+    - `P3 E482` Mudiay made FG at `1:31`
+    - then same-clock subs:
+      - `Burke FOR Mudiay`
+      - `Thomas FOR Beasley`
+  - the prior live issue row had already advanced to the settled post-sub Knicks lineup and was crediting Mudiay while he was off-court
+  - unlike the rebound-family and `0020000628` scratches, the direct one-event rerun actually improved the game cleanly
+- Scratch validation artifact:
+  - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/_tmp_validate_0021700886_event_20260322_v1`
+- Scratch validation result:
+  - counting-stat boxscore audit stayed clean
+  - `event_player_on_court` issues went:
+    - `1 -> 0`
+  - minute mismatches stayed:
+    - `0`
+  - plus-minus mismatch rows went:
+    - `6 -> 2`
+  - the only surviving PM tail is now:
+    - `Shane Larkin = -2`
+    - `Jayson Tatum = +2`
+    - i.e. a tiny Celtics-side boundary/reference tail, not a live lineup blocker
+- One-game residual confirmation:
+  - built at:
+    - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/_tmp_validate_0021700886_event_20260322_v1_residual`
+  - key result:
+    - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/_tmp_validate_0021700886_event_20260322_v1_residual/game_quality.csv`
+      classifies `0021700886` as:
+      - `primary_quality_status = boundary_difference`
+      - `n_actionable_event_rows = 0`
+      - `max_abs_minute_diff = 0`
+      - `n_pm_reference_delta_rows = 2`
+- Built a patched Block E residual bundle because the PM report builder can overwrite changed rows but cannot delete vanished PM rows from an older bundle by itself:
+  - patched bundle:
+    - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/phase5_block_residuals_20260322_v4/E_2017-2020`
+  - Block E moved:
+    - `open: 12 -> 11`
+    - `boundary_difference: 148 -> 149`
+    - `actionable_event_on_court_rows: 12 -> 11`
+    - `actionable_residual_rows: 22 -> 21`
+    - `event_on_court_issue_rows: 21 -> 20`
+    - `plus_minus_reference_delta_rows: 503 -> 499`
+- Rebuilt the current PM deliverable from:
+  - Block A live residual
+  - Block B `v5`
+  - Block C `v2`
+  - Block D `v1`
+  - patched Block E `v4`
+  - artifact:
+    - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/phase5_pm_deliverable_ABCDE_20260322_v4`
+  - updated PM split:
+    - `reference_only_boundary: 1744 rows / 611 games`
+    - `source_limited_upstream: 81 rows / 11 games`
+    - `open_lineup_blocker: 31 rows / 13 games`
+  - practical PM queue result:
+    - `0021700886` is gone from `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/phase5_pm_deliverable_ABCDE_20260322_v4/pm_open_game_queue.csv`
+    - current PM-only open queue is now:
+      - `0021900920`
+      - `0021900487`
+      - `0029700159`
+      - `0021300593`
+      - `0021700337`
+      - `0021900419`
+      - `0020900189`
+      - `0021700377`
+      - `0021700514`
+      - `0021801067`
+      - `0021900201`
+      - `0021900333`
+      - `0041900155`
+- Control reads from this pass:
+  - `0020400335`:
+    - still no new promotion evidence
+    - remains the same severe-minute / insufficient-local-context keep-open case
+  - `0021700394`:
+    - no correction attempted
+    - best next exact step is now explicit:
+      - build a read-only per-event accumulator ledger using `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/trace_player_stints_game.py`
+      - trace the highest-signal same-clock clusters first:
+        - `P1 1:44`
+        - `P2 9:50`
+        - `P2 5:38`
+        - `P2 0:57.20`
+        - `P3 3:48 -> 3:39 -> 3:27`
+      - do not start with late-Q4; the existing trace already rejects the "single late-Q4 local overlap" theory
+- Manifest / runtime state after accepting `0021700886`:
+  - recompiled live runtime views with:
+    - `python /Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/build_override_runtime_views.py`
+  - current active correction inventory is now:
+    - `54` active corrections
+    - `48` active period-start corrections
+    - `6` active window/event corrections
+- Validation for this pass:
+  - `python /Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/build_override_runtime_views.py`
+  - `python /Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/build_lineup_residual_outputs.py --run-dir /Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/_tmp_validate_0021700886_event_20260322_v1 --output-dir /Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/_tmp_validate_0021700886_event_20260322_v1_residual`
+  - `python /Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/build_plus_minus_reference_report.py --residual-dir /Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/block_A_live_postqueue_20260322_v1_residual --residual-dir /Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/phase5_block_residuals_20260322_v5/B_2001-2005 --residual-dir /Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/phase5_block_residuals_20260322_v2/C_2006-2010 --residual-dir /Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/phase5_block_residuals_20260322_v1/D_2011-2016 --residual-dir /Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/phase5_block_residuals_20260322_v4/E_2017-2020 --lane-map-csv /Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/phase5_pm_review_lane_map_20260322_v2.csv --output-dir /Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/phase5_pm_deliverable_ABCDE_20260322_v4`
+  - `PYTHONPATH=. /opt/anaconda3/envs/darko311/bin/python -m pytest -q tests/test_lineup_correction_manifest.py`
+  - result:
+    - runtime compile summary updated cleanly
+    - one-game residual confirms `boundary_difference`
+    - PM deliverable refreshed from patched Block E bundle
+    - `4 passed`
+
+## Latest checkpoint (March 22, 2026, `0021700394` accumulator proof tightened and `0021900201` scratch candidate rejected)
+- Continued the next in-order Phase 6 work with one direct local trace artifact plus three parallel sub-agent reads on:
+  - `0021700394`
+  - `0020400335`
+  - `0021900201`
+- `0021700394` result:
+  - kept `0021700394` open
+  - built a targeted cluster-ledger artifact at:
+    - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/_tmp_trace_stints_0021700394_cluster_ledger_20260322_v1/0021700394`
+  - main summary:
+    - `7` target same-clock clusters
+    - all `7` touch at least one affected player
+    - `10` affected player rows remain at `+9.0s`
+    - `2` of those players (`Russell Westbrook`, `Michael Kidd-Gilchrist`) do **not** have a direct stint boundary on the target cluster clocks
+  - practical consequence:
+    - this is stronger evidence that `0021700394` is a broader same-clock minute-accumulator / substitution-clock attribution defect rather than one hidden local window
+    - do **not** promote it to `source_limited_upstream_error`
+    - do **not** add a narrow manual lineup window
+  - most useful artifact rows:
+    - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/_tmp_trace_stints_0021700394_cluster_ledger_20260322_v1/0021700394/cluster_windows.csv`
+    - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/_tmp_trace_stints_0021700394_cluster_ledger_20260322_v1/0021700394/affected_player_cluster_map.csv`
+- `0020400335` result:
+  - kept `0020400335` open with no new promotion evidence
+  - durable read is unchanged:
+    - severe-minute / insufficient-local-context holdout
+    - not a `source_limited_upstream_error`
+    - not a safe narrow local correction
+  - strongest supporting reasons from the sub-agent pass:
+    - Block B still shows:
+      - `has_severe_minute_issue = True`
+      - `has_event_on_court_issue = True`
+      - `n_actionable_event_rows = 5`
+      - `max_abs_minute_diff = 1.2167`
+    - the live `P2` Harrington contradiction row set still starts too early for the existing deadball-window candidates to explain it cleanly
+    - cross-source minutes remain badly split rather than converging on one safe upstream source
+- `0021900201` result:
+  - pressure-checked the strongest remaining rebound-family survivor instead of leaving it generic-open by default
+  - sub-agent evidence did support a real-looking local candidate:
+    - raw `pbpv3` / `playbyplayv2` order:
+      - `P3 E392` Adams foul at `7:45`
+      - `P3 E395` `SUB: Noel FOR Adams`
+      - `P3 E397` missed FT
+      - `P3 E398` `Noel REBOUND`
+    - `full_pbp_new` also flips OKC from Adams on the `7:49` possession to Noel on the `7:42` possession
+  - tested the event-only candidate:
+    - `window__0021900201__p3__t1610612760__e398_398__proposed_20260322`
+    - validated lineup:
+      - `Chris Paul / Danilo Gallinari / Shai Gilgeous-Alexander / Nerlens Noel / Terrance Ferguson`
+    - scratch artifact:
+      - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/_tmp_validate_0021900201_event_20260322_v1`
+  - scratch outcome:
+    - counting-stat boxscore audit stayed clean
+    - but the blocker moved from:
+      - `P3 E398` (`Noel REBOUND`)
+      to:
+      - `P3 E395` (`SUB: Noel FOR Adams`)
+    - the scratch run also introduced:
+      - `2` small minute mismatches:
+        - `Nerlens Noel = -0.05`
+        - `Steven Adams = +0.05`
+      - `2` small plus-minus mismatches:
+        - `Kentavious Caldwell-Pope = -1`
+        - `Alex Caruso = +1`
+  - practical consequence:
+    - recorded the attempt in `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/overrides/correction_manifest.json` as `rejected`
+    - restored the runtime to the clean reviewed state
+    - `0021900201` should stay open, but it now has explicit failed-scratch history rather than a vague generic-open label
+- Runtime / manifest state after cleaning up the scratch candidate:
+  - recompiled live runtime views with:
+    - `python /Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/build_override_runtime_views.py`
+  - current active correction inventory is back to:
+    - `54` active corrections
+    - `48` active period-start corrections
+    - `6` active window/event corrections
+- Validation for this pass:
+  - `python /Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/build_override_runtime_views.py`
+  - `PYTHONPATH=. /opt/anaconda3/envs/darko311/bin/python -m pytest -q tests/test_lineup_correction_manifest.py`
+  - result:
+    - compile summary restored to the canonical `54 / 48 / 6`
+    - `4 passed`
+
+## Latest checkpoint (March 22, 2026, rebound-credit lane closed harder and PM queue semantics refreshed)
+- Continued the next Phase 6 reduction lane by pressure-testing the remaining rebound-credit survivor family in parallel and then publishing the stronger queue interpretation into the PM deliverable artifacts.
+- `0021900419` result:
+  - the direct source read did look like a plausible local candidate before validation:
+    - raw `playbyplayv2` sequence:
+      - `P2 E253` missed FT at `4:42`
+      - `P2 E254` team rebound
+      - `P2 E255` `SUB: Harkless FOR Williams`
+      - `P2 E257` missed FT
+      - `P2 E258` `Harkless REBOUND`
+    - `full_pbp_new` also flips the Clippers from Lou Williams on the `4:46` possession to Maurice Harkless on the `4:38` possession
+  - tested the one-event candidate:
+    - `window__0021900419__p2__t1610612746__e258_258__proposed_20260322`
+    - validated lineup:
+      - `Patrick Beverley / Maurice Harkless / Montrezl Harrell / Kawhi Leonard / Paul George`
+    - scratch artifact:
+      - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/_tmp_validate_0021900419_event_20260322_v1`
+  - scratch outcome:
+    - counting-stat boxscore audit stayed clean
+    - but the blocker moved from:
+      - `P2 E258` (`Harkless REBOUND`)
+      to:
+      - `P2 E255` (`SUB: Harkless FOR Williams`)
+    - the scratch run also introduced:
+      - `2` small minute mismatches:
+        - `Lou Williams = +0.0667`
+        - `Maurice Harkless = -0.0667`
+      - `2` small plus-minus mismatches:
+        - `Patrick Beverley = +2`
+        - `Patrick Patterson = -2`
+  - practical consequence:
+    - recorded the attempt in `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/overrides/correction_manifest.json` as `rejected`
+    - restored the runtime to the clean reviewed state
+- Rebound-credit family interpretation is now materially stronger than the older "generic open" wording:
+  - `0021900201`:
+    - event-only Noel rebound scratch rejected after the blocker moved backward to `P3 E395`
+  - `0021900419`:
+    - event-only Harkless rebound scratch rejected after the blocker moved backward to `P2 E255`
+  - `0021900487`:
+    - event-only Jackson Jr. rebound scratch already rejected because `P2 E239` stayed live and minute residue worsened
+  - `0021900920`:
+    - event-only Tolliver rebound scratch rejected
+    - widened `P2 E307-E312` window was a true no-op on the blocker
+  - `0041900155`:
+    - Harrell event-only and widened-window scratches both rejected because the blocker just moved backward to `P2 E348`
+  - durable conclusion:
+    - the full rebound-credit micro-family is now effectively closed at local event/window granularity
+    - do **not** keep spending local override passes here unless materially new source evidence appears
+- Important nuance from the parallel `0021900920` read:
+  - the post-sub Memphis lineup evidence is now one-sided and real across:
+    - raw local chronology
+    - `full_pbp_new`
+    - `gamerotation_stints_v6`
+  - but this still should **not** be promoted to `source_limited_upstream_error`
+  - reason:
+    - the problem is not an upstream bad source row
+    - the problem is that the current local override surface cannot encode that boundary safely without moving or preserving the blocker
+- Published the stronger queue semantics into:
+  - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/phase5_pm_review_lane_map_20260322_v3.csv`
+  - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/phase5_pm_deliverable_ABCDE_20260322_v5`
+  - key effect:
+    - counts stay unchanged
+    - but all five rebound-credit survivors now explicitly show `keep_open_rejected_local_boundary_case` instead of the older generic trace wording
+  - current PM split remains:
+    - `reference_only_boundary: 1744 rows / 611 games`
+    - `source_limited_upstream: 81 rows / 11 games`
+    - `open_lineup_blocker: 31 rows / 13 games`
+- Runtime / manifest state after cleaning up the scratch candidate:
+  - recompiled live runtime views with:
+    - `python /Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/build_override_runtime_views.py`
+  - current active correction inventory is back to:
+    - `54` active corrections
+    - `48` active period-start corrections
+    - `6` active window/event corrections
+- Validation for this pass:
+  - `python /Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/build_override_runtime_views.py`
+  - `python /Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/build_plus_minus_reference_report.py --residual-dir /Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/block_A_live_postqueue_20260322_v1_residual --residual-dir /Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/phase5_block_residuals_20260322_v5/B_2001-2005 --residual-dir /Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/phase5_block_residuals_20260322_v2/C_2006-2010 --residual-dir /Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/phase5_block_residuals_20260322_v1/D_2011-2016 --residual-dir /Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/phase5_block_residuals_20260322_v4/E_2017-2020 --lane-map-csv /Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/phase5_pm_review_lane_map_20260322_v3.csv --output-dir /Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/phase5_pm_deliverable_ABCDE_20260322_v5`
+  - `PYTHONPATH=. /opt/anaconda3/envs/darko311/bin/python -m pytest -q tests/test_lineup_correction_manifest.py`
+  - result:
+    - PM deliverable refreshed with stronger rebound-lane notes and unchanged counts
+    - compile summary restored to `54 / 48 / 6`
+    - `4 passed`
+
+## Latest checkpoint (March 22, 2026, external-review verification pass and open-blocker inventory published)
+- Verified the external review claims directly against the live manifest, canary artifacts, and current residual bundles, with parallel sub-agent cross-checks.
+- Claim 1 (`0021700886` / active-correction count inconsistency):
+  - the live state is:
+    - `54` active corrections
+    - `48` active period-start corrections
+    - `6` active window/event corrections
+  - `0021700886` is still live and active in:
+    - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/overrides/correction_manifest.json`
+    - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/overrides/lineup_window_overrides.json`
+    - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/overrides/correction_manifest_compile_summary.json`
+  - conclusion:
+    - the external review was right to flag the inconsistency
+    - the later `53 / 48 / 5` notes are stale notes drift, not a real lost correction
+    - do **not** treat that later count as a real runtime rollback
+- Claim 2 (`0029800606` runner parity / Golden Canary gate quality):
+  - verified as substantially correct
+  - provenance hardening is real and landed, but the hardened fresh single-game rerun still reproduces the broader current `0029800606` shape while the saved block artifacts remain narrow
+  - current repo position remains:
+    - `0029800606` is still an unresolved unstable control / parity split
+    - `golden_canary_suite_20260322_v2` stays useful as historical signal, but it is **not** a clean accepted gate for that case
+- Claim 3 (Block E open-game structure):
+  - verified as correct for the live Block E residual bundle:
+    - `11` open games in `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/phase5_block_residuals_20260322_v4/E_2017-2020/game_quality.csv`
+    - composition:
+      - `5` same-clock controls / guardrails:
+        - `0021700337`
+        - `0021700377`
+        - `0021700514`
+        - `0021801067`
+        - `0021900333`
+      - `5` rebound-credit survivors:
+        - `0021900201`
+        - `0021900419`
+        - `0021900487`
+        - `0021900920`
+        - `0041900155`
+      - `1` diagnosed accumulator holdout:
+        - `0021700394`
+  - practical consequence:
+    - the rebound-credit family is indeed exhausted at local event/window granularity under the current evidence
+- Claim 4 (done-definition distance):
+  - the hard-count part is directionally correct, with one important nuance:
+    - there are currently `15` open games outside Block A across B/C/D/E
+    - there are also still `2` open games inside Block A:
+      - `0029700159`
+      - `0029701075`
+    - so the current live open inventory is `17` games total, not just the outside-Block-A subset
+  - current outside-Block-A actionable row load:
+    - Block B: `2` open games / `6` actionable event rows
+    - Block C: `1` open game / `1` actionable event row
+    - Block D: `1` open game / `2` actionable event rows
+    - Block E: `11` open games / `11` actionable event rows
+    - total outside Block A:
+      - `15` open games
+      - `20` actionable event rows
+  - interpretation:
+    - the external review is right that the project is now at the reclassification / blocker-policy frontier more than the local-override frontier for many remaining cases
+    - but it understated the current Block A open holdout set by omitting `0029701075`
+- Published a reviewed open-blocker inventory artifact at:
+  - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/phase6_open_blocker_inventory_20260322_v1.csv`
+  - current lanes in that inventory:
+    - Block A:
+      - `0029700159` `special_holdout_material_minute`
+      - `0029701075` `candidate_systematic_defect`
+    - Block B:
+      - `0020000628` `contradiction_mixed_source_case`
+      - `0020400335` `severe_minute_insufficient_local_context`
+    - Block C / D:
+      - `0020900189` `contradiction_period_start_boundary`
+      - `0021300593` `contradiction_period_start_boundary`
+    - Block E:
+      - `0021700394` `same_clock_accumulator_holdout`
+      - `5` same-clock controls
+      - `5` rebound-credit survivors with rejected local-boundary history
+- Validation for this pass:
+  - `python /Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/build_override_runtime_views.py`
+  - `PYTHONPATH=. /opt/anaconda3/envs/darko311/bin/python -m pytest -q tests/test_lineup_correction_manifest.py`
+  - result:
+    - live correction inventory still `54 / 48 / 6`
+    - `4 passed`
+
+## Latest checkpoint (March 22, 2026, Block B micro-candidate pass stayed conservative)
+- Used one more local scratch validation plus three parallel sub-agent reads on the smallest remaining non-Block-A open cases:
+  - `0020000628`
+  - `0020900189`
+  - `0021300593`
+- `0020000628` result:
+  - tested the only evidence-backed Nets local window:
+    - `P2 E227-E230`
+    - lineup:
+      - `[950, 271, 2030, 446, 1496]`
+      - `Stephon Marbury / Johnny Newman / Kenyon Martin / Lucious Harris / Keith Van Horn`
+  - scratch artifact:
+    - `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/_tmp_validate_0020000628_window_20260322_v1`
+  - source evidence behind the probe:
+    - raw `playbyplayv2` and cached `pbpv3` both show:
+      - `P2 E227` Van Horn shooting foul at `2:23`
+      - then `P2 E229` `SUB: Van Horn FOR Williams` at the same clock
+    - `full_pbp_new` already has Van Horn on the Nets lineup for the `143`-second possession and drops Aaron Williams there
+  - scratch outcome:
+    - counting-stat boxscore audit stayed clean
+    - but the correction only moved the blocker from:
+      - `P2 E227` Van Horn foul
+      to:
+      - `P2 E229` `SUB: Van Horn FOR Williams`
+    - the `0.25` Van Horn minute tail stayed unchanged
+    - and the run introduced `2` small plus-minus mismatches:
+      - Keith Van Horn
+      - Aaron Williams
+  - practical consequence:
+    - keep the proposal in `/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/overrides/correction_manifest.json` as `rejected`
+    - keep `0020000628` open
+    - do not promote a `source_limited_upstream_error` annotation here yet because the event row is real but the attached minute tail is still source-split:
+      - output / `pbpstats_box` at `32.7333`
+      - official / `tpdev_box*` / BBR at `32.9833`
+      - `tpdev_pbp` at `31.9167`
+- `0020900189` result:
+  - keep `0020900189` open
+  - current best read remains:
+    - true period-start contradiction
+    - not a source-limited upstream error
+  - supporting read:
+    - `period_starters_v6` resolves Denver P2 with Lawson in and Billups out
+    - raw `pbpv3` still keeps the same-clock start-of-period technical cluster ambiguous rather than impossible
+  - practical consequence:
+    - leave it in the `contradiction_period_start_boundary` lane
+- `0021300593` result:
+  - keep `0021300593` open
+  - current best read remains:
+    - true exact-start contradiction
+    - not a source-limited upstream error
+  - supporting read:
+    - `period_starters_v6` resolves Miami P2 with Roger Mason in and Norris Cole out
+    - raw `pbpv3` still preserves the `12:00` foul / FT / sub cluster as a contradiction rather than a one-sided bad source row
+  - practical consequence:
+    - leave it in the `contradiction_period_start_boundary` lane
+- Manifest / inventory correction from this pass:
+  - while cleaning up the scratch candidate, rechecked the live correction inventory against the manifest and the project brief
+  - durable current active split is:
+    - `53` active corrections
+    - `48` active period-start corrections
+    - `5` active window/event corrections
+  - the temporary `47 / 6` checkpoint was notes/test drift, not a real runtime state change
+- Practical queue consequence:
+  - no new closures landed from this pass
+  - Block B still has:
+    - `0020000628`
+    - `0020400335`
+      as its open pair
+  - the two older period-start contradiction cases:
+    - `0020900189`
+    - `0021300593`
+      stay documented-open comparison cases, not reduction targets
+- Validation for this pass:
+  - `python /Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/build_override_runtime_views.py`
+  - `PYTHONPATH=. /opt/anaconda3/envs/darko311/bin/python -m pytest -q tests/test_lineup_correction_manifest.py`
+  - result:
+    - manifest compile summary updated cleanly
+    - `4 passed`

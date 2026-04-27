@@ -1,0 +1,184 @@
+game_id,action,event_num,anchor_event_num,notes,period,pctimestring,wctimestring,description_side,player_out_id,player_out_name,player_out_team_id,player_in_id,player_in_name,player_in_team_id
+0029600002,drop,220,,Drop stray Nets team rebound placeholder with corrupted clock placement
+0029600085,drop,364,,Drop stray start-of-period Pacers team rebound placeholder
+0029600204,move_before,338,339,Normalize Ron Harper FOR Jordan before Harper's Q3 0:35 foul; accept residual Harper/Jordan clock and PM source split
+0029600245,drop,169,,Drop dead-ball 76ers missed-FT team rebound placeholder
+0029600245,drop,469,,Drop dead-ball Mavericks missed-FT team rebound placeholder
+0029600262,move_before,433,435,Move Dallas team rebound back ahead of the later Vancouver miss
+0029600396,move_before,411,412,Move Zidek miss ahead of the same-clock rebound row
+0029600396,move_after,417,416,Move Miami team FT placeholder behind the missed free throw
+0029600401,drop,439,,Drop impossible Laettner rebound logged after a turnover with no missed shot context
+0029600442,move_before,377,378,Move delayed Bullets rebound back ahead of the later FT block
+0029600443,move_before,350,352,Move the delayed James miss ahead of the Laettner putback pair
+0029600443,move_before,352,351,Order Laettner rebound before the same-clock tip make
+0029600682,move_after,362,364,Move Oakley rebound behind the later Grant miss it belongs to
+0029600615,drop,343,,Drop unrecoverable Bo Outlaw rebound row already covered by stat override
+0029800075,drop,435,,Drop impossible Mourning second rebound logged after Gill already secured the same missed shot
+0029900377,drop,423,,Drop impossible Abdur-Rahim rebound logged after his made and-one free throw; keep Lopez's real earlier rebound instead
+0029901052,drop,448,,Drop stray Travis Knight free-throw row logged after the end of regulation
+0049600063,drop,85,,Drop dead-ball Rockets missed-FT team rebound placeholder
+0049600063,drop,147,,Drop extra same-clock Rockets team rebound placeholder after tip sequence
+0049600063,drop,268,,Drop dead-ball Rockets technical-FT team rebound placeholder
+0049700045,drop,336,,Drop end-of-period Hornets team rebound placeholder after buzzer miss
+0020000628,move_before,229,227,Move Van Horn substitution ahead of his same-clock Q2 shooting foul; residual minute/PM source split remains documented
+0020400335,insert_sub_before,148,149,Synthesize missing Q2 7:59 Junior Harrington FOR J.R. Smith sub using BBR and tpdev possession support,2,7:59,,home,2747,JR Smith,1610612740,2454,Junior Harrington,1610612740
+0020000350,drop,473,,Drop unresolved Stromile Swift late-game rebound row and restore the missing board via stat override
+0020000383,drop,204,,Drop unresolved Vlade Divac early-third-quarter rebound row and restore the missing board via stat override
+20300257,move_before,318,319,Move the delayed Bulls team rebound back ahead of the sub block so it stays attached to McKie's missed three
+20300778,drop,462,,Drop Jared Jeffries' after-the-buzzer 0:00 three that raw PBP adds but the official and BBR boxscores do not count
+20500469,move_after,72,80,Move the delayed Kings rebound behind Mobley's 3:03 missed jumper so Ewing's earlier rebound stays attached to Martin's miss
+20500717,drop,470,,Drop unresolved late-overtime Magloire rebound row logged with no missed-shot context between the timeout block and Redd's later miss
+20600882,move_after,498,497,Move Mike Miller's 0:00 rebound behind his own missed jumper so it stays attached to the correct shot
+20600882,drop,500,,Drop the extra Grizzlies team rebound placeholder logged after Miller already rebounded the final 0:00 miss
+20700184,move_before,62,60,Move Evans' same-clock rebound back ahead of the Warriors sub so it stays attached to Green's missed free throw and leaves Pietrus' later board intact
+20700863,move_after,444,445,Move David West's delayed offensive rebound behind his 2:06 missed tip so it stays attached to the correct shot
+20701110,move_after,148,147,Move Monta Ellis' rebound behind his own same-clock missed jumper instead of the prior missed technical free throw
+20701110,drop,149,,Drop unresolved Vaughn rebound row from the same-clock Spurs cluster after Monta's reordered offensive rebound
+20701110,drop,151,,Drop unresolved Spurs team rebound placeholder from the same-clock cluster after Udoka's later miss
+20800138,drop,403,,Drop the malformed Rockets team rebound placeholder inserted between Chuck Hayes free throws so Yao's earlier defensive rebound stays attached to Posey's miss
+20800017,drop,173,,Drop the malformed Rockets team rebound placeholder inserted between Chuck Hayes free throws so Howard's later defensive rebound stays attached to the missed second free throw
+20800153,drop,472,,Drop the stray duplicate Paul Pierce free throw row logged at 0:00 after the game is already in its closing foul sequence
+20800499,move_after,529,528,Move the delayed Celtics team rebound behind Ray Allen's blocked 4:03 layup so Jeffries' earlier defensive rebound stays attached to Rondo's miss
+20900887,drop,99,,Drop the malformed Cavaliers team rebound placeholder inserted between JJ Hickson free throws so Jamison's earlier defensive rebound stays attached to Lee's miss
+0020900189,drop,217,,Drop stale exact-start Lawson FOR Billups phantom row; Lawson is already active in Q2 and Billups re-enters later
+20900900,drop,295,,Drop the stray Dwight Howard rebound row logged ahead of the later third-quarter Magic offense with no local missed-shot context
+20900925,drop,153,,Drop the impossible Henderson rebound row from the Bobcats same-clock Thomas miss / Diaw rebound / free-throw cluster so Diaw's offensive rebound survives
+21000365,drop,482,,Drop the duplicate Carmelo Anthony FT2 row so only the real made free throw remains
+21001191,drop,322,,Drop the malformed Spurs team rebound placeholder inserted between Splitter free throws
+21000448,move_before,475,471,Move Horford's 3:25 missed layup back ahead of the delayed 3:04 Hawks/Bucks rebound cluster
+21000448,move_after,476,475,Keep Horford's 3:24 offensive rebound attached to his 3:25 miss
+21000448,move_after,477,476,Keep Horford's offensive-goaltending turnover attached to the restored Horford rebound sequence
+21000448,move_after,472,477,Move Boykins' 3:04 missed three behind the Horford cluster so Smith's rebound becomes defensive
+21100772,drop,112,,Drop the duplicate Derrick Brown FT1 row so only the real made and-one free throw remains
+21100843,move_before,466,464,Move Wafer's delayed 3:12 rebound back ahead of the later foul/free-throw block
+21100843,move_before,471,466,Move Villanueva's 3:12 missed layup back ahead of Wafer's delayed rebound
+21100843,drop,469,,Drop the malformed Magic team rebound placeholder inserted between Von Wafer free throws
+21200541,move_before,131,129,Move Bledsoe's 10:07 missed layup back ahead of his delayed offensive rebound so O'Quinn's earlier defensive board survives
+21201046,move_before,70,69,Move Morris' 5:12 missed jumper back ahead of Lopez's delayed rebound so Lopez's board becomes defensive and the earlier Suns rebound survives
+21500061,drop,269,,Drop the stranded Kawhi Leonard rebound row from the Humphries miss / Leonard miss / Aldridge putback cluster and restore the official Spurs rebound split with manual stat overrides
+21600417,drop,173,,Drop the stranded Nikola Jokic rebound row from the Nuggets second-quarter cluster and restore the official rebound split with manual stat overrides
+21600874,drop,427,,Drop the stranded Spurs rebound row from the fourth-quarter Bertans / Dedmon cluster and restore the official rebound split with manual stat overrides
+21700032,move_after,96,95,Move Harden's delayed offensive rebound behind his 4:01 miss
+21700035,move_after,416,415,Move Cauley-Stein's delayed offensive rebound behind his 4:26 miss
+21700041,move_after,91,88,Move the 76ers team rebound directly behind McConnell's 3:36 miss and ahead of the timeout / replay / sub block (BBR-supported)
+21700056,move_before,347,346,Move Drummond's delayed rebound ahead of the later Timberwolves rebound placeholder
+21700065,move_after,599,598,Move Justin Holiday's delayed offensive rebound behind his 1:54 miss
+21700080,move_after,415,414,Move Harden's delayed offensive rebound behind his 3:51 miss
+21700089,move_after,401,400,Move Labissiere's delayed offensive rebound behind his 2:14 miss
+21700092,move_after,536,535,Move Gasol's delayed offensive rebound behind his 10:21 miss
+21700097,move_after,30,29,Move Aaron Gordon's delayed offensive rebound behind his 9:32 miss
+21700109,move_after,76,75,Move Baynes' delayed offensive rebound behind his 4:46 miss
+21700111,move_after,13,12,Move Capela's delayed offensive rebound behind his 10:51 miss
+21700120,move_after,151,149,Move Felicio's delayed offensive rebound behind his 10:48 miss
+21700127,move_after,257,256,Move Adebayo's delayed defensive rebound behind Murray's missed free throw
+21700127,move_after,458,457,Move Plumlee's delayed offensive rebound behind his 0:06 miss
+21700150,move_after,360,359,Move Oladipo's delayed defensive rebound behind Mirotic's 5:32 miss
+21700152,move_after,138,136,Move Zeller's delayed offensive rebound behind his 1:41 miss
+21700155,move_after,642,641,Move Beasley's delayed offensive rebound behind his 6:07 miss
+21700159,move_after,27,26,Move Young's delayed miss behind the completed Drummond/Turner 10:08 rebound chain so Harris' later board stays defensive
+21700159,move_after,56,55,Move Young's delayed offensive rebound behind Bogdanovic's 6:48 miss
+21700174,move_after,123,122,Move Len's delayed offensive rebound behind his 3:28 miss
+21700174,move_after,518,517,Move Daniels' delayed offensive rebound behind Ross' 11:36 miss
+21700186,move_after,182,181,Move Len's delayed offensive rebound behind his 10:36 miss
+21700195,move_after,90,89,Move Cunningham's delayed offensive rebound behind his 5:43 miss
+0021800484,move_before,437,433,Move Curry's and-one shooting foul before same-clock Warriors substitutions so the foul precedes the dead-ball substitution block
+0021801067,move_before,374,369,Move Smart flagrant cause before Brown replacement sub in same-clock ejection cluster
+0021801067,move_after,369,372,Move Brown replacement after Smart ejection and Embiid technical in same-clock ejection cluster
+21700198,move_after,551,549,Move Swanigan's delayed offensive rebound behind his 4:51 miss
+21700211,move_after,227,226,Move Cousins' delayed offensive rebound behind his 5:51 miss
+21700218,move_after,97,96,Move Gortat's delayed offensive rebound behind his 3:38 miss
+21700223,move_after,432,431,Move Adams' delayed offensive rebound behind his 1:51 miss
+21700228,move_after,590,588,Move Walker's delayed defensive rebound behind Rivers' 3:30 miss
+21700259,move_after,519,518,Move Plumlee's delayed offensive rebound behind his 9:57 miss
+21700285,move_before,347,346,Move Henson's delayed rebound ahead of the later Jazz rebound placeholder
+21700287,move_after,175,174,Move Valentine's delayed defensive rebound behind Whiteside's 9:02 miss
+21700287,move_after,547,546,Move Portis' delayed offensive rebound behind his 1:32 miss
+21700303,move_after,73,72,Move Monroe's delayed offensive rebound behind his 4:39 miss
+21700311,drop,92,,Drop the Spurs team rebound placeholder that is already being deleted without affecting the final box score
+21700315,move_after,393,392,Move Faried's delayed offensive rebound behind his 7:06 miss
+21700317,move_after,428,427,Move Lou Williams' delayed defensive rebound behind Ingles' missed free throw
+21700333,move_after,598,597,Move Connaughton's delayed offensive rebound behind his 0:07 miss
+21700353,move_after,62,61,Move Love's delayed offensive rebound behind his 5:45 miss
+21700359,move_before,319,318,Move Drummond's delayed rebound ahead of the later Bucks rebound placeholder
+21700362,move_after,392,391,Move Gibson's delayed offensive rebound behind his 4:44 miss
+21700363,move_after,83,82,Move Lonzo Ball's delayed defensive rebound behind Redick's missed free throw
+21700496,move_after,80,79,Move Harden's delayed offensive rebound behind his 5:19 miss
+21700504,move_after,140,139,Move Deyonta Davis' delayed offensive rebound behind his 1:03 miss
+21700695,drop,381,,Drop the Timberwolves missed-free-throw team rebound placeholder after Towns' delayed defensive rebound
+21700824,move_after,18,17,Move Favors' delayed offensive rebound behind his 10:38 miss
+21700845,move_after,346,345,Move Gobert's delayed offensive rebound behind his 7:20 miss
+21700906,move_after,585,584,Move Bjelica's delayed offensive rebound behind his 5:26 miss
+21700972,move_after,288,287,Move Hollis-Jefferson's delayed offensive rebound behind his 1:34 miss
+21700980,move_after,539,538,Move Deyonta Davis' delayed offensive rebound behind his 8:18 miss
+21701039,move_after,216,215,Move Portis' delayed offensive rebound behind his 7:19 miss
+21701101,move_after,550,549,Move Zhou Qi's delayed defensive rebound behind King's missed free throw
+21701142,move_after,482,481,Move Cauley-Stein's delayed offensive rebound behind his 2:34 miss
+21800061,move_after,254,253,Move Gasol's delayed offensive rebound behind his 7:15 miss
+21800064,move_after,622,620,Move Isaac's delayed offensive rebound behind Ross' 2:31 missed free throw
+21800239,move_after,238,237,Move Zeller's delayed offensive rebound behind Lamb's 5:05 miss
+21800239,move_after,282,280,Move Irving's delayed offensive rebound behind his 2:52 miss
+21800253,move_after,556,555,Move Davis' delayed offensive rebound behind his 0:31 miss
+21800258,drop,232,,Drop the Pistons missed-free-throw team rebound placeholder so Tucker's 7:05 defensive rebound stays attached to Drummond's miss
+21800258,move_after,236,235,Move Tucker's delayed defensive rebound behind Stephenson's 4:14 miss
+21800287,move_after,397,396,Move Ayton's delayed offensive rebound behind Bridges' 10:39 miss
+21800287,move_after,652,651,Move Ayton's delayed defensive rebound behind Johnson's 5:23 miss
+21800287,move_before,651,628,Move Johnson's delayed 5:23 tip miss back ahead of Booker's later make so Stanley's offensive rebound survives
+21800287,drop,627,,Drop Stanley Johnson's stranded rebound row and restore the official offensive board with a manual stat override
+21800332,move_after,166,165,Move Nance Jr.'s delayed offensive rebound behind his 4:18 miss
+21800375,move_after,92,91,Move Ball's delayed offensive rebound behind his 6:16 miss
+21800407,move_after,266,265,Move Turner's delayed offensive rebound behind Matthews' 7:50 miss
+21800454,move_after,97,96,Move Matthews' delayed offensive rebound behind his 9:57 miss
+21800459,move_after,498,497,Move Sabonis' delayed offensive rebound behind Collison's 3:34 miss
+21800544,drop,317,,Drop the bogus Rockets team rebound that sits ahead of Harden's delayed 0:56 missed free throw
+21800544,move_before,323,318,Move Harden's delayed 0:56 missed free throw back ahead of the later 0:39 sequence
+21800544,move_after,327,323,Move JaMychal Green's delayed 0:56 defensive rebound directly behind Harden's missed free throw
+21800670,move_after,115,114,Move George's delayed offensive rebound behind his 7:38 miss
+21800715,move_after,139,138,Move Crowder's delayed defensive rebound behind Craig's missed free throw 2 of 2 at 2:46 (BBR-supported)
+21800809,move_after,522,505,Move Bagley's delayed 11:42 reverse-layup miss behind his initial offensive rebound
+21800809,move_after,524,522,Move Labissiere's delayed 11:42 rebound behind Bagley's reverse-layup miss
+21800809,move_after,533,524,Move Labissiere's delayed 11:42 hook miss behind his offensive rebound
+21800809,move_after,534,533,Move Giles' delayed 11:39 offensive rebound behind Labissiere's hook miss
+21800862,move_after,91,89,Move Nurkic's delayed offensive rebound behind his 4:00 miss
+21800911,move_after,212,211,Move Zeller's delayed offensive rebound behind Walker's 6:57 miss
+21800922,move_after,86,85,Move Towns' delayed offensive rebound behind Covington's 4:15 miss
+21800977,move_after,308,307,Move Williams' delayed offensive rebound behind his 7:44 miss
+21801073,move_after,526,525,Move Freedom's delayed offensive rebound behind his 5:48 miss
+21801144,move_after,645,644,Move Valanciunas' delayed offensive rebound behind Brooks' 5:17 miss
+21900004,drop,191,,Drop the Pistons missed-free-throw team rebound placeholder inserted between Drummond free throws
+21900168,move_before,408,410,Move Poeltl's substitution back ahead of Aminu's missed second free throw to match the BBR ordering and unblock the later Gordon rebound chain
+21900175,move_before,476,477,Move Wendell Carter Jr.'s offensive rebound ahead of his same-clock putback miss
+21900175,drop,593,,Drop Jordan's stranded offensive rebound row and restore the missing board via stat override
+21900175,move_before,599,594,Move DeAndre Jordan's delayed 10:23 tip miss back ahead of his made dunk
+21900175,move_after,600,599,Move Jordan's second offensive rebound directly behind his restored 10:23 miss
+21900209,move_before,354,326,Move Christian Wood's delayed tip miss back ahead of Satoransky's later miss so Drummond's rebound stays defensive
+21900209,move_after,356,354,Move Wendell Carter Jr.'s rebound directly behind Wood's restored tip miss
+21900261,drop,367,,Drop Ilyasova's stranded offensive rebound row and restore the missing board via stat override
+21900261,move_before,367,368,Move Ilyasova's same-clock offensive rebound ahead of his putback miss
+21900261,move_after,370,368,Move the Bucks team rebound directly behind Ilyasova's restored miss
+21900415,move_before,490,489,Move Whiteside's first 5:12 offensive rebound ahead of its same-clock tip miss to match the BBR sequence
+21900415,move_before,460,461,Move Whiteside's second 5:12 offensive rebound ahead of its same-clock tip miss to match the BBR sequence
+21900529,move_before,140,141,Move Freedom's offensive rebound ahead of his same-clock putback miss
+21900535,drop,307,,Drop the Heat missed-free-throw team rebound placeholder inserted between Adebayo free throws
+21900676,drop,164,,Drop the stray Pelicans team rebound placeholder that steals Porter Jr.'s defensive rebound
+21900704,move_after,500,499,Move Jerami Grant's same-clock offensive rebound behind Malik Beasley's miss
+21900704,move_after,505,501,Move the Grizzlies team rebound directly behind Grant's restored miss
+21900830,drop,588,,Drop the Celtics missed-free-throw team rebound placeholder inserted between Smart free throws
+21900830,drop,594,,Drop Theis's stranded offensive rebound row and restore the missing board via stat override
+21900830,move_before,594,595,Move Theis' same-clock offensive rebound ahead of his putback miss
+21900830,move_after,597,595,Move the Celtics team rebound directly behind Theis' restored miss
+21900928,move_after,424,419,Move Harris's delayed tip miss back into the same-clock rebound chain before Barnes' defensive board
+21900928,move_after,425,424,Move Harris's delayed offensive rebound directly behind his restored tip miss
+21901243,drop,308,,Drop the Lakers missed-free-throw team rebound placeholder inserted between Danny Green free throws so Davis' later offensive rebound survives
+21901243,drop,312,,Drop Davis's stranded offensive rebound row and restore the missing board via stat override
+41800225,move_after,371,370,Move Tucker's delayed offensive rebound behind his 9:35 miss
+41800225,move_after,384,369,Move Capela's delayed 7:57 tip miss back into the offensive-rebound chain
+41800225,move_after,385,384,Move Capela's delayed 7:56 offensive rebound behind his restored tip miss
+41900315,drop,528,,Drop the Nuggets missed-free-throw team rebound placeholder inserted between Michael Porter Jr. free throws
+21700012,drop,305,,Drop the Trail Blazers missed-free-throw team rebound placeholder after Aminu's delayed defensive rebound
+21700012,drop,422,,Drop the Trail Blazers missed-free-throw team rebound placeholder after Nurkic's delayed defensive rebound
+21700150,drop,360,,Drop Oladipo's stranded rebound row after restoring his missing defensive board via stat override
+21700285,drop,347,,Drop Henson's stranded rebound row after restoring his missing offensive board via stat override
+21700317,drop,419,,Drop Favors' stranded rebound row after restoring his missing offensive board via stat override
+21700359,drop,319,,Drop Drummond's stranded rebound row after restoring his missing offensive board via stat override
+21700359,drop,329,,Drop the Bucks team rebound placeholder from the Jackson miss / loose-ball foul cluster
+21700056,drop,347,,Drop Drummond's stranded rebound row after restoring his missing offensive board via stat override
