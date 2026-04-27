@@ -63,6 +63,14 @@ def test_load_pbp_row_overrides_rejects_unknown_action(tmp_path):
         load_pbp_row_overrides(path)
 
 
+def test_load_pbp_row_overrides_rejects_missing_required_columns(tmp_path):
+    path = tmp_path / "overrides.csv"
+    path.write_text("game_id,action\n", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="missing columns"):
+        load_pbp_row_overrides(path)
+
+
 def test_load_pbp_row_overrides_rejects_missing_synthetic_fields(tmp_path):
     path = tmp_path / "overrides.csv"
     path.write_text(
@@ -72,6 +80,18 @@ def test_load_pbp_row_overrides_rejects_missing_synthetic_fields(tmp_path):
     )
 
     with pytest.raises(ValueError, match="requires player_in_id"):
+        load_pbp_row_overrides(path)
+
+
+def test_load_pbp_row_overrides_rejects_non_numeric_synthetic_ids(tmp_path):
+    path = tmp_path / "overrides.csv"
+    path.write_text(
+        "game_id,action,event_num,anchor_event_num,notes,player_out_id,player_out_name,player_in_id,player_in_name\n"
+        "0020400335,insert_sub_before,148,149,bad player in,2747,JR Smith,abc,Junior Harrington\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="invalid integer field player_in_id"):
         load_pbp_row_overrides(path)
 
 

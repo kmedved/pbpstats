@@ -4,6 +4,7 @@ from pathlib import Path
 
 from historic_backfill.runners.validate_release_manifest import (
     _validate_authoritative_checksum_coverage,
+    _raw_open_game_count,
     validate_checksums,
     validate_manifest,
 )
@@ -36,6 +37,15 @@ def test_v4_release_checksum_validation_catches_mutated_artifact(tmp_path):
     errors = validate_checksums(release_copy)
 
     assert any("closure_note.md" in error for error in errors)
+
+
+def test_raw_open_game_count_preserves_zero():
+    assert _raw_open_game_count(
+        {
+            "quality_status_counts": {"open": 0},
+            "raw_quality_status_counts": {"open": 13},
+        }
+    ) == 0
 
 
 def test_v4_release_manifest_rejects_authoritative_files_without_checksum(monkeypatch):
@@ -80,3 +90,18 @@ def test_v4_release_sidecar_validation_rejects_extra_reviewed_rows(tmp_path):
     errors = validate_manifest(release_copy / "release_manifest.json")
 
     assert any("reviewed_override games not in overlay" in error for error in errors)
+
+
+def test_v4_release_sidecar_validation_rejects_bad_summary_counts(tmp_path):
+    release_copy = tmp_path / "release"
+    shutil.copytree(RELEASE_DIR, release_copy)
+    summary_path = release_copy / "sidecar" / "summary.json"
+    summary_text = summary_path.read_text(encoding="utf-8")
+    summary_path.write_text(
+        summary_text.replace('"row_count": 753', '"row_count": 752'),
+        encoding="utf-8",
+    )
+
+    errors = validate_manifest(release_copy / "release_manifest.json")
+
+    assert any("row_count does not match" in error for error in errors)

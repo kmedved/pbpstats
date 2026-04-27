@@ -21,7 +21,9 @@ def _imported_modules(path: Path) -> list[str]:
             modules.extend(alias.name for alias in node.names)
         elif isinstance(node, ast.ImportFrom):
             prefix = "." * node.level
-            modules.append(f"{prefix}{node.module or ''}")
+            module = f"{prefix}{node.module or ''}"
+            modules.append(module)
+            modules.extend(f"{module}.{alias.name}" for alias in node.names)
     return modules
 
 

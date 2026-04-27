@@ -27,6 +27,13 @@ def _as_bool(value: object) -> bool:
     return str(value).strip().lower() in {"1", "true", "yes"}
 
 
+def _raw_open_game_count(raw_summary: dict[str, Any]) -> Any:
+    value = raw_summary.get("quality_status_counts", {}).get("open")
+    if value is None:
+        value = raw_summary.get("raw_quality_status_counts", {}).get("open")
+    return value
+
+
 def _normalize_checksum_rel_path(raw_rel_path: str) -> str:
     return raw_rel_path.strip().removeprefix("./")
 
@@ -104,6 +111,14 @@ def _validate_sidecar_contract(release_dir: Path) -> list[str]:
     documented_hold_ids = [row["game_id"] for row in rows if row.get("execution_lane") == "documented_hold"]
     if documented_hold_ids:
         errors.append(f"sidecar contains documented_hold execution lanes: {documented_hold_ids}")
+    if summary.get("row_count") != len(rows):
+        errors.append("sidecar row_count does not match CSV row count")
+    if summary.get("unique_game_count") != len(set(game_ids)):
+        errors.append("sidecar unique_game_count does not match unique game_id count")
+    if summary.get("release_blocking_game_count") != len(blocking_ids):
+        errors.append("sidecar release_blocking_game_count does not match rows")
+    if summary.get("research_open_game_count") != len(research_open_ids):
+        errors.append("sidecar research_open_game_count does not match rows")
 
     overlay_rows = _load_csv(
         release_dir
@@ -205,10 +220,7 @@ def validate_manifest(manifest_path: Path) -> list[str]:
     )
     sidecar = _load_json(release_dir / "sidecar" / "summary.json")
 
-    raw_open_games = (
-        raw.get("quality_status_counts", {}).get("open")
-        or raw.get("raw_quality_status_counts", {}).get("open")
-    )
+    raw_open_games = _raw_open_game_count(raw)
     checks = {
         "failed_games": full_history.get("failed_games"),
         "event_stats_errors": full_history.get("event_stats_errors"),

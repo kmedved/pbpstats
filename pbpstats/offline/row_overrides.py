@@ -63,6 +63,13 @@ VALID_PBP_ROW_OVERRIDE_ACTIONS = {
     "insert_sub_before",
     "insert_sub_after",
 }
+REQUIRED_PBP_ROW_OVERRIDE_COLUMNS = {
+    "game_id",
+    "action",
+    "event_num",
+    "anchor_event_num",
+    "notes",
+}
 
 
 _OPTIONAL_INSERT_FIELDS = {
@@ -149,6 +156,12 @@ def _validate_parsed_override(row: dict, row_number: int, strict: bool) -> bool:
         for field in ("player_out_id", "player_out_name", "player_in_id", "player_in_name"):
             if not str(row.get(field, "")).strip():
                 raise ValueError(f"Row {row_number} action {action} requires {field}")
+        for field in ("player_out_id", "player_in_id"):
+            _parse_int(str(row.get(field, "")).strip(), field, row_number, strict, required=True)
+        for field in ("player_out_team_id", "player_in_team_id"):
+            raw_value = str(row.get(field, "")).strip()
+            if raw_value:
+                _parse_int(raw_value, field, row_number, strict, required=False)
 
     return True
 
@@ -220,6 +233,9 @@ def load_pbp_row_overrides(
             **{field: str for field in _OPTIONAL_INSERT_FIELDS},
         },
     ).fillna("")
+    missing_columns = REQUIRED_PBP_ROW_OVERRIDE_COLUMNS - set(df.columns)
+    if strict and missing_columns:
+        raise ValueError(f"PBP row override catalog missing columns: {sorted(missing_columns)}")
 
     overrides: Dict[str, List[dict]] = {}
     seen_rows: set[tuple[str, str, int, int | None]] = set()

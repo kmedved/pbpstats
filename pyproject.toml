@@ -38,6 +38,9 @@ license = "MIT License"
 [tool.poetry.dependencies]
 python = ">=3.10,<4.0"
 requests = "^2.27.1"
+pandas = ">=2.0"
+numpy = ">=1.24"
+pyarrow = ">=14.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.0.1"
