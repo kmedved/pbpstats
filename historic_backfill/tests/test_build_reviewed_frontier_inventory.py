@@ -233,7 +233,7 @@ def test_build_reviewed_frontier_inventory_emits_raw_release_and_reviewed_views(
     subprocess.run(
         [
             sys.executable,
-            str(ROOT / "build_reviewed_frontier_inventory.py"),
+            str(ROOT / "audits" / "core" / "build_reviewed_frontier_inventory.py"),
             "--residual-dir",
             str(residual_a),
             "--residual-dir",
@@ -248,7 +248,7 @@ def test_build_reviewed_frontier_inventory_emits_raw_release_and_reviewed_views(
             str(output_dir),
         ],
         check=True,
-        cwd=ROOT,
+        cwd=ROOT.parent,
     )
 
     summary = json.loads((output_dir / "summary.json").read_text(encoding="utf-8"))

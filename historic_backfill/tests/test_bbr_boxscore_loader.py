@@ -57,7 +57,7 @@ def test_load_bbr_boxscore_df_uses_crosswalk_mapping(monkeypatch, tmp_path: Path
     ).to_csv(crosswalk_path, index=False)
 
     monkeypatch.setattr(
-        "bbr_boxscore_loader.find_bbr_game_for_nba_game",
+        "historic_backfill.audits.cross_source.bbr_boxscore_loader.find_bbr_game_for_nba_game",
         lambda *_args, **_kwargs: (
             NbaGameContext(
                 nba_game_id="0021900001",
@@ -71,7 +71,7 @@ def test_load_bbr_boxscore_df_uses_crosswalk_mapping(monkeypatch, tmp_path: Path
         ),
     )
     monkeypatch.setattr(
-        "bbr_boxscore_loader.load_official_boxscore_df",
+        "historic_backfill.audits.cross_source.bbr_boxscore_loader.load_official_boxscore_df",
         lambda *_args, **_kwargs: pd.DataFrame(),
     )
 
@@ -102,7 +102,7 @@ def test_load_bbr_boxscore_df_falls_back_to_official_name_match(monkeypatch, tmp
     )
 
     monkeypatch.setattr(
-        "bbr_boxscore_loader.find_bbr_game_for_nba_game",
+        "historic_backfill.audits.cross_source.bbr_boxscore_loader.find_bbr_game_for_nba_game",
         lambda *_args, **_kwargs: (
             NbaGameContext(
                 nba_game_id="0021900002",
@@ -116,7 +116,7 @@ def test_load_bbr_boxscore_df_falls_back_to_official_name_match(monkeypatch, tmp
         ),
     )
     monkeypatch.setattr(
-        "bbr_boxscore_loader.load_official_boxscore_df",
+        "historic_backfill.audits.cross_source.bbr_boxscore_loader.load_official_boxscore_df",
         lambda *_args, **_kwargs: pd.DataFrame(
             [
                 {

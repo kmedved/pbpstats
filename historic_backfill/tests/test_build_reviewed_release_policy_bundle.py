@@ -132,7 +132,7 @@ def test_build_reviewed_release_policy_bundle_applies_overlay_to_existing_residu
     subprocess.run(
         [
             sys.executable,
-            str(ROOT / "build_reviewed_release_policy_bundle.py"),
+            str(ROOT / "audits" / "core" / "build_reviewed_release_policy_bundle.py"),
             "--source-bundle-dir",
             str(source_dir),
             "--reviewed-policy-overlay-csv",
@@ -141,7 +141,7 @@ def test_build_reviewed_release_policy_bundle_applies_overlay_to_existing_residu
             str(output_dir),
         ],
         check=True,
-        cwd=ROOT,
+        cwd=ROOT.parent,
     )
 
     rows = list(csv.DictReader((output_dir / "game_quality.csv").open()))

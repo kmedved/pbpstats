@@ -157,7 +157,7 @@ def test_build_reviewed_release_quality_sidecar_combines_sparse_game_quality_out
     subprocess.run(
         [
             sys.executable,
-            str(ROOT / "build_reviewed_release_quality_sidecar.py"),
+            str(ROOT / "audits" / "core" / "build_reviewed_release_quality_sidecar.py"),
             "--residual-dir",
             str(residual_a),
             "--residual-dir",
@@ -170,7 +170,7 @@ def test_build_reviewed_release_quality_sidecar_combines_sparse_game_quality_out
             str(output_dir),
         ],
         check=True,
-        cwd=ROOT,
+        cwd=ROOT.parent,
     )
 
     rows = list(csv.DictReader((output_dir / "game_quality_sparse.csv").open()))

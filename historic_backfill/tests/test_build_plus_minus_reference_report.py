@@ -360,7 +360,7 @@ def test_build_plus_minus_reference_report_classifies_rows_and_emits_sample(tmp_
     subprocess.run(
         [
             sys.executable,
-            str(ROOT / "build_plus_minus_reference_report.py"),
+            str(ROOT / "audits" / "core" / "build_plus_minus_reference_report.py"),
             "--residual-dir",
             str(residual_dir),
             "--residual-dir",
@@ -373,7 +373,7 @@ def test_build_plus_minus_reference_report_classifies_rows_and_emits_sample(tmp_
             str(overlay_csv),
         ],
         check=True,
-        cwd=ROOT,
+        cwd=ROOT.parent,
     )
 
     summary = json.loads((output_dir / "summary.json").read_text(encoding="utf-8"))
@@ -596,14 +596,14 @@ def test_build_plus_minus_reference_report_applies_release_overlay_to_raw_open_p
     subprocess.run(
         [
             sys.executable,
-            str(ROOT / "build_plus_minus_reference_report.py"),
+            str(ROOT / "audits" / "core" / "build_plus_minus_reference_report.py"),
             "--residual-dir",
             str(residual_dir),
             "--output-dir",
             str(output_dir),
         ],
         check=True,
-        cwd=ROOT,
+        cwd=ROOT.parent,
     )
 
     characterization_rows = list(csv.DictReader((output_dir / "pm_reference_characterization.csv").open()))
@@ -715,13 +715,13 @@ def test_build_plus_minus_reference_report_fails_on_unmapped_release_pm_combinat
     result = subprocess.run(
         [
             sys.executable,
-            str(ROOT / "build_plus_minus_reference_report.py"),
+            str(ROOT / "audits" / "core" / "build_plus_minus_reference_report.py"),
             "--residual-dir",
             str(residual_dir),
             "--output-dir",
             str(output_dir),
         ],
-        cwd=ROOT,
+        cwd=ROOT.parent,
         capture_output=True,
         text=True,
     )

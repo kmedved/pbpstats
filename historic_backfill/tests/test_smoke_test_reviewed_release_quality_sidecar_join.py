@@ -150,7 +150,7 @@ def test_smoke_test_reviewed_release_quality_sidecar_join_uses_real_join_default
     subprocess.run(
         [
             sys.executable,
-            str(ROOT / "smoke_test_reviewed_release_quality_sidecar_join.py"),
+            str(ROOT / "audits" / "core" / "smoke_test_reviewed_release_quality_sidecar_join.py"),
             "--darko-parquet",
             str(darko_path),
             "--sidecar-csv",
@@ -163,7 +163,7 @@ def test_smoke_test_reviewed_release_quality_sidecar_join_uses_real_join_default
             str(output_dir),
         ],
         check=True,
-        cwd=ROOT,
+        cwd=ROOT.parent,
     )
 
     summary = json.loads((output_dir / "summary.json").read_text(encoding="utf-8"))

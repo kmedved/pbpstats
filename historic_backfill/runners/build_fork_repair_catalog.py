@@ -7,8 +7,8 @@ from pathlib import Path
 
 import pandas as pd
 
-ROOT = Path(__file__).resolve().parent
-BUNDLE_ROOT = ROOT.parent
+ROOT = Path(__file__).resolve().parents[1]
+REPO_ROOT = ROOT.parent
 DEFAULT_OUTPUT_DIR = ROOT / "fork_repair_catalog_20260315_v1"
 
 
@@ -17,7 +17,7 @@ def _resolve_pbpstats_root() -> Path:
     env_path = os.environ.get("PBPSTATS_REPO")
     if env_path:
         candidates.append(Path(env_path).expanduser())
-    candidates.append(BUNDLE_ROOT / "pbpstats")
+    candidates.append(REPO_ROOT)
 
     for candidate in candidates:
         package_root = candidate / "pbpstats"

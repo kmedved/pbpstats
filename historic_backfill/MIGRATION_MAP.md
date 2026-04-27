@@ -18,6 +18,7 @@ Starting `pbpstats` commit: `e53dab5ac6ad12e4d6fc59d634c4bbc89d6be6ee`.
 | `replace_tpdev/boxscore_source_overrides.csv` | `historic_backfill/catalogs/boxscore_source_overrides.csv` | Runtime catalog. |
 | `replace_tpdev/pbp_stat_overrides.csv` | `historic_backfill/catalogs/pbp_stat_overrides.csv` | Runtime catalog. |
 | `replace_tpdev/manual_poss_fixes.json` | `historic_backfill/catalogs/manual_poss_fixes.json` | Runtime catalog. |
+| `replace_tpdev/overrides/` | `historic_backfill/catalogs/overrides/` | Active lineup correction runtime catalogs. |
 | `replace_tpdev/audit_event_player_on_court.py` | `historic_backfill/audits/core/event_player_on_court.py` | NBA-only core audit. |
 | `replace_tpdev/audit_period_starters_against_tpdev.py` | `historic_backfill/audits/cross_source/period_starters.py` plus shared helpers in `historic_backfill/common/` | Cross-source diagnostic after helper extraction. |
 | `replace_tpdev/audit_lineup_possession_starts_against_tpdev.py` | `historic_backfill/audits/cross_source/lineup_possession_starts.py` | Cross-source diagnostic. |

@@ -63,8 +63,7 @@ class _ParquetStarterLookup:
         parquet_read_kwargs: Dict[str, Any] = {"columns": STARTER_LOOKUP_COLUMNS}
         if allowed_game_ids:
             normalized_allowed_ids = {str(game_id).zfill(10) for game_id in allowed_game_ids}
-            raw_allowed_ids = {game_id.lstrip("0") or "0" for game_id in normalized_allowed_ids}
-            parquet_read_kwargs["filters"] = self._build_game_id_filters(parquet_path, raw_allowed_ids)
+            parquet_read_kwargs["filters"] = self._build_game_id_filters(parquet_path, normalized_allowed_ids)
 
         df = pd.read_parquet(parquet_path, **parquet_read_kwargs)
         if "resolved" in df.columns:
@@ -112,16 +111,19 @@ class _ParquetStarterLookup:
                 )
 
     @staticmethod
-    def _build_game_id_filters(parquet_path: Path, raw_allowed_ids: set[str]) -> list[tuple[str, str, list[Any]]]:
+    def _build_game_id_filters(parquet_path: Path, normalized_allowed_ids: set[str]) -> list[tuple[str, str, list[Any]]]:
         try:
             import pyarrow.parquet as pq
         except ImportError:
-            return [("game_id", "in", sorted(raw_allowed_ids))]
+            return [("game_id", "in", sorted(normalized_allowed_ids))]
 
         game_id_type = pq.read_schema(parquet_path).field("game_id").type
         if getattr(game_id_type, "id", None) in {"int32", "int64"} or "int" in str(game_id_type):
-            return [("game_id", "in", sorted({int(game_id) for game_id in raw_allowed_ids}))]
-        return [("game_id", "in", sorted(raw_allowed_ids))]
+            return [("game_id", "in", sorted({int(game_id) for game_id in normalized_allowed_ids}))]
+
+        string_allowed_ids = set(normalized_allowed_ids)
+        string_allowed_ids.update(game_id.lstrip("0") or "0" for game_id in normalized_allowed_ids)
+        return [("game_id", "in", sorted(string_allowed_ids))]
 
     def get(self, game_id: str, period: int) -> Dict[str, Any] | None:
         starter_data = self._lookup.get((str(game_id).zfill(10), int(period)))

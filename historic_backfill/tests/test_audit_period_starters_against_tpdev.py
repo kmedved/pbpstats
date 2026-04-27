@@ -5,19 +5,19 @@ from historic_backfill.audits.cross_source.period_starters import build_period_s
 
 def test_build_period_starter_audit_handles_missing_tpdev_rows(monkeypatch, tmp_path: Path):
     monkeypatch.setattr(
-        "audit_period_starters_against_tpdev.load_v9b_namespace",
+        "historic_backfill.audits.cross_source.period_starters.load_v9b_namespace",
         lambda: {},
     )
     monkeypatch.setattr(
-        "audit_period_starters_against_tpdev.install_local_boxscore_wrapper",
+        "historic_backfill.audits.cross_source.period_starters.install_local_boxscore_wrapper",
         lambda *_args, **_kwargs: None,
     )
     monkeypatch.setattr(
-        "audit_period_starters_against_tpdev._load_current_game_possessions",
+        "historic_backfill.audits.cross_source.period_starters._load_current_game_possessions",
         lambda _namespace, _game_id, _parquet_path: (object(), {11: "Starter One", 22: "Starter Two"}),
     )
     monkeypatch.setattr(
-        "audit_period_starters_against_tpdev._extract_current_period_starters",
+        "historic_backfill.audits.cross_source.period_starters._extract_current_period_starters",
         lambda _possessions, _name_map: [
             {
                 "game_id": "0029600001",
@@ -29,7 +29,7 @@ def test_build_period_starter_audit_handles_missing_tpdev_rows(monkeypatch, tmp_
         ],
     )
     monkeypatch.setattr(
-        "audit_period_starters_against_tpdev._load_tpdev_period_starters",
+        "historic_backfill.audits.cross_source.period_starters._load_tpdev_period_starters",
         lambda _tpdev_pbp_path, _game_id, _name_map: [],
     )
 

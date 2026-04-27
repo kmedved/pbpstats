@@ -69,7 +69,7 @@ def test_build_minutes_plus_minus_audit_flags_material_outliers(monkeypatch):
         return official[official["game_id"].isin(requested)].copy()
 
     monkeypatch.setattr(
-        "audit_minutes_plus_minus.load_official_boxscore_batch_df",
+        "historic_backfill.audits.core.minutes_plus_minus.load_official_boxscore_batch_df",
         fake_batch_loader,
     )
 

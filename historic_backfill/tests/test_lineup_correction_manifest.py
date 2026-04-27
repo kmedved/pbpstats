@@ -1,15 +1,9 @@
 from __future__ import annotations
 
 import json
-import sys
 from pathlib import Path
 
 import pytest
-
-TESTS_DIR = Path(__file__).resolve().parent
-REPO_ROOT = TESTS_DIR.parent
-if str(REPO_ROOT) not in sys.path:
-    sys.path.insert(0, str(REPO_ROOT))
 
 from historic_backfill.catalogs.lineup_correction_manifest import (
     DEFAULT_DB_PATH,
@@ -35,8 +29,20 @@ def test_seed_manifest_captures_all_active_runtime_corrections():
     assert sum(1 for row in corrections if row["scope_type"] in {"window", "event"}) == 6
 
 
-def test_seeded_manifest_round_trips_runtime_views_exactly(tmp_path: Path):
+def test_seeded_manifest_round_trips_runtime_views_exactly(tmp_path: Path, monkeypatch):
     manifest = seed_manifest_from_runtime(overrides_dir=DEFAULT_OVERRIDES_DIR)
+    roster_by_game = {}
+    for correction in manifest["corrections"]:
+        if correction["status"] != "active":
+            continue
+        roster_by_game.setdefault(str(correction["game_id"]).zfill(10), {}).setdefault(
+            correction["team_id"],
+            set(),
+        ).update(correction["lineup_player_ids"])
+    monkeypatch.setattr(
+        "historic_backfill.catalogs.lineup_correction_manifest._load_game_rosters",
+        lambda game_id, *_args, **_kwargs: roster_by_game[str(game_id).zfill(10)],
+    )
     compile_runtime_views(
         manifest,
         output_dir=tmp_path,
@@ -121,11 +127,11 @@ def test_compiler_resolves_delta_windows(monkeypatch: pytest.MonkeyPatch, tmp_pa
     }
 
     monkeypatch.setattr(
-        "lineup_correction_manifest._resolve_base_lineup",
+        "historic_backfill.catalogs.lineup_correction_manifest._resolve_base_lineup",
         lambda *args, **kwargs: [932, 948, 57, 961, 111],
     )
     monkeypatch.setattr(
-        "lineup_correction_manifest._load_game_rosters",
+        "historic_backfill.catalogs.lineup_correction_manifest._load_game_rosters",
         lambda *args, **kwargs: {1610612761: {757, 948, 57, 961, 111, 932}},
     )
 

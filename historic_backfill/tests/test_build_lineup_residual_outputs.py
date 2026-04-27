@@ -68,7 +68,7 @@ def _run_builder(
 ) -> None:
     command = [
         sys.executable,
-        str(repo_root / "build_lineup_residual_outputs.py"),
+        str(repo_root / "audits" / "core" / "build_lineup_residual_outputs.py"),
         "--run-dir",
         str(run_dir),
         "--output-dir",
@@ -80,7 +80,7 @@ def _run_builder(
         command.extend(["--seasons", *[str(season) for season in seasons]])
     if reviewed_policy_path is not None:
         command.extend(["--reviewed-policy-overlay-csv", str(reviewed_policy_path)])
-    subprocess.run(command, check=True, cwd=repo_root)
+    subprocess.run(command, check=True, cwd=repo_root.parent)
 
 
 def _read_csv_rows(path: Path) -> tuple[list[str], list[dict[str, str]]]:
@@ -465,7 +465,7 @@ def test_build_lineup_residual_outputs_applies_reviewed_policy_overlay_and_detec
     completed = subprocess.run(
         [
             sys.executable,
-            str(repo_root / "build_lineup_residual_outputs.py"),
+            str(repo_root / "audits" / "core" / "build_lineup_residual_outputs.py"),
             "--run-dir",
             str(run_dir),
             "--output-dir",
@@ -475,7 +475,7 @@ def test_build_lineup_residual_outputs_applies_reviewed_policy_overlay_and_detec
             "--reviewed-policy-overlay-csv",
             str(stale_policy_path),
         ],
-        cwd=repo_root,
+        cwd=repo_root.parent,
         capture_output=True,
         text=True,
     )

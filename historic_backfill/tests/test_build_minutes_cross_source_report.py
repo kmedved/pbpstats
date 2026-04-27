@@ -41,11 +41,11 @@ def test_build_minutes_cross_source_report_compares_official_and_tpdev(monkeypat
     )
 
     monkeypatch.setattr(
-        "build_minutes_cross_source_report.load_official_boxscore_batch_df",
+        "historic_backfill.audits.cross_source.build_minutes_cross_source_report.load_official_boxscore_batch_df",
         fake_official_batch,
     )
     monkeypatch.setattr(
-        "build_minutes_cross_source_report.load_bbr_boxscore_df",
+        "historic_backfill.audits.cross_source.build_minutes_cross_source_report.load_bbr_boxscore_df",
         lambda *_args, **_kwargs: pd.DataFrame(
             [
                 {

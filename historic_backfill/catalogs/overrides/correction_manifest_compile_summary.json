@@ -1,0 +1,10 @@
+{
+  "manifest_version": "20260321_v1",
+  "active_corrections": 54,
+  "active_period_start_corrections": 48,
+  "active_window_corrections": 6,
+  "active_domains": [
+    "lineup"
+  ],
+  "output_dir": "/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/overrides"
+}

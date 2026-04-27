@@ -185,7 +185,7 @@ def test_build_phase7_frontier_v2_artifacts_writes_seed_checkpoint(tmp_path: Pat
     result = subprocess.run(
         [
             sys.executable,
-            "build_phase7_frontier_v2_artifacts.py",
+            str(Path(__file__).resolve().parents[1] / "audits" / "core" / "build_phase7_frontier_v2_artifacts.py"),
             "--raw-game-quality-csv",
             str(raw_game_quality_csv),
             "--base-inventory-csv",
@@ -215,7 +215,7 @@ def test_build_phase7_frontier_v2_artifacts_writes_seed_checkpoint(tmp_path: Pat
             "--expected-uncovered-game-ids",
             "0029600070",
         ],
-        cwd=Path(__file__).resolve().parent.parent,
+        cwd=Path(__file__).resolve().parents[2],
         text=True,
         capture_output=True,
         check=True,

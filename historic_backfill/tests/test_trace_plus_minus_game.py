@@ -1,8 +1,3 @@
-import sys
-from pathlib import Path
-
-sys.path.append(str(Path(__file__).resolve().parents[1]))
-
 from historic_backfill.audits.cross_source.trace_plus_minus_game import _collect_same_clock_window, _serialize_lineups
 
 

@@ -128,7 +128,7 @@ def test_build_reviewed_frontier_policy_overlay_maps_lanes_to_release_policy(tmp
     subprocess.run(
         [
             sys.executable,
-            str(ROOT / "build_reviewed_frontier_policy_overlay.py"),
+            str(ROOT / "audits" / "core" / "build_reviewed_frontier_policy_overlay.py"),
             "--inventory-csv",
             str(inventory_path),
             "--shortlist-csv",
@@ -137,7 +137,7 @@ def test_build_reviewed_frontier_policy_overlay_maps_lanes_to_release_policy(tmp
             str(output_path),
         ],
         check=True,
-        cwd=ROOT,
+        cwd=ROOT.parent,
     )
 
     rows = list(csv.DictReader(output_path.open()))

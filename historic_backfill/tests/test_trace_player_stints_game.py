@@ -1,11 +1,6 @@
 from __future__ import annotations
 
-import sys
-from pathlib import Path
-
 import pandas as pd
-
-sys.path.append(str(Path(__file__).resolve().parents[1]))
 
 from historic_backfill.audits.cross_source.trace_player_stints_game import (
     _build_player_stints,

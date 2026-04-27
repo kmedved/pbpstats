@@ -1,11 +1,8 @@
 import argparse
 import json
-import sys
 from pathlib import Path
 
 import pandas as pd
-
-sys.path.append(str(Path(__file__).resolve().parents[1]))
 
 import historic_backfill.runners.rerun_selected_games as rerun
 from historic_backfill.runners.rerun_selected_games import _expand_game_id_tokens, _load_game_ids
