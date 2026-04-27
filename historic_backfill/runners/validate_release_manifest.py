@@ -27,6 +27,28 @@ def _as_bool(value: object) -> bool:
     return str(value).strip().lower() in {"1", "true", "yes"}
 
 
+def _normalize_checksum_rel_path(raw_rel_path: str) -> str:
+    return raw_rel_path.strip().removeprefix("./")
+
+
+def _checksum_paths(release_dir: Path) -> set[str]:
+    checksum_path = release_dir / "checksums.sha256"
+    if not checksum_path.exists():
+        return set()
+
+    paths: set[str] = set()
+    for raw_line in checksum_path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            continue
+        try:
+            _expected_hash, raw_rel_path = line.split(maxsplit=1)
+        except ValueError:
+            continue
+        paths.add(_normalize_checksum_rel_path(raw_rel_path))
+    return paths
+
+
 def validate_checksums(release_dir: Path) -> list[str]:
     checksum_path = release_dir / "checksums.sha256"
     errors: list[str] = []
@@ -42,8 +64,8 @@ def validate_checksums(release_dir: Path) -> list[str]:
         except ValueError:
             errors.append(f"checksum line {line_number} is malformed")
             continue
-        rel_path = raw_rel_path.strip()
-        if rel_path in {"checksums.sha256", "./checksums.sha256"}:
+        rel_path = _normalize_checksum_rel_path(raw_rel_path)
+        if rel_path == "checksums.sha256":
             errors.append("checksums.sha256 must not include its own checksum")
             continue
         artifact_path = (release_dir / rel_path).resolve()
@@ -97,8 +119,33 @@ def _validate_sidecar_contract(release_dir: Path) -> list[str]:
     missing_reviewed_ids = sorted(reviewed_ids - sidecar_reviewed_ids)
     if missing_reviewed_ids:
         errors.append(f"reviewed policy games missing from sidecar: {missing_reviewed_ids}")
-    if summary.get("reviewed_override_game_count") != len(sidecar_reviewed_ids):
-        errors.append("sidecar reviewed_override_game_count does not match reviewed sidecar rows")
+    extra_reviewed_ids = sorted(sidecar_reviewed_ids - reviewed_ids)
+    if extra_reviewed_ids:
+        errors.append(f"sidecar has reviewed_override games not in overlay: {extra_reviewed_ids}")
+    if sidecar_reviewed_ids != reviewed_ids:
+        errors.append("sidecar reviewed_override game set does not match reviewed policy overlay")
+    if summary.get("reviewed_override_game_count") != len(reviewed_ids):
+        errors.append("sidecar reviewed_override_game_count does not match reviewed policy overlay")
+    return errors
+
+
+def _validate_authoritative_checksum_coverage(
+    manifest: dict[str, Any],
+    release_dir: Path,
+) -> list[str]:
+    errors: list[str] = []
+    covered_paths = _checksum_paths(release_dir)
+    for label, rel_path in manifest.get("authoritative_files", {}).items():
+        artifact_path = (REPO_ROOT / rel_path).resolve()
+        try:
+            release_rel_path = artifact_path.relative_to(release_dir.resolve()).as_posix()
+        except ValueError:
+            errors.append(f"authoritative file {label} is outside release dir: {rel_path}")
+            continue
+        if release_rel_path not in covered_paths:
+            errors.append(
+                f"authoritative file {label} is not covered by checksums.sha256: {rel_path}"
+            )
     return errors
 
 
@@ -187,6 +234,7 @@ def validate_manifest(manifest_path: Path) -> list[str]:
             errors.append(f"authoritative file {label} is missing: {rel_path}")
 
     errors.extend(validate_checksums(release_dir))
+    errors.extend(_validate_authoritative_checksum_coverage(manifest, release_dir))
     errors.extend(_validate_sidecar_contract(release_dir))
     errors.extend(_validate_path_policy(manifest, release_dir))
 

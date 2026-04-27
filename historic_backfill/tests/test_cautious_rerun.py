@@ -16,6 +16,7 @@ def _write_runtime_sources(base_dir: Path) -> dict[str, Path]:
     files = {
         "db_path": live_dir / "nba_raw.db",
         "parquet_path": live_dir / "playbyplayv2.parq",
+        "pbp_v3_path": live_dir / "playbyplayv3.parq",
         "overrides_path": live_dir / "validation_overrides.csv",
         "boxscore_source_overrides_path": live_dir / "boxscore_source_overrides.csv",
         "notebook_dump_path": live_dir / "build_tpdev_box_stats_v9b.py",
@@ -47,6 +48,7 @@ def test_prepare_local_runtime_inputs_fresh_copy_ignores_latest_global_cache(
     for name in [
         "nba_raw.db",
         "playbyplayv2.parq",
+        "playbyplayv3.parq",
         "build_tpdev_box_stats_v9b.py",
         "boxscore_source_overrides.csv",
         "period_starters_v6.parquet",
@@ -69,6 +71,7 @@ def test_prepare_local_runtime_inputs_fresh_copy_ignores_latest_global_cache(
         cache_dir,
         db_path=files["db_path"],
         parquet_path=files["parquet_path"],
+        pbp_v3_path=files["pbp_v3_path"],
         overrides_path=files["overrides_path"],
         boxscore_source_overrides_path=files["boxscore_source_overrides_path"],
         period_starter_parquet_paths=[files["period_starters_v6"], files["period_starters_v5"]],
@@ -78,12 +81,14 @@ def test_prepare_local_runtime_inputs_fresh_copy_ignores_latest_global_cache(
 
     assert runtime_inputs["db_path"] == cache_dir / "nba_raw.db"
     assert runtime_inputs["parquet_path"] == cache_dir / "playbyplayv2.parq"
+    assert runtime_inputs["pbp_v3_path"] == cache_dir / "playbyplayv3.parq"
     assert runtime_inputs["notebook_dump_path"] == cache_dir / "build_tpdev_box_stats_v9b.py"
     assert runtime_inputs["period_starter_parquet_paths"] == [
         cache_dir / "period_starters_v6.parquet",
         cache_dir / "period_starters_v5.parquet",
     ]
     assert runtime_inputs["runtime_input_provenance"]["inputs"]["db_path"]["resolution_kind"] == "copied_to_run_cache"
+    assert "pbp_v3_path" in runtime_inputs["runtime_input_provenance"]["inputs"]
     assert runtime_inputs["file_directory"] != files["db_path"].parent
     assert (
         runtime_inputs["file_directory"] / "overrides" / "lineup_window_overrides.json"
@@ -102,6 +107,7 @@ def test_prepare_local_runtime_inputs_can_reuse_global_cache_when_explicitly_req
     for name in [
         "nba_raw.db",
         "playbyplayv2.parq",
+        "playbyplayv3.parq",
         "build_tpdev_box_stats_v9b.py",
         "boxscore_source_overrides.csv",
         "period_starters_v6.parquet",
@@ -126,6 +132,7 @@ def test_prepare_local_runtime_inputs_can_reuse_global_cache_when_explicitly_req
         cache_dir,
         db_path=files["db_path"],
         parquet_path=files["parquet_path"],
+        pbp_v3_path=files["pbp_v3_path"],
         overrides_path=files["overrides_path"],
         boxscore_source_overrides_path=files["boxscore_source_overrides_path"],
         period_starter_parquet_paths=[files["period_starters_v6"], files["period_starters_v5"]],
@@ -135,6 +142,7 @@ def test_prepare_local_runtime_inputs_can_reuse_global_cache_when_explicitly_req
 
     assert runtime_inputs["db_path"] == cached_paths["nba_raw.db"]
     assert runtime_inputs["parquet_path"] == cached_paths["playbyplayv2.parq"]
+    assert runtime_inputs["pbp_v3_path"] == cached_paths["playbyplayv3.parq"]
     assert runtime_inputs["notebook_dump_path"] == cached_paths["build_tpdev_box_stats_v9b.py"]
     assert runtime_inputs["period_starter_parquet_paths"] == [
         cached_paths["period_starters_v6.parquet"],
@@ -182,6 +190,7 @@ def test_prepare_local_runtime_inputs_reuse_validated_cache_reuses_matching_file
         cache_dir,
         db_path=files["db_path"],
         parquet_path=files["parquet_path"],
+        pbp_v3_path=files["pbp_v3_path"],
         overrides_path=files["overrides_path"],
         boxscore_source_overrides_path=files["boxscore_source_overrides_path"],
         period_starter_parquet_paths=[files["period_starters_v6"], files["period_starters_v5"]],
@@ -193,12 +202,11 @@ def test_prepare_local_runtime_inputs_reuse_validated_cache_reuses_matching_file
     )
     assert manifest_path.exists()
 
-    db_cached_path = cache_dir / "nba_raw.db"
-    db_cached_path.write_text("manually mutated cache\n", encoding="utf-8")
     second_runtime_inputs = runner.prepare_local_runtime_inputs(
         cache_dir,
         db_path=files["db_path"],
         parquet_path=files["parquet_path"],
+        pbp_v3_path=files["pbp_v3_path"],
         overrides_path=files["overrides_path"],
         boxscore_source_overrides_path=files["boxscore_source_overrides_path"],
         period_starter_parquet_paths=[files["period_starters_v6"], files["period_starters_v5"]],
@@ -206,15 +214,16 @@ def test_prepare_local_runtime_inputs_reuse_validated_cache_reuses_matching_file
         runtime_input_cache_mode="reuse-validated-cache",
     )
 
+    db_cached_path = cache_dir / "nba_raw.db"
     assert second_runtime_inputs["db_path"] == db_cached_path
-    assert db_cached_path.read_text(encoding="utf-8") == "manually mutated cache\n"
+    assert db_cached_path.read_text(encoding="utf-8") == "nba_raw.db"
     assert (
         second_runtime_inputs["runtime_input_provenance"]["inputs"]["db_path"]["resolution_kind"]
         == "validated_run_cache_hit"
     )
 
 
-def test_prepare_local_runtime_inputs_reuse_validated_cache_refreshes_stale_entries(
+def test_prepare_local_runtime_inputs_reuse_validated_cache_refreshes_mutated_cache(
     tmp_path: Path,
     monkeypatch,
 ) -> None:
@@ -230,6 +239,53 @@ def test_prepare_local_runtime_inputs_reuse_validated_cache_refreshes_stale_entr
         cache_dir,
         db_path=files["db_path"],
         parquet_path=files["parquet_path"],
+        pbp_v3_path=files["pbp_v3_path"],
+        overrides_path=files["overrides_path"],
+        boxscore_source_overrides_path=files["boxscore_source_overrides_path"],
+        period_starter_parquet_paths=[files["period_starters_v6"], files["period_starters_v5"]],
+        file_directory=files["db_path"].parent,
+        runtime_input_cache_mode="reuse-validated-cache",
+    )
+
+    db_cached_path = cache_dir / "nba_raw.db"
+    db_cached_path.write_text("manually mutated cache\n", encoding="utf-8")
+
+    refreshed_runtime_inputs = runner.prepare_local_runtime_inputs(
+        cache_dir,
+        db_path=files["db_path"],
+        parquet_path=files["parquet_path"],
+        pbp_v3_path=files["pbp_v3_path"],
+        overrides_path=files["overrides_path"],
+        boxscore_source_overrides_path=files["boxscore_source_overrides_path"],
+        period_starter_parquet_paths=[files["period_starters_v6"], files["period_starters_v5"]],
+        file_directory=files["db_path"].parent,
+        runtime_input_cache_mode="reuse-validated-cache",
+    )
+
+    assert db_cached_path.read_text(encoding="utf-8") == "nba_raw.db"
+    assert (
+        refreshed_runtime_inputs["runtime_input_provenance"]["inputs"]["db_path"]["resolution_kind"]
+        == "validated_run_cache_refresh"
+    )
+
+
+def test_prepare_local_runtime_inputs_reuse_validated_cache_refreshes_stale_sources(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    files = _write_runtime_sources(tmp_path)
+    cache_dir = tmp_path / "run" / "_local_runtime_cache"
+
+    monkeypatch.setattr(runner, "NOTEBOOK_DUMP", files["notebook_dump_path"])
+    monkeypatch.setattr(runner, "NOTEBOOK_LOCAL_IMPORT_PRELOADS", [])
+    monkeypatch.setattr(runner, "load_boxscore_source_overrides", lambda _path: {})
+    monkeypatch.setattr(runner, "set_boxscore_source_overrides", lambda _overrides: None)
+
+    runner.prepare_local_runtime_inputs(
+        cache_dir,
+        db_path=files["db_path"],
+        parquet_path=files["parquet_path"],
+        pbp_v3_path=files["pbp_v3_path"],
         overrides_path=files["overrides_path"],
         boxscore_source_overrides_path=files["boxscore_source_overrides_path"],
         period_starter_parquet_paths=[files["period_starters_v6"], files["period_starters_v5"]],
@@ -242,6 +298,7 @@ def test_prepare_local_runtime_inputs_reuse_validated_cache_refreshes_stale_entr
         cache_dir,
         db_path=files["db_path"],
         parquet_path=files["parquet_path"],
+        pbp_v3_path=files["pbp_v3_path"],
         overrides_path=files["overrides_path"],
         boxscore_source_overrides_path=files["boxscore_source_overrides_path"],
         period_starter_parquet_paths=[files["period_starters_v6"], files["period_starters_v5"]],

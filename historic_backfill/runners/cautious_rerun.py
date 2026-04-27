@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import importlib.util
 import importlib.machinery
 import json
@@ -42,6 +43,7 @@ RUNTIME_INPUT_CACHE_MODES = {
 }
 AUDIT_PROFILES = {"full", "counting_only"}
 VALIDATED_CACHE_MANIFEST_NAME = "validated_runtime_input_manifest.json"
+SMALL_RUNTIME_INPUT_HASH_LIMIT_BYTES = 1024 * 1024
 # Runtime starter precedence is now gamerotation-backed v6, then v5 as fallback.
 DEFAULT_PERIOD_STARTERS_PARQUETS = [
     DATA_ROOT / "period_starters_v6.parquet",
@@ -212,6 +214,21 @@ def _source_fingerprint(path: Path) -> dict[str, Any]:
     }
 
 
+def _cached_fingerprint(path: Path) -> dict[str, Any]:
+    resolved = path.resolve()
+    if not resolved.exists():
+        return {"exists": False}
+    stat = resolved.stat()
+    fingerprint: dict[str, Any] = {
+        "exists": True,
+        "size_bytes": int(stat.st_size),
+        "mtime_ns": int(stat.st_mtime_ns),
+    }
+    if stat.st_size <= SMALL_RUNTIME_INPUT_HASH_LIMIT_BYTES:
+        fingerprint["sha256"] = hashlib.sha256(resolved.read_bytes()).hexdigest()
+    return fingerprint
+
+
 def _validated_cache_entry_key(source_path: Path) -> str:
     return str(source_path.resolve())
 
@@ -229,7 +246,10 @@ def _validated_cache_entry_matches(
         return False
     if not cached_path.exists():
         return False
-    return entry.get("source") == _source_fingerprint(source_path)
+    return (
+        entry.get("source") == _source_fingerprint(source_path)
+        and entry.get("cached") == _cached_fingerprint(cached_path)
+    )
 
 
 def _record_validated_cache_entry(
@@ -240,6 +260,7 @@ def _record_validated_cache_entry(
 ) -> None:
     manifest.setdefault("entries", {})[_validated_cache_entry_key(source_path)] = {
         "source": _source_fingerprint(source_path),
+        "cached": _cached_fingerprint(cached_path),
         "cached_path": str(cached_path),
     }
 
@@ -362,6 +383,7 @@ def prepare_local_runtime_inputs(
     cache_dir: Path,
     db_path: Path = DEFAULT_DB,
     parquet_path: Path = DEFAULT_PARQUET,
+    pbp_v3_path: Path = DEFAULT_PBP_V3,
     overrides_path: Path = DEFAULT_OVERRIDES,
     boxscore_source_overrides_path: Path = DEFAULT_BOXSCORE_SOURCE_OVERRIDES,
     period_starter_parquet_paths: Iterable[Path] = DEFAULT_PERIOD_STARTERS_PARQUETS,
@@ -379,6 +401,7 @@ def prepare_local_runtime_inputs(
         "build_tpdev_box_stats_v9b.py",
         "nba_raw.db",
         "playbyplayv2.parq",
+        "playbyplayv3.parq",
         "boxscore_source_overrides.csv",
         "period_starters_v6.parquet",
         "period_starters_v5.parquet",
@@ -468,6 +491,10 @@ def prepare_local_runtime_inputs(
         parquet_path,
         allow_empty_fallback=False,
     )
+    hydrated_pbp_v3_path, runtime_input_provenance["inputs"]["pbp_v3_path"] = _hydrate_or_fallback(
+        pbp_v3_path,
+        allow_empty_fallback=False,
+    )
     hydrated_notebook_dump_path, runtime_input_provenance["inputs"]["notebook_dump_path"] = _hydrate_or_fallback(
         NOTEBOOK_DUMP,
         allow_empty_fallback=False,
@@ -517,6 +544,7 @@ def prepare_local_runtime_inputs(
     return {
         "db_path": hydrated_db_path,
         "parquet_path": hydrated_parquet_path,
+        "pbp_v3_path": hydrated_pbp_v3_path,
         "notebook_dump_path": hydrated_notebook_dump_path,
         "preload_module_paths": hydrated_preload_module_paths,
         "overrides_path": hydrated_overrides_path,
@@ -947,6 +975,7 @@ def parse_args(argv: Iterable[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--db-path", type=Path, default=DEFAULT_DB)
     parser.add_argument("--parquet-path", type=Path, default=DEFAULT_PARQUET)
+    parser.add_argument("--pbp-v3-path", type=Path, default=DEFAULT_PBP_V3)
     parser.add_argument("--overrides-path", type=Path, default=DEFAULT_OVERRIDES)
     parser.add_argument("--file-directory", type=Path, default=DEFAULT_FILE_DIRECTORY)
     parser.add_argument("--strict-mode", action="store_true", default=False)
@@ -974,6 +1003,7 @@ def main(argv: Iterable[str] | None = None) -> int:
         output_dir / "_local_runtime_cache",
         db_path=args.db_path.resolve(),
         parquet_path=args.parquet_path.resolve(),
+        pbp_v3_path=args.pbp_v3_path.resolve(),
         overrides_path=args.overrides_path.resolve(),
         allow_unreadable_csv_fallback=args.allow_unreadable_csv_fallback,
         file_directory=args.file_directory.resolve(),

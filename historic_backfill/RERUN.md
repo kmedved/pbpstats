@@ -71,6 +71,9 @@ PYTHONPATH=. python -m historic_backfill.runners.validate --scope=provenance
 `historic_backfill/runners/cautious_rerun.py` remains the bulk orchestration
 entrypoint. Its defaults resolve under `historic_backfill/data/` and
 `historic_backfill/catalogs/`.
+The runner snapshots `nba_raw.db`, `playbyplayv2.parq`, and
+`playbyplayv3.parq` into each run cache; use `--pbp-v3-path` if the v3 source
+lives somewhere else.
 
 Check its current CLI before a full run:
 

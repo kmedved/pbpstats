@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import csv
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -31,6 +32,20 @@ CORE_CATALOG_INPUTS = (
     "catalogs/validation_overrides.csv",
     "catalogs/overrides/correction_manifest.json",
 )
+PBP_STAT_OVERRIDE_REQUIRED_COLUMNS = {
+    "game_id",
+    "team_id",
+    "player_id",
+    "stat_key",
+    "stat_value",
+    "notes",
+}
+VALIDATION_OVERRIDE_REQUIRED_COLUMNS = {"game_id", "action", "tolerance", "notes"}
+CORRECTION_MANIFEST_REQUIRED_KEYS = {
+    "manifest_version",
+    "corrections",
+    "residual_annotations",
+}
 
 
 @dataclass
@@ -59,17 +74,57 @@ def _missing(root: Path, paths: Iterable[str]) -> list[str]:
     return [path for path in paths if not (root / path).exists()]
 
 
+def _validate_csv_columns(path: Path, required_columns: set[str]) -> None:
+    with path.open(newline="", encoding="utf-8") as handle:
+        reader = csv.reader(handle)
+        try:
+            header = next(reader)
+        except StopIteration as exc:
+            raise ValueError(f"{path} is empty") from exc
+    missing_columns = required_columns - set(header)
+    if missing_columns:
+        raise ValueError(f"{path} missing columns: {sorted(missing_columns)}")
+
+
+def _validate_json_keys(path: Path, required_keys: set[str]) -> None:
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict):
+        raise ValueError(f"{path} must contain a JSON object")
+    missing_keys = required_keys - set(payload)
+    if missing_keys:
+        raise ValueError(f"{path} missing keys: {sorted(missing_keys)}")
+
+
+def _validate_core_catalogs(root: Path) -> list[str]:
+    validators = [
+        lambda: validate_historic_pbp_row_override_catalog(root / "catalogs" / "pbp_row_overrides.csv"),
+        lambda: _validate_csv_columns(
+            root / "catalogs" / "pbp_stat_overrides.csv",
+            PBP_STAT_OVERRIDE_REQUIRED_COLUMNS,
+        ),
+        lambda: _validate_csv_columns(
+            root / "catalogs" / "validation_overrides.csv",
+            VALIDATION_OVERRIDE_REQUIRED_COLUMNS,
+        ),
+        lambda: _validate_json_keys(
+            root / "catalogs" / "overrides" / "correction_manifest.json",
+            CORRECTION_MANIFEST_REQUIRED_KEYS,
+        ),
+    ]
+    errors: list[str] = []
+    for validator in validators:
+        try:
+            validator()
+        except Exception as exc:  # noqa: BLE001 - CLI preflight should report catalog errors plainly.
+            errors.append(str(exc))
+    return errors
+
+
 def validate_scope(scope: str, root: Path = ROOT) -> ValidationResult:
     root = root.resolve()
     if scope == "core":
         missing_required = _missing(root, (*CORE_INPUTS, *CORE_CATALOG_INPUTS))
-        validation_errors: list[str] = []
-        catalog_path = root / "catalogs" / "pbp_row_overrides.csv"
-        if catalog_path.exists():
-            try:
-                validate_historic_pbp_row_override_catalog(catalog_path)
-            except Exception as exc:  # noqa: BLE001 - CLI preflight should report all catalog errors plainly.
-                validation_errors.append(str(exc))
+        validation_errors = [] if missing_required else _validate_core_catalogs(root)
         return ValidationResult(
             scope=scope,
             ok=not missing_required and not validation_errors,

@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import pytest
+
 from historic_backfill.runners.validate import validate_scope
 
 
@@ -19,8 +21,14 @@ def _write_core_catalogs(root: Path) -> None:
         "2747,JR Smith,1610612740,2454,Junior Harrington,1610612740\n",
         encoding="utf-8",
     )
-    (catalogs / "pbp_stat_overrides.csv").write_text("game_id\n", encoding="utf-8")
-    (catalogs / "validation_overrides.csv").write_text("game_id\n", encoding="utf-8")
+    (catalogs / "pbp_stat_overrides.csv").write_text(
+        "game_id,team_id,player_id,stat_key,stat_value,notes\n",
+        encoding="utf-8",
+    )
+    (catalogs / "validation_overrides.csv").write_text(
+        "game_id,action,tolerance,notes\n",
+        encoding="utf-8",
+    )
     (catalogs / "overrides" / "correction_manifest.json").write_text(
         '{"manifest_version": "test", "corrections": [], "residual_annotations": []}\n',
         encoding="utf-8",
@@ -58,6 +66,31 @@ def test_core_validation_reports_invalid_catalogs(tmp_path):
         "0020400335,teleport,148,149,bad action\n",
         encoding="utf-8",
     )
+
+    result = validate_scope("core", root=tmp_path)
+
+    assert result.ok is False
+    assert result.validation_errors
+
+
+@pytest.mark.parametrize(
+    ("rel_path", "bad_contents"),
+    [
+        ("catalogs/pbp_stat_overrides.csv", "game_id\n"),
+        ("catalogs/validation_overrides.csv", "game_id\n"),
+        ("catalogs/overrides/correction_manifest.json", "{not json\n"),
+        ("catalogs/overrides/correction_manifest.json", '{"manifest_version": "test"}\n'),
+    ],
+)
+def test_core_validation_reports_invalid_non_pbp_row_catalogs(tmp_path, rel_path, bad_contents):
+    for input_path in (
+        "data/nba_raw.db",
+        "data/playbyplayv2.parq",
+        "data/playbyplayv3.parq",
+    ):
+        _touch(tmp_path, input_path)
+    _write_core_catalogs(tmp_path)
+    (tmp_path / rel_path).write_text(bad_contents, encoding="utf-8")
 
     result = validate_scope("core", root=tmp_path)
 

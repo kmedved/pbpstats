@@ -94,6 +94,10 @@ def normalize_game_id(value: object) -> str:
     raw = str(value if value is not None else "").strip()
     if not raw:
         raise ValueError("game_id is blank")
+    if raw.isdigit():
+        return raw.zfill(10)
+    if raw.endswith(".0") and raw[:-2].isdigit():
+        return raw[:-2].zfill(10)
     return str(int(float(raw))).zfill(10)
 
 
@@ -435,6 +439,8 @@ def apply_pbp_row_overrides(
             raise ValueError(f"Unknown PBP row override action: {action!r}")
         event_num = override["event_num"]
         anchor_event_num = override.get("anchor_event_num")
+        if anchor_event_num is not None and int(event_num) == int(anchor_event_num):
+            raise ValueError(f"{action} override for event {event_num} cannot anchor to itself")
 
         if action in {"insert_sub_before", "insert_sub_after"}:
             if anchor_event_num is None:

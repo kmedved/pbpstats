@@ -6,6 +6,7 @@ from pbpstats.offline.row_overrides import (
     PBP_ROW_OVERRIDE_ACTION_COLUMN,
     apply_pbp_row_overrides,
     load_pbp_row_overrides,
+    normalize_game_id,
 )
 
 
@@ -111,6 +112,25 @@ def test_apply_pbp_row_overrides_normalizes_float_like_game_ids():
     )
 
     assert result["EVENTNUM"].tolist() == [1, 2, 3]
+
+
+def test_normalize_game_id_preserves_plain_digit_strings():
+    assert normalize_game_id("0020400335") == "0020400335"
+    assert normalize_game_id("29600442.0") == "0029600442"
+
+
+def test_apply_pbp_row_overrides_rejects_direct_self_anchor_move():
+    df = _game_df([1, 2, 3])
+
+    with pytest.raises(ValueError, match="cannot anchor to itself"):
+        apply_pbp_row_overrides(
+            df,
+            {
+                "0029600442": [
+                    {"action": "move_before", "event_num": 2, "anchor_event_num": 2},
+                ]
+            },
+        )
 
 
 def test_apply_pbp_row_overrides_marks_synthetic_sub_rows():
