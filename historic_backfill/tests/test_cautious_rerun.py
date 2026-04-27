@@ -21,7 +21,7 @@ def _write_runtime_sources(base_dir: Path) -> dict[str, Path]:
         "parquet_path": live_dir / "playbyplayv2.parq",
         "overrides_path": live_dir / "validation_overrides.csv",
         "boxscore_source_overrides_path": live_dir / "boxscore_source_overrides.csv",
-        "notebook_dump_path": live_dir / "0c2_build_tpdev_box_stats_version_v9b.py",
+        "notebook_dump_path": live_dir / "build_tpdev_box_stats_v9b.py",
         "period_starters_v6": live_dir / "period_starters_v6.parquet",
         "period_starters_v5": live_dir / "period_starters_v5.parquet",
         "lineup_window_overrides": overrides_dir / "lineup_window_overrides.json",
@@ -50,7 +50,7 @@ def test_prepare_local_runtime_inputs_fresh_copy_ignores_latest_global_cache(
     for name in [
         "nba_raw.db",
         "playbyplayv2.parq",
-        "0c2_build_tpdev_box_stats_version_v9b.py",
+        "build_tpdev_box_stats_v9b.py",
         "boxscore_source_overrides.csv",
         "period_starters_v6.parquet",
         "period_starters_v5.parquet",
@@ -81,7 +81,7 @@ def test_prepare_local_runtime_inputs_fresh_copy_ignores_latest_global_cache(
 
     assert runtime_inputs["db_path"] == cache_dir / "nba_raw.db"
     assert runtime_inputs["parquet_path"] == cache_dir / "playbyplayv2.parq"
-    assert runtime_inputs["notebook_dump_path"] == cache_dir / "0c2_build_tpdev_box_stats_version_v9b.py"
+    assert runtime_inputs["notebook_dump_path"] == cache_dir / "build_tpdev_box_stats_v9b.py"
     assert runtime_inputs["period_starter_parquet_paths"] == [
         cache_dir / "period_starters_v6.parquet",
         cache_dir / "period_starters_v5.parquet",
@@ -105,7 +105,7 @@ def test_prepare_local_runtime_inputs_can_reuse_global_cache_when_explicitly_req
     for name in [
         "nba_raw.db",
         "playbyplayv2.parq",
-        "0c2_build_tpdev_box_stats_version_v9b.py",
+        "build_tpdev_box_stats_v9b.py",
         "boxscore_source_overrides.csv",
         "period_starters_v6.parquet",
         "period_starters_v5.parquet",
@@ -138,7 +138,7 @@ def test_prepare_local_runtime_inputs_can_reuse_global_cache_when_explicitly_req
 
     assert runtime_inputs["db_path"] == cached_paths["nba_raw.db"]
     assert runtime_inputs["parquet_path"] == cached_paths["playbyplayv2.parq"]
-    assert runtime_inputs["notebook_dump_path"] == cached_paths["0c2_build_tpdev_box_stats_version_v9b.py"]
+    assert runtime_inputs["notebook_dump_path"] == cached_paths["build_tpdev_box_stats_v9b.py"]
     assert runtime_inputs["period_starter_parquet_paths"] == [
         cached_paths["period_starters_v6.parquet"],
         cached_paths["period_starters_v5.parquet"],

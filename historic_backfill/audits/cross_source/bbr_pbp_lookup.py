@@ -11,10 +11,10 @@ from pathlib import Path
 from typing import Iterable, Sequence
 
 
-DEFAULT_NBA_RAW_DB_PATH = Path(__file__).resolve().parent / "nba_raw.db"
-DEFAULT_BBR_DB_PATH = (
-    Path(__file__).resolve().parent.parent / "33_wowy_rapm" / "bbref_boxscores.db"
-)
+ROOT = Path(__file__).resolve().parents[2]
+DATA_ROOT = ROOT / "data"
+DEFAULT_NBA_RAW_DB_PATH = DATA_ROOT / "nba_raw.db"
+DEFAULT_BBR_DB_PATH = DATA_ROOT / "bbr" / "bbref_boxscores.db"
 
 
 @dataclass(frozen=True)

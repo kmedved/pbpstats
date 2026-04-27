@@ -57,7 +57,10 @@ from pbpstats.resources.enhanced_pbp import (
 # DATABASE CONFIG
 # ==============================================================================
 
-DB_PATH = Path("nba_raw.db")
+ROOT = Path(__file__).resolve().parents[1]
+DATA_ROOT = ROOT / "data"
+DB_PATH = DATA_ROOT / "nba_raw.db"
+DEFAULT_PARQUET_PATH = DATA_ROOT / "playbyplayv2.parq"
 _local = threading.local()
 
 # Thread-safe error logging (for single-process mode)
@@ -1843,6 +1846,7 @@ def main_multi_season():
 if __name__ == "__main__":
     pass
 
+'''
 
 # In[2]:
 
@@ -1942,7 +1946,6 @@ season_df = load_pbp_from_parquet(parquet_path, season=season)
 
 # In[ ]:
 
-
 from pbpstats.offline import get_possessions_from_df
 
 game = season_df[season_df["GAME_ID"].astype(int) == 49600063].copy()
@@ -1951,7 +1954,6 @@ print(f"Success! {len(poss.items)} possessions")
 
 
 # In[ ]:
-
 
 game = season_df[season_df["GAME_ID"].astype(int) == 49600063].copy()
 game["EVENTNUM"] = game["EVENTNUM"].astype(int)
@@ -2029,6 +2031,4 @@ combined_df, error_df = process_season(
 
 # In[ ]:
 
-
-
-
+'''

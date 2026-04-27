@@ -16,9 +16,10 @@ from historic_backfill.audits.cross_source.bbr_pbp_lookup import (
 )
 
 
-ROOT = Path(__file__).resolve().parent
+ROOT = Path(__file__).resolve().parents[2]
+DATA_ROOT = ROOT / "data"
 DEFAULT_PLAYER_CROSSWALK_PATH = (
-    ROOT.parent / "fixed_data" / "crosswalks" / "player_master_crosswalk.csv"
+    DATA_ROOT / "crosswalks" / "player_master_crosswalk.csv"
 )
 
 

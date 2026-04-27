@@ -10,11 +10,12 @@ import pandas as pd
 from historic_backfill.runners.cautious_rerun import install_local_boxscore_wrapper, load_v9b_namespace
 
 
-ROOT = Path(__file__).resolve().parent
-DEFAULT_PARQUET_PATH = ROOT / "playbyplayv2.parq"
-DEFAULT_DB_PATH = ROOT / "nba_raw.db"
+ROOT = Path(__file__).resolve().parents[2]
+DATA_ROOT = ROOT / "data"
+DEFAULT_PARQUET_PATH = DATA_ROOT / "playbyplayv2.parq"
+DEFAULT_DB_PATH = DATA_ROOT / "nba_raw.db"
 DEFAULT_TPDEV_PBP_PATH = (
-    ROOT.parent / "fixed_data" / "raw_input_data" / "tpdev_data" / "full_pbp_new.parq"
+    DATA_ROOT / "tpdev" / "full_pbp_new.parq"
 )
 CURRENT_STARTER_COLUMNS = [
     "game_id",

@@ -30,10 +30,11 @@ from historic_backfill.audits.cross_source.minute_reference_sources import (
 )
 
 
-ROOT = Path(__file__).resolve().parent
-DEFAULT_FILE_DIRECTORY = ROOT
+ROOT = Path(__file__).resolve().parents[2]
+DATA_ROOT = ROOT / "data"
+DEFAULT_FILE_DIRECTORY = DATA_ROOT
 DEFAULT_TPDEV_BOX_PATH = (
-    ROOT.parent / "fixed_data" / "raw_input_data" / "tpdev_data" / "tpdev_box.parq"
+    DATA_ROOT / "tpdev" / "tpdev_box.parq"
 )
 DEFAULT_PBPSTATS_BOX_PATH = DEFAULT_PBPSTATS_PLAYER_BOX_PATH
 SECONDS_MATCH_TOLERANCE = 1.0

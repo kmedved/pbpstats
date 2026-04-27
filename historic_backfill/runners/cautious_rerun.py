@@ -22,13 +22,17 @@ from historic_backfill.catalogs.boxscore_source_overrides import (
     set_boxscore_source_overrides,
 )
 
-ROOT = Path(__file__).resolve().parent
-NOTEBOOK_DUMP = ROOT / "0c2_build_tpdev_box_stats_version_v9b.py"
-DEFAULT_DB = ROOT / "nba_raw.db"
-DEFAULT_PARQUET = ROOT / "playbyplayv2.parq"
-DEFAULT_OVERRIDES = ROOT / "validation_overrides.csv"
-DEFAULT_BOXSCORE_SOURCE_OVERRIDES = ROOT / "boxscore_source_overrides.csv"
-DEFAULT_FILE_DIRECTORY = ROOT
+ROOT = Path(__file__).resolve().parents[1]
+RUNNERS_ROOT = ROOT / "runners"
+CATALOGS_ROOT = ROOT / "catalogs"
+DATA_ROOT = ROOT / "data"
+NOTEBOOK_DUMP = RUNNERS_ROOT / "build_tpdev_box_stats_v9b.py"
+DEFAULT_DB = DATA_ROOT / "nba_raw.db"
+DEFAULT_PARQUET = DATA_ROOT / "playbyplayv2.parq"
+DEFAULT_PBP_V3 = DATA_ROOT / "playbyplayv3.parq"
+DEFAULT_OVERRIDES = CATALOGS_ROOT / "validation_overrides.csv"
+DEFAULT_BOXSCORE_SOURCE_OVERRIDES = CATALOGS_ROOT / "boxscore_source_overrides.csv"
+DEFAULT_FILE_DIRECTORY = DATA_ROOT
 DEFAULT_RUNTIME_INPUT_CACHE_MODE = "fresh-copy"
 DEFAULT_AUDIT_PROFILE = "full"
 RUNTIME_INPUT_CACHE_MODES = {
@@ -40,8 +44,8 @@ AUDIT_PROFILES = {"full", "counting_only"}
 VALIDATED_CACHE_MANIFEST_NAME = "validated_runtime_input_manifest.json"
 # Runtime starter precedence is now gamerotation-backed v6, then v5 as fallback.
 DEFAULT_PERIOD_STARTERS_PARQUETS = [
-    ROOT / "period_starters_v6.parquet",
-    ROOT / "period_starters_v5.parquet",
+    DATA_ROOT / "period_starters_v6.parquet",
+    DATA_ROOT / "period_starters_v5.parquet",
 ]
 RUNTIME_FILE_DIRECTORY_LINK_NAMES = [
     "game_details",
@@ -51,14 +55,7 @@ RUNTIME_FILE_DIRECTORY_LINK_NAMES = [
     "schedule",
 ]
 
-NOTEBOOK_LOCAL_IMPORT_PRELOADS = [
-    "boxscore_source_overrides",
-    "pbp_row_overrides",
-    "pbp_stat_overrides",
-    "player_id_normalization",
-    "team_event_normalization",
-    "boxscore_audit",
-]
+NOTEBOOK_LOCAL_IMPORT_PRELOADS: list[str] = []
 
 
 class _BoxscoreSourceLoader:
@@ -379,7 +376,7 @@ def prepare_local_runtime_inputs(
         )
 
     reuse_cached_names = {
-        "0c2_build_tpdev_box_stats_version_v9b.py",
+        "build_tpdev_box_stats_v9b.py",
         "nba_raw.db",
         "playbyplayv2.parq",
         "boxscore_source_overrides.csv",
@@ -494,7 +491,10 @@ def prepare_local_runtime_inputs(
                 resolution_kind="local_pyc_direct",
             )
             continue
-        hydrated_path, record = _hydrate_or_fallback(ROOT / f"{module_name}.py", allow_empty_fallback=False)
+        hydrated_path, record = _hydrate_or_fallback(
+            RUNNERS_ROOT / f"{module_name}.py",
+            allow_empty_fallback=False,
+        )
         hydrated_preload_module_paths[module_name] = hydrated_path
         runtime_input_provenance["preload_modules"][module_name] = record
 
@@ -1081,6 +1081,3 @@ def main(argv: Iterable[str] | None = None) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-
-
-

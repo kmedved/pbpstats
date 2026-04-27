@@ -6,21 +6,22 @@ from typing import Iterable
 import pandas as pd
 
 
-ROOT = Path(__file__).resolve().parent
+ROOT = Path(__file__).resolve().parents[2]
+DATA_ROOT = ROOT / "data"
 DEFAULT_TPDEV_BOX_PATH = (
-    ROOT.parent / "fixed_data" / "raw_input_data" / "tpdev_data" / "tpdev_box.parq"
+    DATA_ROOT / "tpdev" / "tpdev_box.parq"
 )
 DEFAULT_TPDEV_BOX_NEW_PATH = (
-    ROOT.parent / "fixed_data" / "raw_input_data" / "tpdev_data" / "tpdev_box_new.parq"
+    DATA_ROOT / "tpdev" / "tpdev_box_new.parq"
 )
 DEFAULT_TPDEV_BOX_CDN_PATH = (
-    ROOT.parent / "fixed_data" / "raw_input_data" / "tpdev_data" / "tpdev_box_cdn.parq"
+    DATA_ROOT / "tpdev" / "tpdev_box_cdn.parq"
 )
 DEFAULT_TPDEV_PBP_PATH = (
-    ROOT.parent / "fixed_data" / "raw_input_data" / "tpdev_data" / "full_pbp_new.parq"
+    DATA_ROOT / "tpdev" / "full_pbp_new.parq"
 )
 DEFAULT_PBPSTATS_PLAYER_BOX_PATH = (
-    ROOT.parent / "calculated_data" / "pbpstats" / "pbpstats_player_box.parq"
+    DATA_ROOT / "pbpstats_player_box.parq"
 )
 
 
