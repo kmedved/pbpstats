@@ -12,6 +12,14 @@ from typing import Any
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+SIDECAR_REQUIRED_COLUMNS = {
+    "game_id",
+    "blocks_release",
+    "research_open",
+    "execution_lane",
+    "policy_source",
+    "release_gate_status",
+}
 
 
 def _load_json(path: Path) -> dict[str, Any]:
@@ -25,7 +33,28 @@ def _load_csv(path: Path) -> list[dict[str, str]]:
 
 
 def _as_bool(value: object) -> bool:
-    return str(value).strip().lower() in {"1", "true", "yes"}
+    text = str(value if value is not None else "").strip().lower()
+    if text in {"1", "true", "yes"}:
+        return True
+    if text in {"0", "false", "no", ""}:
+        return False
+    raise ValueError(f"invalid boolean value: {value!r}")
+
+
+def _true_game_ids(
+    rows: list[dict[str, str]], field: str
+) -> tuple[list[str], list[str]]:
+    game_ids: list[str] = []
+    errors: list[str] = []
+    for row_number, row in enumerate(rows, start=2):
+        try:
+            is_true = _as_bool(row.get(field))
+        except ValueError as exc:
+            errors.append(f"sidecar row {row_number} field {field}: {exc}")
+            continue
+        if is_true:
+            game_ids.append(row.get("game_id", ""))
+    return game_ids, errors
 
 
 def _raw_open_game_count(raw_summary: dict[str, Any]) -> Any:
@@ -63,7 +92,9 @@ def validate_checksums(release_dir: Path) -> list[str]:
     if not checksum_path.exists():
         return [f"checksum file is missing: {checksum_path}"]
 
-    for line_number, raw_line in enumerate(checksum_path.read_text(encoding="utf-8").splitlines(), start=1):
+    for line_number, raw_line in enumerate(
+        checksum_path.read_text(encoding="utf-8").splitlines(), start=1
+    ):
         line = raw_line.strip()
         if not line or line.startswith("#"):
             continue
@@ -80,14 +111,18 @@ def validate_checksums(release_dir: Path) -> list[str]:
         try:
             artifact_path.relative_to(release_dir.resolve())
         except ValueError:
-            errors.append(f"checksum line {line_number} points outside release dir: {rel_path}")
+            errors.append(
+                f"checksum line {line_number} points outside release dir: {rel_path}"
+            )
             continue
         if not artifact_path.exists():
             errors.append(f"checksum artifact missing: {rel_path}")
             continue
         observed_hash = hashlib.sha256(artifact_path.read_bytes()).hexdigest()
         if observed_hash != expected_hash:
-            errors.append(f"checksum mismatch for {rel_path}: expected {expected_hash}, observed {observed_hash}")
+            errors.append(
+                f"checksum mismatch for {rel_path}: expected {expected_hash}, observed {observed_hash}"
+            )
     return errors
 
 
@@ -96,22 +131,38 @@ def _validate_sidecar_contract(release_dir: Path) -> list[str]:
     sidecar_dir = release_dir / "sidecar"
     summary = _load_json(sidecar_dir / "summary.json")
     join_contract = _load_json(sidecar_dir / "join_contract.json")
-    if summary.get("default_absent_row_values") != join_contract.get("default_absent_row_values"):
-        errors.append("sidecar summary default_absent_row_values do not match join contract")
+    if summary.get("default_absent_row_values") != join_contract.get(
+        "default_absent_row_values"
+    ):
+        errors.append(
+            "sidecar summary default_absent_row_values do not match join contract"
+        )
 
     rows = _load_csv(sidecar_dir / "game_quality_sparse.csv")
+    if rows:
+        missing_columns = SIDECAR_REQUIRED_COLUMNS - set(rows[0])
+        if missing_columns:
+            errors.append(
+                f"sidecar game_quality_sparse.csv missing columns: {sorted(missing_columns)}"
+            )
     game_ids = [row.get("game_id", "") for row in rows]
     if len(game_ids) != len(set(game_ids)):
         errors.append("sidecar game_quality_sparse.csv contains duplicate game_id rows")
-    blocking_ids = [row["game_id"] for row in rows if _as_bool(row.get("blocks_release"))]
+    blocking_ids, bool_errors = _true_game_ids(rows, "blocks_release")
+    errors.extend(bool_errors)
     if blocking_ids:
         errors.append(f"sidecar contains release-blocking game rows: {blocking_ids}")
-    research_open_ids = [row["game_id"] for row in rows if _as_bool(row.get("research_open"))]
+    research_open_ids, bool_errors = _true_game_ids(rows, "research_open")
+    errors.extend(bool_errors)
     if research_open_ids:
         errors.append(f"sidecar contains research-open game rows: {research_open_ids}")
-    documented_hold_ids = [row["game_id"] for row in rows if row.get("execution_lane") == "documented_hold"]
+    documented_hold_ids = [
+        row["game_id"] for row in rows if row.get("execution_lane") == "documented_hold"
+    ]
     if documented_hold_ids:
-        errors.append(f"sidecar contains documented_hold execution lanes: {documented_hold_ids}")
+        errors.append(
+            f"sidecar contains documented_hold execution lanes: {documented_hold_ids}"
+        )
     if summary.get("row_count") != len(rows):
         errors.append("sidecar row_count does not match CSV row count")
     if summary.get("unique_game_count") != len(set(game_ids)):
@@ -136,21 +187,33 @@ def _validate_sidecar_contract(release_dir: Path) -> list[str]:
         / "reviewed_frontier_policy_overlay_20260424_mechanics_fullrun_v4.csv"
     )
     if len(overlay_rows) != 13:
-        errors.append(f"reviewed policy overlay row count is {len(overlay_rows)}, expected 13")
+        errors.append(
+            f"reviewed policy overlay row count is {len(overlay_rows)}, expected 13"
+        )
     reviewed_ids = {row["game_id"] for row in overlay_rows}
     sidecar_reviewed_ids = {
-        row["game_id"] for row in rows if row.get("policy_source") == "reviewed_override"
+        row["game_id"]
+        for row in rows
+        if row.get("policy_source") == "reviewed_override"
     }
     missing_reviewed_ids = sorted(reviewed_ids - sidecar_reviewed_ids)
     if missing_reviewed_ids:
-        errors.append(f"reviewed policy games missing from sidecar: {missing_reviewed_ids}")
+        errors.append(
+            f"reviewed policy games missing from sidecar: {missing_reviewed_ids}"
+        )
     extra_reviewed_ids = sorted(sidecar_reviewed_ids - reviewed_ids)
     if extra_reviewed_ids:
-        errors.append(f"sidecar has reviewed_override games not in overlay: {extra_reviewed_ids}")
+        errors.append(
+            f"sidecar has reviewed_override games not in overlay: {extra_reviewed_ids}"
+        )
     if sidecar_reviewed_ids != reviewed_ids:
-        errors.append("sidecar reviewed_override game set does not match reviewed policy overlay")
+        errors.append(
+            "sidecar reviewed_override game set does not match reviewed policy overlay"
+        )
     if summary.get("reviewed_override_game_count") != len(reviewed_ids):
-        errors.append("sidecar reviewed_override_game_count does not match reviewed policy overlay")
+        errors.append(
+            "sidecar reviewed_override_game_count does not match reviewed policy overlay"
+        )
     return errors
 
 
@@ -163,9 +226,13 @@ def _validate_authoritative_checksum_coverage(
     for label, rel_path in manifest.get("authoritative_files", {}).items():
         artifact_path = (REPO_ROOT / rel_path).resolve()
         try:
-            release_rel_path = artifact_path.relative_to(release_dir.resolve()).as_posix()
+            release_rel_path = artifact_path.relative_to(
+                release_dir.resolve()
+            ).as_posix()
         except ValueError:
-            errors.append(f"authoritative file {label} is outside release dir: {rel_path}")
+            errors.append(
+                f"authoritative file {label} is outside release dir: {rel_path}"
+            )
             continue
         if release_rel_path not in covered_paths:
             errors.append(
@@ -190,16 +257,25 @@ def _validate_path_policy(manifest: dict[str, Any], release_dir: Path) -> list[s
         original_root in row.get("evidence_artifact", "")
         for row in _load_csv(overlay_path)
     )
-    if overlay_has_original_paths and path_policy.get("policy_overlay_evidence_artifact") is None:
-        errors.append("path_policy does not document policy overlay evidence_artifact absolute paths")
+    if (
+        overlay_has_original_paths
+        and path_policy.get("policy_overlay_evidence_artifact") is None
+    ):
+        errors.append(
+            "path_policy does not document policy overlay evidence_artifact absolute paths"
+        )
 
     sidecar_summary = _load_json(release_dir / "sidecar" / "summary.json")
     sidecar_has_original_paths = any(
-        original_root in str(path)
-        for path in sidecar_summary.get("residual_dirs", [])
+        original_root in str(path) for path in sidecar_summary.get("residual_dirs", [])
     )
-    if sidecar_has_original_paths and path_policy.get("sidecar_summary_residual_dirs") is None:
-        errors.append("path_policy does not document sidecar summary residual_dirs absolute paths")
+    if (
+        sidecar_has_original_paths
+        and path_policy.get("sidecar_summary_residual_dirs") is None
+    ):
+        errors.append(
+            "path_policy does not document sidecar summary residual_dirs absolute paths"
+        )
     return errors
 
 
@@ -212,7 +288,9 @@ def validate_manifest(manifest_path: Path) -> list[str]:
     if manifest.get("git", {}).get("release_tag") != expected_tag:
         errors.append("manifest git.release_tag does not match expected v4 tag")
     if "integrated_repo_commit" in manifest.get("git", {}):
-        errors.append("manifest must not embed a self-referential integrated repo commit SHA")
+        errors.append(
+            "manifest must not embed a self-referential integrated repo commit SHA"
+        )
 
     seasons = manifest.get("seasons")
     if seasons != list(range(1997, 2021)):
@@ -223,7 +301,10 @@ def validate_manifest(manifest_path: Path) -> list[str]:
         release_dir / "summaries" / "original" / "full_history_summary.original.json"
     )
     reviewed = _load_json(
-        release_dir / "summaries" / "original" / "reviewed_residuals_summary.original.json"
+        release_dir
+        / "summaries"
+        / "original"
+        / "reviewed_residuals_summary.original.json"
     )
     raw = _load_json(
         release_dir / "summaries" / "original" / "raw_residuals_summary.original.json"

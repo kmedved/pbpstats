@@ -9,7 +9,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Iterable
 
-from historic_backfill.catalogs.lineup_correction_manifest import validate_manifest_schema
+from historic_backfill.catalogs.lineup_correction_manifest import (
+    validate_manifest_schema,
+)
 from historic_backfill.catalogs.loader import validate_historic_pbp_row_override_catalog
 
 
@@ -41,6 +43,7 @@ PBP_STAT_OVERRIDE_REQUIRED_COLUMNS = {
     "notes",
 }
 VALIDATION_OVERRIDE_REQUIRED_COLUMNS = {"game_id", "action", "tolerance", "notes"}
+VALIDATION_OVERRIDE_ACTIONS = {"allow"}
 CORRECTION_MANIFEST_REQUIRED_KEYS = {
     "manifest_version",
     "corrections",
@@ -86,6 +89,107 @@ def _validate_csv_columns(path: Path, required_columns: set[str]) -> None:
         raise ValueError(f"{path} missing columns: {sorted(missing_columns)}")
 
 
+def _read_csv_dicts(path: Path, required_columns: set[str]) -> list[dict[str, str]]:
+    _validate_csv_columns(path, required_columns)
+    with path.open(newline="", encoding="utf-8") as handle:
+        return list(csv.DictReader(handle))
+
+
+def _parse_numeric_field(
+    value: str,
+    *,
+    path: Path,
+    row_number: int,
+    field: str,
+    integer: bool,
+) -> float | int:
+    text = str(value if value is not None else "").strip()
+    if not text:
+        raise ValueError(f"{path} row {row_number} missing required field {field}")
+    try:
+        parsed = float(text)
+    except ValueError as exc:
+        raise ValueError(
+            f"{path} row {row_number} has invalid numeric {field}: {text!r}"
+        ) from exc
+    if integer:
+        if not parsed.is_integer():
+            raise ValueError(
+                f"{path} row {row_number} has non-integer {field}: {text!r}"
+            )
+        return int(parsed)
+    return parsed
+
+
+def _validate_pbp_stat_overrides(path: Path) -> None:
+    for row_number, row in enumerate(
+        _read_csv_dicts(path, PBP_STAT_OVERRIDE_REQUIRED_COLUMNS),
+        start=2,
+    ):
+        _parse_numeric_field(
+            row.get("game_id", ""),
+            path=path,
+            row_number=row_number,
+            field="game_id",
+            integer=True,
+        )
+        team_id = _parse_numeric_field(
+            row.get("team_id", ""),
+            path=path,
+            row_number=row_number,
+            field="team_id",
+            integer=True,
+        )
+        player_id = _parse_numeric_field(
+            row.get("player_id", ""),
+            path=path,
+            row_number=row_number,
+            field="player_id",
+            integer=True,
+        )
+        stat_value = _parse_numeric_field(
+            row.get("stat_value", ""),
+            path=path,
+            row_number=row_number,
+            field="stat_value",
+            integer=False,
+        )
+        if team_id <= 0:
+            raise ValueError(f"{path} row {row_number} team_id must be positive")
+        if player_id <= 0:
+            raise ValueError(f"{path} row {row_number} player_id must be positive")
+        if float(stat_value) == 0.0:
+            raise ValueError(f"{path} row {row_number} stat_value must be non-zero")
+        if not str(row.get("stat_key", "")).strip():
+            raise ValueError(f"{path} row {row_number} missing required field stat_key")
+
+
+def _validate_validation_overrides(path: Path) -> None:
+    for row_number, row in enumerate(
+        _read_csv_dicts(path, VALIDATION_OVERRIDE_REQUIRED_COLUMNS),
+        start=2,
+    ):
+        _parse_numeric_field(
+            row.get("game_id", ""),
+            path=path,
+            row_number=row_number,
+            field="game_id",
+            integer=True,
+        )
+        action = str(row.get("action", "")).strip().lower()
+        if action not in VALIDATION_OVERRIDE_ACTIONS:
+            raise ValueError(f"{path} row {row_number} has invalid action: {action!r}")
+        tolerance = _parse_numeric_field(
+            row.get("tolerance", ""),
+            path=path,
+            row_number=row_number,
+            field="tolerance",
+            integer=False,
+        )
+        if tolerance < 0:
+            raise ValueError(f"{path} row {row_number} tolerance must be non-negative")
+
+
 def _validate_json_keys(path: Path, required_keys: set[str]) -> None:
     payload = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(payload, dict):
@@ -103,11 +207,11 @@ def _validate_core_catalogs(root: Path) -> list[str]:
         ),
         (
             root / "catalogs" / "pbp_stat_overrides.csv",
-            lambda path: _validate_csv_columns(path, PBP_STAT_OVERRIDE_REQUIRED_COLUMNS),
+            _validate_pbp_stat_overrides,
         ),
         (
             root / "catalogs" / "validation_overrides.csv",
-            lambda path: _validate_csv_columns(path, VALIDATION_OVERRIDE_REQUIRED_COLUMNS),
+            _validate_validation_overrides,
         ),
         (
             root / "catalogs" / "overrides" / "correction_manifest.json",
@@ -123,7 +227,9 @@ def _validate_core_catalogs(root: Path) -> list[str]:
             continue
         try:
             validator(path)
-        except Exception as exc:  # noqa: BLE001 - CLI preflight should report catalog errors plainly.
+        except (
+            Exception
+        ) as exc:  # noqa: BLE001 - CLI preflight should report catalog errors plainly.
             errors.append(str(exc))
     return errors
 

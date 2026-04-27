@@ -4,6 +4,7 @@ import pandas as pd
 
 from historic_backfill.catalogs.loader import (
     DEFAULT_HISTORIC_PBP_ROW_OVERRIDES_PATH,
+    apply_historic_pbp_row_overrides,
     load_historic_pbp_row_overrides,
     validate_historic_pbp_row_override_catalog,
 )
@@ -67,7 +68,19 @@ def test_apply_pbp_row_overrides_supports_multiple_actions_for_same_game():
         overrides={"0029600396": overrides["0029600442"]},
     )
 
-    assert result["EVENTNUM"].tolist() == [408, 409, 410, 411, 412, 413, 414, 415, 416, 417, 418]
+    assert result["EVENTNUM"].tolist() == [
+        408,
+        409,
+        410,
+        411,
+        412,
+        413,
+        414,
+        415,
+        416,
+        417,
+        418,
+    ]
 
 
 def test_apply_pbp_row_overrides_can_move_rebound_after_later_miss():
@@ -77,7 +90,16 @@ def test_apply_pbp_row_overrides_can_move_rebound_after_later_miss():
             "EVENTNUM": [354, 355, 356, 357, 361, 362, 364, 365],
             "EVENTMSGTYPE": [2, 4, 2, 4, 1, 4, 2, 13],
             "PERIOD": [3] * 8,
-            "PCTIMESTRING": ["1:27", "1:24", "1:12", "1:07", "0:35", "0:16", "0:00", "0:00"],
+            "PCTIMESTRING": [
+                "1:27",
+                "1:24",
+                "1:12",
+                "1:07",
+                "0:35",
+                "0:16",
+                "0:00",
+                "0:00",
+            ],
         }
     )
     overrides = {
@@ -124,9 +146,19 @@ def test_apply_pbp_row_overrides_can_insert_synthetic_sub_before_anchor():
             "PERIOD": [2] * 4,
             "PCTIMESTRING": ["8:00", "7:59", "7:59", "7:59"],
             "WCTIMESTRING": ["8:59 PM"] * 4,
-            "HOMEDESCRIPTION": ["MISS Smith 26' 3PT Jump Shot", "Baxter L.B.FOUL (P2.T2)", "", ""],
+            "HOMEDESCRIPTION": [
+                "MISS Smith 26' 3PT Jump Shot",
+                "Baxter L.B.FOUL (P2.T2)",
+                "",
+                "",
+            ],
             "NEUTRALDESCRIPTION": [""] * 4,
-            "VISITORDESCRIPTION": ["", "", "SUB: Barry FOR Udrih", "SUB: Parker FOR Ginobili"],
+            "VISITORDESCRIPTION": [
+                "",
+                "",
+                "SUB: Barry FOR Udrih",
+                "SUB: Parker FOR Ginobili",
+            ],
             "SCORE": [""] * 4,
             "SCOREMARGIN": [""] * 4,
             "PLAYER1_ID": [2747, 2437, 2757, 1939],
@@ -184,7 +216,9 @@ def test_apply_pbp_row_overrides_can_insert_synthetic_sub_before_anchor():
 
 
 def test_historic_pbp_row_override_catalog_path_is_explicit():
-    expected = Path(__file__).resolve().parents[1] / "catalogs" / "pbp_row_overrides.csv"
+    expected = (
+        Path(__file__).resolve().parents[1] / "catalogs" / "pbp_row_overrides.csv"
+    )
 
     assert DEFAULT_HISTORIC_PBP_ROW_OVERRIDES_PATH == expected
 
@@ -205,3 +239,26 @@ def test_historic_pbp_row_override_catalog_contains_synthetic_canary():
 
 def test_historic_pbp_row_override_catalog_validates_strictly():
     validate_historic_pbp_row_override_catalog()
+
+
+def test_historic_pbp_row_override_application_is_strict():
+    df = _game_df([1, 2, 3])
+    overrides = {
+        "0029600442": [
+            {
+                "action": "move_before",
+                "event_num": 2,
+                "anchor_event_num": 99,
+                "notes": "stale anchor",
+            }
+        ]
+    }
+
+    try:
+        apply_historic_pbp_row_overrides(df, overrides)
+    except ValueError as exc:
+        assert "move_before override anchor" in str(exc)
+    else:
+        raise AssertionError(
+            "historic row override application should reject stale anchors"
+        )

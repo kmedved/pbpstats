@@ -40,7 +40,9 @@ def validate_historic_pbp_row_override_catalog(
     missing_columns = PBP_ROW_OVERRIDE_REQUIRED_COLUMNS - set(raw_df.columns)
     if missing_columns:
         missing = ", ".join(sorted(missing_columns))
-        raise ValueError(f"Historic PBP row override catalog missing columns: {missing}")
+        raise ValueError(
+            f"Historic PBP row override catalog missing columns: {missing}"
+        )
 
     parsed = load_pbp_row_overrides(catalog_path, strict=True)
     parsed_row_count = sum(len(rows) for rows in parsed.values())
@@ -50,9 +52,13 @@ def validate_historic_pbp_row_override_catalog(
             f"{parsed_row_count} does not match CSV row count {len(raw_df)}"
         )
 
-    unknown_actions = sorted(set(raw_df["action"].str.strip().str.lower()) - VALID_PBP_ROW_OVERRIDE_ACTIONS)
+    unknown_actions = sorted(
+        set(raw_df["action"].str.strip().str.lower()) - VALID_PBP_ROW_OVERRIDE_ACTIONS
+    )
     if unknown_actions:
-        raise ValueError(f"Unknown historic PBP row override actions: {unknown_actions}")
+        raise ValueError(
+            f"Unknown historic PBP row override actions: {unknown_actions}"
+        )
 
     canaries = [
         row
@@ -60,7 +66,21 @@ def validate_historic_pbp_row_override_catalog(
         if row["event_num"] == 148 and row["action"] == "insert_sub_before"
     ]
     if len(canaries) != 1:
-        raise ValueError("Synthetic substitution canary 0020400335 event 148 is missing")
+        raise ValueError(
+            "Synthetic substitution canary 0020400335 event 148 is missing"
+        )
+    expected_canary_fields = {
+        "anchor_event_num": 149,
+        "player_out_id": "2747",
+        "player_in_id": "2454",
+    }
+    canary = canaries[0]
+    for field, expected in expected_canary_fields.items():
+        if canary.get(field) != expected:
+            raise ValueError(
+                f"Synthetic substitution canary 0020400335 event 148 has "
+                f"{field}={canary.get(field)!r}, expected {expected!r}"
+            )
 
 
 def apply_historic_pbp_row_overrides(
@@ -70,4 +90,5 @@ def apply_historic_pbp_row_overrides(
     return apply_pbp_row_overrides(
         game_df,
         overrides if overrides is not None else load_historic_pbp_row_overrides(),
+        strict_lookup=True,
     )

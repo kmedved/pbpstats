@@ -40,12 +40,15 @@ def test_v4_release_checksum_validation_catches_mutated_artifact(tmp_path):
 
 
 def test_raw_open_game_count_preserves_zero():
-    assert _raw_open_game_count(
-        {
-            "quality_status_counts": {"open": 0},
-            "raw_quality_status_counts": {"open": 13},
-        }
-    ) == 0
+    assert (
+        _raw_open_game_count(
+            {
+                "quality_status_counts": {"open": 0},
+                "raw_quality_status_counts": {"open": 13},
+            }
+        )
+        == 0
+    )
 
 
 def test_v4_release_manifest_rejects_authoritative_files_without_checksum(monkeypatch):
@@ -120,3 +123,41 @@ def test_v4_release_sidecar_validation_recomputes_summary_count_dictionaries(tmp
     errors = validate_manifest(release_copy / "release_manifest.json")
 
     assert any("policy_source_counts do not match" in error for error in errors)
+
+
+def test_v4_release_sidecar_validation_rejects_invalid_booleans(tmp_path):
+    release_copy = tmp_path / "release"
+    shutil.copytree(RELEASE_DIR, release_copy)
+    sidecar_path = release_copy / "sidecar" / "game_quality_sparse.csv"
+    with sidecar_path.open(newline="", encoding="utf-8") as handle:
+        rows = list(csv.DictReader(handle))
+        fieldnames = list(rows[0])
+    rows[0]["blocks_release"] = "maybe"
+    with sidecar_path.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(rows)
+
+    errors = validate_manifest(release_copy / "release_manifest.json")
+
+    assert any("invalid boolean value" in error for error in errors)
+
+
+def test_v4_release_sidecar_validation_rejects_missing_required_columns(tmp_path):
+    release_copy = tmp_path / "release"
+    shutil.copytree(RELEASE_DIR, release_copy)
+    sidecar_path = release_copy / "sidecar" / "game_quality_sparse.csv"
+    with sidecar_path.open(newline="", encoding="utf-8") as handle:
+        rows = list(csv.DictReader(handle))
+        fieldnames = [field for field in rows[0] if field != "research_open"]
+    with sidecar_path.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fieldnames)
+        writer.writeheader()
+        for row in rows:
+            writer.writerow({field: row[field] for field in fieldnames})
+
+    errors = validate_manifest(release_copy / "release_manifest.json")
+
+    assert any(
+        "missing columns" in error and "research_open" in error for error in errors
+    )

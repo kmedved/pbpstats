@@ -33,6 +33,7 @@ DEFAULT_PARQUET = DATA_ROOT / "playbyplayv2.parq"
 DEFAULT_OVERRIDES = CATALOGS_ROOT / "validation_overrides.csv"
 DEFAULT_BOXSCORE_SOURCE_OVERRIDES = CATALOGS_ROOT / "boxscore_source_overrides.csv"
 DEFAULT_FILE_DIRECTORY = DATA_ROOT
+DEFAULT_RUNTIME_CATALOG_OVERRIDES_DIR = CATALOGS_ROOT / "overrides"
 DEFAULT_RUNTIME_INPUT_CACHE_MODE = "fresh-copy"
 DEFAULT_AUDIT_PROFILE = "full"
 RUNTIME_INPUT_CACHE_MODES = {
@@ -105,7 +106,9 @@ def _preload_local_module(module_name: str, module_path: Path) -> None:
         loader = importlib.machinery.SourcelessFileLoader(module_name, str(module_path))
         spec = importlib.util.spec_from_loader(module_name, loader)
         if spec is None:
-            raise ImportError(f"Could not build spec for sourceless module {module_name} at {module_path}")
+            raise ImportError(
+                f"Could not build spec for sourceless module {module_name} at {module_path}"
+            )
         module = importlib.util.module_from_spec(spec)
         sys.modules[module_name] = module
         try:
@@ -129,7 +132,9 @@ def _preload_local_module(module_name: str, module_path: Path) -> None:
         raise
 
 
-def _load_raw_response(db_path: Path, game_id: str, endpoint: str) -> Dict[str, Any] | None:
+def _load_raw_response(
+    db_path: Path, game_id: str, endpoint: str
+) -> Dict[str, Any] | None:
     game_id = str(game_id).zfill(10)
     conn = sqlite3.connect(db_path, timeout=30)
     try:
@@ -193,7 +198,9 @@ def _write_validated_cache_manifest(cache_dir: Path, manifest: dict[str, Any]) -
     payload = {
         "entries": manifest.get("entries", {}),
     }
-    manifest_path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    manifest_path.write_text(
+        json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
     return manifest_path
 
 
@@ -245,10 +252,9 @@ def _validated_cache_entry_matches(
         return False
     if not cached_path.exists():
         return False
-    return (
-        entry.get("source") == _source_fingerprint(source_path)
-        and entry.get("cached") == _cached_fingerprint(cached_path)
-    )
+    return entry.get("source") == _source_fingerprint(source_path) and entry.get(
+        "cached"
+    ) == _cached_fingerprint(cached_path)
 
 
 def _record_validated_cache_entry(
@@ -333,9 +339,15 @@ def prepare_local_runtime_file_directory(
     runtime_file_directory: Path,
     *,
     live_file_directory: Path = DEFAULT_FILE_DIRECTORY,
+    catalog_overrides_dir: Path | None = DEFAULT_RUNTIME_CATALOG_OVERRIDES_DIR,
 ) -> Dict[str, Any]:
     live_file_directory = live_file_directory.resolve()
     runtime_file_directory = runtime_file_directory.resolve()
+    catalog_overrides_dir = (
+        Path(catalog_overrides_dir).resolve()
+        if catalog_overrides_dir is not None
+        else None
+    )
     _remove_existing_path(runtime_file_directory)
     runtime_file_directory.mkdir(parents=True, exist_ok=True)
 
@@ -355,7 +367,16 @@ def prepare_local_runtime_file_directory(
             }
         )
 
-    overrides_source = live_file_directory / "overrides"
+    live_overrides_source = live_file_directory / "overrides"
+    overrides_source_kind = "empty"
+    if catalog_overrides_dir is not None and catalog_overrides_dir.exists():
+        overrides_source = catalog_overrides_dir
+        overrides_source_kind = "catalogs"
+    elif live_overrides_source.exists():
+        overrides_source = live_overrides_source
+        overrides_source_kind = "file_directory"
+    else:
+        overrides_source = live_overrides_source
     overrides_target = runtime_file_directory / "overrides"
     if overrides_source.exists():
         shutil.copytree(overrides_source, overrides_target)
@@ -367,6 +388,7 @@ def prepare_local_runtime_file_directory(
         "runtime_file_directory": _path_metadata(runtime_file_directory),
         "linked_paths": linked_paths,
         "overrides_snapshot": {
+            "source_kind": overrides_source_kind,
             "source": _path_metadata(overrides_source),
             "target": _path_metadata(overrides_target),
             "files": [
@@ -387,6 +409,7 @@ def prepare_local_runtime_inputs(
     period_starter_parquet_paths: Iterable[Path] = DEFAULT_PERIOD_STARTERS_PARQUETS,
     allow_unreadable_csv_fallback: bool = False,
     file_directory: Path = DEFAULT_FILE_DIRECTORY,
+    catalog_overrides_dir: Path | None = DEFAULT_RUNTIME_CATALOG_OVERRIDES_DIR,
     runtime_input_cache_mode: str = DEFAULT_RUNTIME_INPUT_CACHE_MODE,
 ) -> Dict[str, Any]:
     if runtime_input_cache_mode not in RUNTIME_INPUT_CACHE_MODES:
@@ -450,7 +473,10 @@ def prepare_local_runtime_inputs(
         try:
             had_cached_copy = cached_path.exists()
             hydrated_path = _hydrate_runtime_input(source_path, cache_dir)
-            if runtime_input_cache_mode == "reuse-validated-cache" and hydrated_path != source_path:
+            if (
+                runtime_input_cache_mode == "reuse-validated-cache"
+                and hydrated_path != source_path
+            ):
                 _record_validated_cache_entry(
                     manifest=validated_cache_manifest,
                     source_path=source_path,
@@ -487,35 +513,53 @@ def prepare_local_runtime_inputs(
                 error_message=str(exc),
             )
 
-    hydrated_db_path, runtime_input_provenance["inputs"]["db_path"] = _hydrate_or_fallback(
-        db_path,
-        allow_empty_fallback=False,
+    hydrated_db_path, runtime_input_provenance["inputs"]["db_path"] = (
+        _hydrate_or_fallback(
+            db_path,
+            allow_empty_fallback=False,
+        )
     )
-    hydrated_parquet_path, runtime_input_provenance["inputs"]["parquet_path"] = _hydrate_or_fallback(
-        parquet_path,
-        allow_empty_fallback=False,
+    hydrated_parquet_path, runtime_input_provenance["inputs"]["parquet_path"] = (
+        _hydrate_or_fallback(
+            parquet_path,
+            allow_empty_fallback=False,
+        )
     )
-    hydrated_notebook_dump_path, runtime_input_provenance["inputs"]["notebook_dump_path"] = _hydrate_or_fallback(
+    (
+        hydrated_notebook_dump_path,
+        runtime_input_provenance["inputs"]["notebook_dump_path"],
+    ) = _hydrate_or_fallback(
         NOTEBOOK_DUMP,
         allow_empty_fallback=False,
     )
-    hydrated_overrides_path, runtime_input_provenance["inputs"]["overrides_path"] = _hydrate_or_fallback(
-        overrides_path,
-        allow_empty_fallback=True,
+    hydrated_overrides_path, runtime_input_provenance["inputs"]["overrides_path"] = (
+        _hydrate_or_fallback(
+            overrides_path,
+            allow_empty_fallback=True,
+        )
     )
-    hydrated_boxscore_source_path, runtime_input_provenance["inputs"]["boxscore_source_overrides_path"] = _hydrate_or_fallback(
+    (
+        hydrated_boxscore_source_path,
+        runtime_input_provenance["inputs"]["boxscore_source_overrides_path"],
+    ) = _hydrate_or_fallback(
         boxscore_source_overrides_path,
         allow_empty_fallback=True,
     )
     hydrated_preload_module_paths: Dict[str, Path] = {}
     for module_name in NOTEBOOK_LOCAL_IMPORT_PRELOADS:
-        pyc_path = ROOT / "__pycache__" / f"{module_name}.cpython-{sys.version_info.major}{sys.version_info.minor}.pyc"
+        pyc_path = (
+            ROOT
+            / "__pycache__"
+            / f"{module_name}.cpython-{sys.version_info.major}{sys.version_info.minor}.pyc"
+        )
         if module_name == "pbp_row_overrides" and pyc_path.exists():
             hydrated_preload_module_paths[module_name] = pyc_path
-            runtime_input_provenance["preload_modules"][module_name] = _build_runtime_input_record(
-                source_path=ROOT / f"{module_name}.py",
-                resolved_path=pyc_path,
-                resolution_kind="local_pyc_direct",
+            runtime_input_provenance["preload_modules"][module_name] = (
+                _build_runtime_input_record(
+                    source_path=ROOT / f"{module_name}.py",
+                    resolved_path=pyc_path,
+                    resolution_kind="local_pyc_direct",
+                )
             )
             continue
         hydrated_path, record = _hydrate_or_fallback(
@@ -538,13 +582,18 @@ def prepare_local_runtime_inputs(
     file_directory_provenance = prepare_local_runtime_file_directory(
         cache_dir.parent / "_local_runtime_file_directory",
         live_file_directory=file_directory,
+        catalog_overrides_dir=catalog_overrides_dir,
     )
     runtime_input_provenance["file_directory"] = file_directory_provenance
     if runtime_input_cache_mode == "reuse-validated-cache":
         runtime_input_provenance["validated_cache_manifest_path"] = str(
-            _write_validated_cache_manifest(cache_dir, validated_cache_manifest).resolve()
+            _write_validated_cache_manifest(
+                cache_dir, validated_cache_manifest
+            ).resolve()
         )
-    set_boxscore_source_overrides(load_boxscore_source_overrides(hydrated_boxscore_source_path))
+    set_boxscore_source_overrides(
+        load_boxscore_source_overrides(hydrated_boxscore_source_path)
+    )
     return {
         "db_path": hydrated_db_path,
         "parquet_path": hydrated_parquet_path,
@@ -553,7 +602,9 @@ def prepare_local_runtime_inputs(
         "overrides_path": hydrated_overrides_path,
         "boxscore_source_overrides_path": hydrated_boxscore_source_path,
         "period_starter_parquet_paths": hydrated_period_starter_paths,
-        "file_directory": Path(file_directory_provenance["runtime_file_directory"]["path"]),
+        "file_directory": Path(
+            file_directory_provenance["runtime_file_directory"]["path"]
+        ),
         "runtime_input_provenance": runtime_input_provenance,
     }
 
@@ -574,19 +625,27 @@ def _patch_v9b_runtime_namespace(namespace: Dict[str, Any]) -> None:
     ) -> Tuple[Any, Any, Any, Any, Any]:
         db_path_str = str(namespace["DB_PATH"])
         normalized_game_ids = [str(gid).zfill(10) for gid in game_ids]
-        print(f"[PREP] Building lazy row slices for {len(normalized_game_ids)} games...")
+        print(
+            f"[PREP] Building lazy row slices for {len(normalized_game_ids)} games..."
+        )
 
         row_positions_by_game: dict[str, list[int]] = {}
         for row_index, raw_game_id in enumerate(season_pbp_df["GAME_ID"].tolist()):
             normalized = str(raw_game_id).zfill(10)
             row_positions_by_game.setdefault(normalized, []).append(row_index)
 
-        missing_game_ids = sorted(gid for gid in normalized_game_ids if gid not in row_positions_by_game)
+        missing_game_ids = sorted(
+            gid for gid in normalized_game_ids if gid not in row_positions_by_game
+        )
         if missing_game_ids:
-            raise ValueError(f"Requested games missing from season dataframe: {missing_game_ids}")
+            raise ValueError(
+                f"Requested games missing from season dataframe: {missing_game_ids}"
+            )
 
         print(f"[RUN] Processing with {max_workers} workers (backend={backend})...")
-        results_list = namespace["Parallel"](n_jobs=max_workers, backend=backend, verbose=10)(
+        results_list = namespace["Parallel"](
+            n_jobs=max_workers, backend=backend, verbose=10
+        )(
             namespace["delayed"](original_process_single_game_worker)(
                 gid,
                 season_pbp_df.iloc[row_positions_by_game[gid]].copy(),
@@ -608,7 +667,14 @@ def _patch_v9b_runtime_namespace(namespace: Dict[str, Any]) -> None:
         all_player_mismatch_rows: list[dict[str, Any]] = []
         all_audit_error_rows: list[dict[str, Any]] = []
 
-        for game_id, df, error, event_errors, rebound_deletions, audit_payload in results_list:
+        for (
+            game_id,
+            df,
+            error,
+            event_errors,
+            rebound_deletions,
+            audit_payload,
+        ) in results_list:
             all_event_errors.extend(event_errors)
             all_rebound_deletions.extend(rebound_deletions)
             if run_boxscore_audit:
@@ -626,7 +692,11 @@ def _patch_v9b_runtime_namespace(namespace: Dict[str, Any]) -> None:
         with namespace["_rebound_fallback_lock"]:
             namespace["_rebound_fallback_deletions"].extend(all_rebound_deletions)
 
-        combined_df = namespace["pd"].concat(results, ignore_index=True) if results else namespace["pd"].DataFrame()
+        combined_df = (
+            namespace["pd"].concat(results, ignore_index=True)
+            if results
+            else namespace["pd"].DataFrame()
+        )
         error_df = namespace["pd"].DataFrame(errors)
         team_audit_df = namespace["pd"].DataFrame(
             all_team_audit_rows,
@@ -677,17 +747,29 @@ def _patch_v9b_runtime_namespace(namespace: Dict[str, Any]) -> None:
             timings["error_write_seconds"] = 0.0
             timings["rebound_export_seconds"] = 0.0
             timings["boxscore_audit_seconds"] = 0.0
-            timings["total_wall_seconds"] = round(time.perf_counter() - overall_start, 6)
+            timings["total_wall_seconds"] = round(
+                time.perf_counter() - overall_start, 6
+            )
             namespace["_last_process_season_timing"] = timings
-            namespace["_last_process_season_resource_usage"] = {"peak_rss_mb": _current_peak_rss_mb()}
+            namespace["_last_process_season_resource_usage"] = {
+                "peak_rss_mb": _current_peak_rss_mb()
+            }
             namespace["_last_process_season_audit_summary"] = None
             return namespace["pd"].DataFrame(), namespace["pd"].DataFrame()
 
         game_ids = season_df["GAME_ID"].unique().tolist()
-        print(f"Processing {len(game_ids)} games for season {season} with {max_workers} workers...")
+        print(
+            f"Processing {len(game_ids)} games for season {season} with {max_workers} workers..."
+        )
 
         game_processing_start = time.perf_counter()
-        combined_df, error_df, team_audit_df, player_mismatch_df, audit_error_df = namespace["process_games_parallel"](
+        (
+            combined_df,
+            error_df,
+            team_audit_df,
+            player_mismatch_df,
+            audit_error_df,
+        ) = namespace["process_games_parallel"](
             game_ids,
             season_df,
             max_workers=max_workers,
@@ -697,25 +779,35 @@ def _patch_v9b_runtime_namespace(namespace: Dict[str, Any]) -> None:
             strict_mode=strict_mode,
             run_boxscore_audit=run_boxscore_audit,
         )
-        timings["game_processing_seconds"] = round(time.perf_counter() - game_processing_start, 6)
+        timings["game_processing_seconds"] = round(
+            time.perf_counter() - game_processing_start, 6
+        )
 
         parquet_write_start = time.perf_counter()
         if not combined_df.empty:
             output_file = f"{output_dir}/darko_{season}.parquet"
             combined_df.to_parquet(output_file, index=False)
             print(f"[OUTPUT] Saved {len(combined_df)} rows to {output_file}")
-        timings["parquet_write_seconds"] = round(time.perf_counter() - parquet_write_start, 6)
+        timings["parquet_write_seconds"] = round(
+            time.perf_counter() - parquet_write_start, 6
+        )
 
         error_write_start = time.perf_counter()
         if not error_df.empty:
             error_file = f"{output_dir}/errors_{season}.csv"
             error_df.to_csv(error_file, index=False)
             print(f"[ERRORS] {len(error_df)} game errors saved to {error_file}")
-        timings["error_write_seconds"] = round(time.perf_counter() - error_write_start, 6)
+        timings["error_write_seconds"] = round(
+            time.perf_counter() - error_write_start, 6
+        )
 
         rebound_export_start = time.perf_counter()
-        namespace["export_rebound_fallback_deletions"](f"rebound_fallback_deletions_{season}.csv")
-        timings["rebound_export_seconds"] = round(time.perf_counter() - rebound_export_start, 6)
+        namespace["export_rebound_fallback_deletions"](
+            f"rebound_fallback_deletions_{season}.csv"
+        )
+        timings["rebound_export_seconds"] = round(
+            time.perf_counter() - rebound_export_start, 6
+        )
 
         if run_boxscore_audit:
             audit_start = time.perf_counter()
@@ -727,7 +819,9 @@ def _patch_v9b_runtime_namespace(namespace: Dict[str, Any]) -> None:
                 output_dir=Path(output_dir),
                 games_requested=len(game_ids),
             )
-            timings["boxscore_audit_seconds"] = round(time.perf_counter() - audit_start, 6)
+            timings["boxscore_audit_seconds"] = round(
+                time.perf_counter() - audit_start, 6
+            )
             print(
                 f"[AUDIT] Saved season {season}: games_with_team_mismatch={audit_summary['games_with_team_mismatch']} "
                 f"player_rows_with_mismatch={audit_summary['player_rows_with_mismatch']} "
@@ -738,7 +832,9 @@ def _patch_v9b_runtime_namespace(namespace: Dict[str, Any]) -> None:
 
         timings["total_wall_seconds"] = round(time.perf_counter() - overall_start, 6)
         namespace["_last_process_season_timing"] = timings
-        namespace["_last_process_season_resource_usage"] = {"peak_rss_mb": _current_peak_rss_mb()}
+        namespace["_last_process_season_resource_usage"] = {
+            "peak_rss_mb": _current_peak_rss_mb()
+        }
         namespace["_last_process_season_audit_summary"] = audit_summary
         return combined_df, error_df
 
@@ -771,6 +867,7 @@ def load_v9b_namespace(
     _patch_v9b_runtime_namespace(namespace)
     return namespace
 
+
 def install_local_boxscore_wrapper(
     namespace: Dict[str, Any],
     db_path: Path,
@@ -779,7 +876,9 @@ def install_local_boxscore_wrapper(
     allowed_game_ids: Iterable[str | int] | None = None,
     period_starter_parquet_paths: Iterable[Path] | None = None,
 ) -> None:
-    from historic_backfill.common.period_boxscore_source_loader import PeriodBoxscoreSourceLoader
+    from historic_backfill.common.period_boxscore_source_loader import (
+        PeriodBoxscoreSourceLoader,
+    )
 
     original_get_possessions = namespace["get_possessions_from_df"]
     parquet_paths = [
@@ -806,7 +905,9 @@ def install_local_boxscore_wrapper(
                 loader = _BoxscoreSourceLoader(raw_boxscore)
 
         kwargs.setdefault("boxscore_source_loader", loader)
-        kwargs.setdefault("period_boxscore_source_loader", period_boxscore_source_loader)
+        kwargs.setdefault(
+            "period_boxscore_source_loader", period_boxscore_source_loader
+        )
         kwargs.setdefault("file_directory", str(file_directory.resolve()))
         return original_get_possessions(*args, **kwargs)
 
@@ -821,7 +922,9 @@ def run_lineup_audits(
     parquet_path: Path,
     file_directory: Path = DEFAULT_FILE_DIRECTORY,
 ) -> Dict[str, Any]:
-    from historic_backfill.audits.core.event_player_on_court import audit_event_player_on_court
+    from historic_backfill.audits.core.event_player_on_court import (
+        audit_event_player_on_court,
+    )
     from historic_backfill.audits.core.minutes_plus_minus import (
         build_minutes_plus_minus_audit,
         summarize_minutes_plus_minus_audit,
@@ -833,7 +936,9 @@ def run_lineup_audits(
     minutes_audit_df = build_minutes_plus_minus_audit(combined_df, db_path=db_path)
     minutes_summary = summarize_minutes_plus_minus_audit(minutes_audit_df)
     minutes_audit_seconds = round(time.perf_counter() - minutes_audit_start, 6)
-    minutes_audit_df.to_csv(output_dir / f"minutes_plus_minus_audit_{season}.csv", index=False)
+    minutes_audit_df.to_csv(
+        output_dir / f"minutes_plus_minus_audit_{season}.csv", index=False
+    )
     (output_dir / f"minutes_plus_minus_summary_{season}.json").write_text(
         json.dumps(minutes_summary, indent=2),
         encoding="utf-8",
@@ -843,7 +948,8 @@ def run_lineup_audits(
         {
             str(game_id).zfill(10)
             for game_id in minutes_audit_df.loc[
-                minutes_audit_df["has_minutes_mismatch"] | minutes_audit_df["has_plus_minus_mismatch"],
+                minutes_audit_df["has_minutes_mismatch"]
+                | minutes_audit_df["has_plus_minus_mismatch"],
                 "game_id",
             ].tolist()
         }
@@ -861,7 +967,9 @@ def run_lineup_audits(
         file_directory=file_directory,
     )
     event_on_court_seconds = round(time.perf_counter() - event_on_court_start, 6)
-    issues_df.to_csv(output_dir / f"event_player_on_court_issues_{season}.csv", index=False)
+    issues_df.to_csv(
+        output_dir / f"event_player_on_court_issues_{season}.csv", index=False
+    )
     (output_dir / f"event_on_court_summary_{season}.json").write_text(
         json.dumps(event_summary, indent=2),
         encoding="utf-8",
@@ -925,9 +1033,13 @@ def run_season(
         if run_boxscore_audit_pass and audit_summary is None:
             audit_summary_path = output_dir / f"boxscore_audit_summary_{season}.json"
             if audit_summary_path.exists():
-                audit_summary = json.loads(audit_summary_path.read_text(encoding="utf-8"))
+                audit_summary = json.loads(
+                    audit_summary_path.read_text(encoding="utf-8")
+                )
             else:
-                print(f"[AUDIT] No integrated audit summary was written for season {season}")
+                print(
+                    f"[AUDIT] No integrated audit summary was written for season {season}"
+                )
         if run_lineup_audit_pass:
             lineup_audit_summary = run_lineup_audits(
                 combined_df=combined_df,
@@ -946,11 +1058,15 @@ def run_season(
             )
         process_timings = dict(namespace.get("_last_process_season_timing", {}))
         process_timings["lineup_audit_seconds"] = (
-            float(lineup_audit_summary.get("timings", {}).get("total_wall_seconds", 0.0))
+            float(
+                lineup_audit_summary.get("timings", {}).get("total_wall_seconds", 0.0)
+            )
             if lineup_audit_summary is not None
             else 0.0
         )
-        process_timings["total_wall_seconds"] = round(time.perf_counter() - overall_start, 6)
+        process_timings["total_wall_seconds"] = round(
+            time.perf_counter() - overall_start, 6
+        )
         summary = {
             "season": season,
             "player_rows": player_rows,
@@ -966,14 +1082,18 @@ def run_season(
                 **dict(namespace.get("_last_process_season_resource_usage", {})),
             },
         }
-        (output_dir / f"summary_{season}.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
+        (output_dir / f"summary_{season}.json").write_text(
+            json.dumps(summary, indent=2), encoding="utf-8"
+        )
         return summary
     finally:
         os.chdir(old_cwd)
 
 
 def parse_args(argv: Iterable[str] | None = None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Cautious offline rerun for replace_tpdev seasons")
+    parser = argparse.ArgumentParser(
+        description="Cautious offline rerun for replace_tpdev seasons"
+    )
     parser.add_argument("--seasons", nargs="+", type=int, required=True)
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--db-path", type=Path, default=DEFAULT_DB)
@@ -985,8 +1105,12 @@ def parse_args(argv: Iterable[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--max-workers", type=int, default=4)
     parser.add_argument("--run-boxscore-audit", action="store_true", default=False)
     parser.add_argument("--skip-lineup-audit", action="store_true", default=False)
-    parser.add_argument("--audit-profile", choices=sorted(AUDIT_PROFILES), default=DEFAULT_AUDIT_PROFILE)
-    parser.add_argument("--allow-unreadable-csv-fallback", action="store_true", default=False)
+    parser.add_argument(
+        "--audit-profile", choices=sorted(AUDIT_PROFILES), default=DEFAULT_AUDIT_PROFILE
+    )
+    parser.add_argument(
+        "--allow-unreadable-csv-fallback", action="store_true", default=False
+    )
     parser.add_argument(
         "--runtime-input-cache-mode",
         choices=sorted(RUNTIME_INPUT_CACHE_MODES),
@@ -1037,7 +1161,9 @@ def main(argv: Iterable[str] | None = None) -> int:
     print(f"[RUNNER] max_workers: {args.max_workers}")
     print(f"[RUNNER] boxscore_audit: {args.run_boxscore_audit}")
     print(f"[RUNNER] audit_profile: {args.audit_profile}")
-    print(f"[RUNNER] lineup_audit: {args.audit_profile == 'full' and not args.skip_lineup_audit}")
+    print(
+        f"[RUNNER] lineup_audit: {args.audit_profile == 'full' and not args.skip_lineup_audit}"
+    )
     print(f"[RUNNER] runtime_input_cache_mode: {args.runtime_input_cache_mode}")
     print(f"[RUNNER] live_file_directory: {args.file_directory.resolve()}")
     print(f"[RUNNER] runtime_file_directory: {runtime_inputs['file_directory']}")
@@ -1066,7 +1192,9 @@ def main(argv: Iterable[str] | None = None) -> int:
                 tolerance=args.tolerance,
                 max_workers=args.max_workers,
                 run_boxscore_audit_pass=args.run_boxscore_audit,
-                run_lineup_audit_pass=(args.audit_profile == "full" and not args.skip_lineup_audit),
+                run_lineup_audit_pass=(
+                    args.audit_profile == "full" and not args.skip_lineup_audit
+                ),
             )
             season_summaries.append(season_summary)
             print(
@@ -1083,16 +1211,29 @@ def main(argv: Iterable[str] | None = None) -> int:
     final_summary = {
         "seasons_requested": [int(season) for season in args.seasons],
         "seasons_completed": [int(summary["season"]) for summary in season_summaries],
-        "player_rows": int(sum(int(summary.get("player_rows", 0) or 0) for summary in season_summaries)),
-        "failed_games": int(sum(int(summary.get("failed_games", 0) or 0) for summary in season_summaries)),
-        "event_stats_errors": int(sum(int(summary.get("event_stats_errors", 0) or 0) for summary in season_summaries)),
+        "player_rows": int(
+            sum(int(summary.get("player_rows", 0) or 0) for summary in season_summaries)
+        ),
+        "failed_games": int(
+            sum(
+                int(summary.get("failed_games", 0) or 0) for summary in season_summaries
+            )
+        ),
+        "event_stats_errors": int(
+            sum(
+                int(summary.get("event_stats_errors", 0) or 0)
+                for summary in season_summaries
+            )
+        ),
         "strict_mode": bool(args.strict_mode),
         "tolerance": int(args.tolerance),
         "max_workers": int(args.max_workers),
         "run_boxscore_audit": bool(args.run_boxscore_audit),
         "audit_profile": str(args.audit_profile),
         "runtime_input_cache_mode": str(args.runtime_input_cache_mode),
-        "runtime_input_provenance_path": str((output_dir / "runtime_input_provenance.json").resolve()),
+        "runtime_input_provenance_path": str(
+            (output_dir / "runtime_input_provenance.json").resolve()
+        ),
         "runtime_file_directory": str(runtime_inputs["file_directory"]),
         "timings": {
             "runtime_input_prep_seconds": runtime_input_seconds,
@@ -1104,7 +1245,9 @@ def main(argv: Iterable[str] | None = None) -> int:
         },
         "seasons": season_summaries,
     }
-    (output_dir / "summary.json").write_text(json.dumps(final_summary, indent=2) + "\n", encoding="utf-8")
+    (output_dir / "summary.json").write_text(
+        json.dumps(final_summary, indent=2) + "\n", encoding="utf-8"
+    )
     print(json.dumps(final_summary, indent=2))
     print("[RUNNER] All requested seasons complete")
     return 0

@@ -134,6 +134,58 @@ def test_apply_pbp_row_overrides_normalizes_float_like_game_ids():
     assert result["EVENTNUM"].tolist() == [1, 2, 3]
 
 
+def test_apply_pbp_row_overrides_default_skips_missing_anchor():
+    df = _game_df([1, 2, 3])
+    result = apply_pbp_row_overrides(
+        df,
+        {
+            "0029600442": [
+                {"action": "move_before", "event_num": 2, "anchor_event_num": 99},
+            ]
+        },
+    )
+
+    assert result["EVENTNUM"].tolist() == [1, 2, 3]
+
+
+def test_apply_pbp_row_overrides_strict_lookup_rejects_missing_anchor():
+    df = _game_df([1, 2, 3])
+
+    with pytest.raises(ValueError, match="move_before override anchor"):
+        apply_pbp_row_overrides(
+            df,
+            {
+                "0029600442": [
+                    {"action": "move_before", "event_num": 2, "anchor_event_num": 99},
+                ]
+            },
+            strict_lookup=True,
+        )
+
+
+def test_apply_pbp_row_overrides_strict_lookup_rejects_existing_synthetic_event():
+    df = _game_df([1, 2, 3])
+
+    with pytest.raises(ValueError, match="cannot insert"):
+        apply_pbp_row_overrides(
+            df,
+            {
+                "0029600442": [
+                    {
+                        "action": "insert_sub_before",
+                        "event_num": 2,
+                        "anchor_event_num": 3,
+                        "player_out_id": "1",
+                        "player_out_name": "Out",
+                        "player_in_id": "2",
+                        "player_in_name": "In",
+                    },
+                ]
+            },
+            strict_lookup=True,
+        )
+
+
 def test_normalize_game_id_preserves_plain_digit_strings():
     assert normalize_game_id("0020400335") == "0020400335"
     assert normalize_game_id("29600442.0") == "0029600442"

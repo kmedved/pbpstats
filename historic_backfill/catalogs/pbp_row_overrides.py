@@ -30,5 +30,7 @@ def apply_pbp_row_overrides(
     overrides: Dict[str, List[dict]] | None = None,
 ) -> pd.DataFrame:
     if overrides is not None:
-        return apply_pbp_row_overrides_with_catalog(game_df, overrides)
+        return apply_pbp_row_overrides_with_catalog(
+            game_df, overrides, strict_lookup=True
+        )
     return apply_historic_pbp_row_overrides(game_df)

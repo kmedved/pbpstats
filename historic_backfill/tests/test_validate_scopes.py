@@ -71,7 +71,9 @@ def test_core_validation_reports_invalid_catalogs(tmp_path):
     assert result.validation_errors
 
 
-def test_core_validation_reports_invalid_catalogs_even_when_nba_inputs_are_missing(tmp_path):
+def test_core_validation_reports_invalid_catalogs_even_when_nba_inputs_are_missing(
+    tmp_path,
+):
     _write_core_catalogs(tmp_path)
     (tmp_path / "catalogs" / "validation_overrides.csv").write_text(
         "game_id\n",
@@ -83,19 +85,39 @@ def test_core_validation_reports_invalid_catalogs_even_when_nba_inputs_are_missi
     assert result.ok is False
     assert "data/nba_raw.db" in result.missing_required
     assert result.validation_errors
-    assert any("validation_overrides.csv" in error for error in result.validation_errors)
+    assert any(
+        "validation_overrides.csv" in error for error in result.validation_errors
+    )
 
 
 @pytest.mark.parametrize(
     ("rel_path", "bad_contents"),
     [
         ("catalogs/pbp_stat_overrides.csv", "game_id\n"),
+        (
+            "catalogs/pbp_stat_overrides.csv",
+            "game_id,team_id,player_id,stat_key,stat_value,notes\n"
+            "0029600332,team,769,UnknownDistance2ptDefRebounds,1,bad team\n",
+        ),
         ("catalogs/validation_overrides.csv", "game_id\n"),
+        (
+            "catalogs/validation_overrides.csv",
+            "game_id,action,tolerance,notes\n" "29600370,teleport,5,bad action\n",
+        ),
+        (
+            "catalogs/validation_overrides.csv",
+            "game_id,action,tolerance,notes\n" "29600370,allow,-1,bad tolerance\n",
+        ),
         ("catalogs/overrides/correction_manifest.json", "{not json\n"),
-        ("catalogs/overrides/correction_manifest.json", '{"manifest_version": "test"}\n'),
+        (
+            "catalogs/overrides/correction_manifest.json",
+            '{"manifest_version": "test"}\n',
+        ),
     ],
 )
-def test_core_validation_reports_invalid_non_pbp_row_catalogs(tmp_path, rel_path, bad_contents):
+def test_core_validation_reports_invalid_non_pbp_row_catalogs(
+    tmp_path, rel_path, bad_contents
+):
     for input_path in (
         "data/nba_raw.db",
         "data/playbyplayv2.parq",
@@ -147,7 +169,9 @@ def test_core_validation_reports_invalid_correction_manifest_semantics(tmp_path)
     result = validate_scope("core", root=tmp_path)
 
     assert result.ok is False
-    assert any("does not resolve to 5 players" in error for error in result.validation_errors)
+    assert any(
+        "does not resolve to 5 players" in error for error in result.validation_errors
+    )
 
 
 def test_cross_source_validation_skips_missing_optional_inputs(tmp_path):
