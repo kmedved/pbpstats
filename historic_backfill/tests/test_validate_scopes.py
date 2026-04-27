@@ -73,6 +73,21 @@ def test_core_validation_reports_invalid_catalogs(tmp_path):
     assert result.validation_errors
 
 
+def test_core_validation_reports_invalid_catalogs_even_when_nba_inputs_are_missing(tmp_path):
+    _write_core_catalogs(tmp_path)
+    (tmp_path / "catalogs" / "validation_overrides.csv").write_text(
+        "game_id\n",
+        encoding="utf-8",
+    )
+
+    result = validate_scope("core", root=tmp_path)
+
+    assert result.ok is False
+    assert "data/nba_raw.db" in result.missing_required
+    assert result.validation_errors
+    assert any("validation_overrides.csv" in error for error in result.validation_errors)
+
+
 @pytest.mark.parametrize(
     ("rel_path", "bad_contents"),
     [

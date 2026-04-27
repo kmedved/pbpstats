@@ -97,24 +97,29 @@ def _validate_json_keys(path: Path, required_keys: set[str]) -> None:
 
 def _validate_core_catalogs(root: Path) -> list[str]:
     validators = [
-        lambda: validate_historic_pbp_row_override_catalog(root / "catalogs" / "pbp_row_overrides.csv"),
-        lambda: _validate_csv_columns(
+        (
+            root / "catalogs" / "pbp_row_overrides.csv",
+            lambda path: validate_historic_pbp_row_override_catalog(path),
+        ),
+        (
             root / "catalogs" / "pbp_stat_overrides.csv",
-            PBP_STAT_OVERRIDE_REQUIRED_COLUMNS,
+            lambda path: _validate_csv_columns(path, PBP_STAT_OVERRIDE_REQUIRED_COLUMNS),
         ),
-        lambda: _validate_csv_columns(
+        (
             root / "catalogs" / "validation_overrides.csv",
-            VALIDATION_OVERRIDE_REQUIRED_COLUMNS,
+            lambda path: _validate_csv_columns(path, VALIDATION_OVERRIDE_REQUIRED_COLUMNS),
         ),
-        lambda: _validate_json_keys(
+        (
             root / "catalogs" / "overrides" / "correction_manifest.json",
-            CORRECTION_MANIFEST_REQUIRED_KEYS,
+            lambda path: _validate_json_keys(path, CORRECTION_MANIFEST_REQUIRED_KEYS),
         ),
     ]
     errors: list[str] = []
-    for validator in validators:
+    for path, validator in validators:
+        if not path.exists():
+            continue
         try:
-            validator()
+            validator(path)
         except Exception as exc:  # noqa: BLE001 - CLI preflight should report catalog errors plainly.
             errors.append(str(exc))
     return errors
@@ -124,7 +129,7 @@ def validate_scope(scope: str, root: Path = ROOT) -> ValidationResult:
     root = root.resolve()
     if scope == "core":
         missing_required = _missing(root, (*CORE_INPUTS, *CORE_CATALOG_INPUTS))
-        validation_errors = [] if missing_required else _validate_core_catalogs(root)
+        validation_errors = _validate_core_catalogs(root)
         return ValidationResult(
             scope=scope,
             ok=not missing_required and not validation_errors,
