@@ -130,6 +130,7 @@ For implementation work, still provide raw source of the files you expect to edi
 - `pbpstats/offline/__init__.py`
 - `pbpstats/offline/ordering.py`
 - `pbpstats/offline/processor.py`
+- `pbpstats/offline/row_overrides.py`
 
 ## pbpstats/resources
 - `pbpstats/resources/__init__.py`
@@ -239,6 +240,7 @@ For implementation work, still provide raw source of the files you expect to edi
 - `tests/test_offline_boxscore_loader.py`
 - `tests/test_offline_ordering.py`
 - `tests/test_offline_repair.py`
+- `tests/test_offline_row_overrides.py`
 - `tests/test_period_starters_carryover.py`
 - `tests/test_replace_tpdev_compatibility_smoke.py`
 - `tests/test_shot_clock.py`
