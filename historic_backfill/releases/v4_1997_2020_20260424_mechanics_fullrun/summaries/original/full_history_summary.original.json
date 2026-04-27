@@ -1,0 +1,2233 @@
+{
+  "seasons_requested": [
+    1997,
+    1998,
+    1999,
+    2000,
+    2001,
+    2002,
+    2003,
+    2004,
+    2005,
+    2006,
+    2007,
+    2008,
+    2009,
+    2010,
+    2011,
+    2012,
+    2013,
+    2014,
+    2015,
+    2016,
+    2017,
+    2018,
+    2019,
+    2020
+  ],
+  "seasons_completed": [
+    1997,
+    1998,
+    1999,
+    2000,
+    2001,
+    2002,
+    2003,
+    2004,
+    2005,
+    2006,
+    2007,
+    2008,
+    2009,
+    2010,
+    2011,
+    2012,
+    2013,
+    2014,
+    2015,
+    2016,
+    2017,
+    2018,
+    2019,
+    2020
+  ],
+  "player_rows": 681578,
+  "failed_games": 0,
+  "event_stats_errors": 0,
+  "strict_mode": false,
+  "tolerance": 2,
+  "max_workers": 12,
+  "run_boxscore_audit": true,
+  "audit_profile": "full",
+  "runtime_input_cache_mode": "fresh-copy",
+  "runtime_input_provenance_path": "/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/full_history_1997_2020_20260424_mechanics_fullrun_v4/runtime_input_provenance.json",
+  "runtime_file_directory": "/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/full_history_1997_2020_20260424_mechanics_fullrun_v4/_local_runtime_file_directory",
+  "timings": {
+    "runtime_input_prep_seconds": 0.856662,
+    "namespace_load_seconds": 1.128131,
+    "total_wall_seconds": 5033.081513
+  },
+  "resource_usage": {
+    "peak_rss_mb": 2646.766
+  },
+  "seasons": [
+    {
+      "season": 1997,
+      "player_rows": 27687,
+      "failed_games": 0,
+      "event_stats_errors": 0,
+      "strict_mode": false,
+      "tolerance": 2,
+      "boxscore_audit": {
+        "season": 1997,
+        "games_requested": 1261,
+        "games_audited": 1261,
+        "audit_failures": 0,
+        "games_with_team_mismatch": 1,
+        "team_rows_with_mismatch": 1,
+        "games_with_player_mismatch": 1,
+        "player_rows_with_mismatch": 1,
+        "team_mismatch_counts_by_stat": {
+          "PTS": 0,
+          "AST": 0,
+          "STL": 0,
+          "BLK": 0,
+          "TOV": 0,
+          "PF": 0,
+          "FGA": 0,
+          "FGM": 0,
+          "3PA": 0,
+          "3PM": 0,
+          "FTA": 0,
+          "FTM": 0,
+          "OREB": 1,
+          "DRB": 0,
+          "REB": 1
+        },
+        "player_mismatch_counts_by_stat": {
+          "PTS": 0,
+          "AST": 0,
+          "STL": 0,
+          "BLK": 0,
+          "TOV": 0,
+          "PF": 0,
+          "FGA": 0,
+          "FGM": 0,
+          "3PA": 0,
+          "3PM": 0,
+          "FTA": 0,
+          "FTM": 0,
+          "OREB": 1,
+          "DRB": 0,
+          "REB": 1
+        }
+      },
+      "lineup_audit": {
+        "minutes_plus_minus": {
+          "rows": 25171,
+          "minutes_mismatches": 62,
+          "minutes_outliers": 12,
+          "plus_minus_mismatches": 199,
+          "minutes_outlier_threshold": 0.5
+        },
+        "problem_games": 61,
+        "event_on_court": {
+          "games": 61,
+          "issue_rows": 9,
+          "issue_games": 3,
+          "status_counts": {
+            "off_court_event_credit": 9
+          }
+        },
+        "timings": {
+          "minutes_audit_seconds": 1.579058,
+          "event_on_court_seconds": 20.114443,
+          "total_wall_seconds": 21.769846
+        },
+        "resource_usage": {
+          "peak_rss_mb": 1771.484
+        }
+      },
+      "timings": {
+        "pbp_load_seconds": 1.195129,
+        "game_processing_seconds": 200.602785,
+        "parquet_write_seconds": 0.070685,
+        "error_write_seconds": 1.4e-05,
+        "rebound_export_seconds": 0.00227,
+        "boxscore_audit_seconds": 0.028665,
+        "total_wall_seconds": 223.749383,
+        "lineup_audit_seconds": 21.769846
+      },
+      "resource_usage": {
+        "peak_rss_mb": 1373.734
+      }
+    },
+    {
+      "season": 1998,
+      "player_rows": 27936,
+      "failed_games": 0,
+      "event_stats_errors": 0,
+      "strict_mode": false,
+      "tolerance": 2,
+      "boxscore_audit": {
+        "season": 1998,
+        "games_requested": 1260,
+        "games_audited": 1260,
+        "audit_failures": 0,
+        "games_with_team_mismatch": 0,
+        "team_rows_with_mismatch": 0,
+        "games_with_player_mismatch": 0,
+        "player_rows_with_mismatch": 0,
+        "team_mismatch_counts_by_stat": {
+          "PTS": 0,
+          "AST": 0,
+          "STL": 0,
+          "BLK": 0,
+          "TOV": 0,
+          "PF": 0,
+          "FGA": 0,
+          "FGM": 0,
+          "3PA": 0,
+          "3PM": 0,
+          "FTA": 0,
+          "FTM": 0,
+          "OREB": 0,
+          "DRB": 0,
+          "REB": 0
+        },
+        "player_mismatch_counts_by_stat": {
+          "PTS": 0,
+          "AST": 0,
+          "STL": 0,
+          "BLK": 0,
+          "TOV": 0,
+          "PF": 0,
+          "FGA": 0,
+          "FGM": 0,
+          "3PA": 0,
+          "3PM": 0,
+          "FTA": 0,
+          "FTM": 0,
+          "OREB": 0,
+          "DRB": 0,
+          "REB": 0
+        }
+      },
+      "lineup_audit": {
+        "minutes_plus_minus": {
+          "rows": 25425,
+          "minutes_mismatches": 18,
+          "minutes_outliers": 6,
+          "plus_minus_mismatches": 103,
+          "minutes_outlier_threshold": 0.5
+        },
+        "problem_games": 37,
+        "event_on_court": {
+          "games": 37,
+          "issue_rows": 29,
+          "issue_games": 5,
+          "status_counts": {
+            "sub_out_player_missing_from_previous_lineup": 1,
+            "off_court_event_credit": 28
+          }
+        },
+        "timings": {
+          "minutes_audit_seconds": 1.567492,
+          "event_on_court_seconds": 13.834846,
+          "total_wall_seconds": 15.490061
+        },
+        "resource_usage": {
+          "peak_rss_mb": 2375.531
+        }
+      },
+      "timings": {
+        "pbp_load_seconds": 1.272559,
+        "game_processing_seconds": 198.027723,
+        "parquet_write_seconds": 0.071588,
+        "error_write_seconds": 9e-06,
+        "rebound_export_seconds": 2e-06,
+        "boxscore_audit_seconds": 0.029136,
+        "total_wall_seconds": 214.969343,
+        "lineup_audit_seconds": 15.490061
+      },
+      "resource_usage": {
+        "peak_rss_mb": 2375.531
+      }
+    },
+    {
+      "season": 1999,
+      "player_rows": 17840,
+      "failed_games": 0,
+      "event_stats_errors": 0,
+      "strict_mode": false,
+      "tolerance": 2,
+      "boxscore_audit": {
+        "season": 1999,
+        "games_requested": 791,
+        "games_audited": 791,
+        "audit_failures": 0,
+        "games_with_team_mismatch": 0,
+        "team_rows_with_mismatch": 0,
+        "games_with_player_mismatch": 0,
+        "player_rows_with_mismatch": 0,
+        "team_mismatch_counts_by_stat": {
+          "PTS": 0,
+          "AST": 0,
+          "STL": 0,
+          "BLK": 0,
+          "TOV": 0,
+          "PF": 0,
+          "FGA": 0,
+          "FGM": 0,
+          "3PA": 0,
+          "3PM": 0,
+          "FTA": 0,
+          "FTM": 0,
+          "OREB": 0,
+          "DRB": 0,
+          "REB": 0
+        },
+        "player_mismatch_counts_by_stat": {
+          "PTS": 0,
+          "AST": 0,
+          "STL": 0,
+          "BLK": 0,
+          "TOV": 0,
+          "PF": 0,
+          "FGA": 0,
+          "FGM": 0,
+          "3PA": 0,
+          "3PM": 0,
+          "FTA": 0,
+          "FTM": 0,
+          "OREB": 0,
+          "DRB": 0,
+          "REB": 0
+        }
+      },
+      "lineup_audit": {
+        "minutes_plus_minus": {
+          "rows": 16263,
+          "minutes_mismatches": 28,
+          "minutes_outliers": 2,
+          "plus_minus_mismatches": 48,
+          "minutes_outlier_threshold": 0.5
+        },
+        "problem_games": 17,
+        "event_on_court": {
+          "games": 17,
+          "issue_rows": 5,
+          "issue_games": 3,
+          "status_counts": {
+            "off_court_event_credit": 5
+          }
+        },
+        "timings": {
+          "minutes_audit_seconds": 1.015315,
+          "event_on_court_seconds": 6.098984,
+          "total_wall_seconds": 7.164979
+        },
+        "resource_usage": {
+          "peak_rss_mb": 2494.953
+        }
+      },
+      "timings": {
+        "pbp_load_seconds": 0.790766,
+        "game_processing_seconds": 123.252986,
+        "parquet_write_seconds": 0.054119,
+        "error_write_seconds": 1.7e-05,
+        "rebound_export_seconds": 0.001059,
+        "boxscore_audit_seconds": 0.019223,
+        "total_wall_seconds": 131.338443,
+        "lineup_audit_seconds": 7.164979
+      },
+      "resource_usage": {
+        "peak_rss_mb": 2494.953
+      }
+    },
+    {
+      "season": 2000,
+      "player_rows": 28292,
+      "failed_games": 0,
+      "event_stats_errors": 0,
+      "strict_mode": false,
+      "tolerance": 2,
+      "boxscore_audit": {
+        "season": 2000,
+        "games_requested": 1264,
+        "games_audited": 1264,
+        "audit_failures": 0,
+        "games_with_team_mismatch": 0,
+        "team_rows_with_mismatch": 0,
+        "games_with_player_mismatch": 0,
+        "player_rows_with_mismatch": 0,
+        "team_mismatch_counts_by_stat": {
+          "PTS": 0,
+          "AST": 0,
+          "STL": 0,
+          "BLK": 0,
+          "TOV": 0,
+          "PF": 0,
+          "FGA": 0,
+          "FGM": 0,
+          "3PA": 0,
+          "3PM": 0,
+          "FTA": 0,
+          "FTM": 0,
+          "OREB": 0,
+          "DRB": 0,
+          "REB": 0
+        },
+        "player_mismatch_counts_by_stat": {
+          "PTS": 0,
+          "AST": 0,
+          "STL": 0,
+          "BLK": 0,
+          "TOV": 0,
+          "PF": 0,
+          "FGA": 0,
+          "FGM": 0,
+          "3PA": 0,
+          "3PM": 0,
+          "FTA": 0,
+          "FTM": 0,
+          "OREB": 0,
+          "DRB": 0,
+          "REB": 0
+        }
+      },
+      "lineup_audit": {
+        "minutes_plus_minus": {
+          "rows": 25773,
+          "minutes_mismatches": 14,
+          "minutes_outliers": 0,
+          "plus_minus_mismatches": 66,
+          "minutes_outlier_threshold": 0.5
+        },
+        "problem_games": 30,
+        "event_on_court": {
+          "games": 30,
+          "issue_rows": 2,
+          "issue_games": 2,
+          "status_counts": {
+            "off_court_event_credit": 2
+          }
+        },
+        "timings": {
+          "minutes_audit_seconds": 1.614239,
+          "event_on_court_seconds": 10.826299,
+          "total_wall_seconds": 12.519
+        },
+        "resource_usage": {
+          "peak_rss_mb": 2494.953
+        }
+      },
+      "timings": {
+        "pbp_load_seconds": 1.244408,
+        "game_processing_seconds": 197.642106,
+        "parquet_write_seconds": 0.074315,
+        "error_write_seconds": 1.1e-05,
+        "rebound_export_seconds": 0.00131,
+        "boxscore_audit_seconds": 0.029914,
+        "total_wall_seconds": 211.594067,
+        "lineup_audit_seconds": 12.519
+      },
+      "resource_usage": {
+        "peak_rss_mb": 2494.953
+      }
+    },
+    {
+      "season": 2001,
+      "player_rows": 27877,
+      "failed_games": 0,
+      "event_stats_errors": 0,
+      "strict_mode": false,
+      "tolerance": 2,
+      "boxscore_audit": {
+        "season": 2001,
+        "games_requested": 1260,
+        "games_audited": 1260,
+        "audit_failures": 0,
+        "games_with_team_mismatch": 0,
+        "team_rows_with_mismatch": 0,
+        "games_with_player_mismatch": 0,
+        "player_rows_with_mismatch": 0,
+        "team_mismatch_counts_by_stat": {
+          "PTS": 0,
+          "AST": 0,
+          "STL": 0,
+          "BLK": 0,
+          "TOV": 0,
+          "PF": 0,
+          "FGA": 0,
+          "FGM": 0,
+          "3PA": 0,
+          "3PM": 0,
+          "FTA": 0,
+          "FTM": 0,
+          "OREB": 0,
+          "DRB": 0,
+          "REB": 0
+        },
+        "player_mismatch_counts_by_stat": {
+          "PTS": 0,
+          "AST": 0,
+          "STL": 0,
+          "BLK": 0,
+          "TOV": 0,
+          "PF": 0,
+          "FGA": 0,
+          "FGM": 0,
+          "3PA": 0,
+          "3PM": 0,
+          "FTA": 0,
+          "FTM": 0,
+          "OREB": 0,
+          "DRB": 0,
+          "REB": 0
+        }
+      },
+      "lineup_audit": {
+        "minutes_plus_minus": {
+          "rows": 25368,
+          "minutes_mismatches": 1,
+          "minutes_outliers": 0,
+          "plus_minus_mismatches": 104,
+          "minutes_outlier_threshold": 0.5
+        },
+        "problem_games": 38,
+        "event_on_court": {
+          "games": 38,
+          "issue_rows": 0,
+          "issue_games": 0,
+          "status_counts": {}
+        },
+        "timings": {
+          "minutes_audit_seconds": 1.603132,
+          "event_on_court_seconds": 12.969404,
+          "total_wall_seconds": 14.64986
+        },
+        "resource_usage": {
+          "peak_rss_mb": 2522.328
+        }
+      },
+      "timings": {
+        "pbp_load_seconds": 1.332424,
+        "game_processing_seconds": 194.749275,
+        "parquet_write_seconds": 0.073297,
+        "error_write_seconds": 1.5e-05,
+        "rebound_export_seconds": 0.000939,
+        "boxscore_audit_seconds": 0.029178,
+        "total_wall_seconds": 210.920866,
+        "lineup_audit_seconds": 14.64986
+      },
+      "resource_usage": {
+        "peak_rss_mb": 2522.328
+      }
+    },
+    {
+      "season": 2002,
+      "player_rows": 27787,
+      "failed_games": 0,
+      "event_stats_errors": 0,
+      "strict_mode": false,
+      "tolerance": 2,
+      "boxscore_audit": {
+        "season": 2002,
+        "games_requested": 1260,
+        "games_audited": 1260,
+        "audit_failures": 0,
+        "games_with_team_mismatch": 0,
+        "team_rows_with_mismatch": 0,
+        "games_with_player_mismatch": 0,
+        "player_rows_with_mismatch": 0,
+        "team_mismatch_counts_by_stat": {
+          "PTS": 0,
+          "AST": 0,
+          "STL": 0,
+          "BLK": 0,
+          "TOV": 0,
+          "PF": 0,
+          "FGA": 0,
+          "FGM": 0,
+          "3PA": 0,
+          "3PM": 0,
+          "FTA": 0,
+          "FTM": 0,
+          "OREB": 0,
+          "DRB": 0,
+          "REB": 0
+        },
+        "player_mismatch_counts_by_stat": {
+          "PTS": 0,
+          "AST": 0,
+          "STL": 0,
+          "BLK": 0,
+          "TOV": 0,
+          "PF": 0,
+          "FGA": 0,
+          "FGM": 0,
+          "3PA": 0,
+          "3PM": 0,
+          "FTA": 0,
+          "FTM": 0,
+          "OREB": 0,
+          "DRB": 0,
+          "REB": 0
+        }
+      },
+      "lineup_audit": {
+        "minutes_plus_minus": {
+          "rows": 25277,
+          "minutes_mismatches": 1,
+          "minutes_outliers": 0,
+          "plus_minus_mismatches": 52,
+          "minutes_outlier_threshold": 0.5
+        },
+        "problem_games": 22,
+        "event_on_court": {
+          "games": 22,
+          "issue_rows": 3,
+          "issue_games": 1,
+          "status_counts": {
+            "sub_out_player_missing_from_previous_lineup": 2,
+            "sub_in_player_missing_from_current_lineup": 1
+          }
+        },
+        "timings": {
+          "minutes_audit_seconds": 1.574731,
+          "event_on_court_seconds": 7.695638,
+          "total_wall_seconds": 9.348262
+        },
+        "resource_usage": {
+          "peak_rss_mb": 2522.328
+        }
+      },
+      "timings": {
+        "pbp_load_seconds": 1.25349,
+        "game_processing_seconds": 194.123058,
+        "parquet_write_seconds": 0.071023,
+        "error_write_seconds": 1.2e-05,
+        "rebound_export_seconds": 0.00089,
+        "boxscore_audit_seconds": 0.029899,
+        "total_wall_seconds": 204.910538,
+        "lineup_audit_seconds": 9.348262
+      },
+      "resource_usage": {
+        "peak_rss_mb": 2522.328
+      }
+    },
+    {
+      "season": 2003,
+      "player_rows": 28243,
+      "failed_games": 0,
+      "event_stats_errors": 0,
+      "strict_mode": false,
+      "tolerance": 2,
+      "boxscore_audit": {
+        "season": 2003,
+        "games_requested": 1277,
+        "games_audited": 1277,
+        "audit_failures": 0,
+        "games_with_team_mismatch": 0,
+        "team_rows_with_mismatch": 0,
+        "games_with_player_mismatch": 0,
+        "player_rows_with_mismatch": 0,
+        "team_mismatch_counts_by_stat": {
+          "PTS": 0,
+          "AST": 0,
+          "STL": 0,
+          "BLK": 0,
+          "TOV": 0,
+          "PF": 0,
+          "FGA": 0,
+          "FGM": 0,
+          "3PA": 0,
+          "3PM": 0,
+          "FTA": 0,
+          "FTM": 0,
+          "OREB": 0,
+          "DRB": 0,
+          "REB": 0
+        },
+        "player_mismatch_counts_by_stat": {
+          "PTS": 0,
+          "AST": 0,
+          "STL": 0,
+          "BLK": 0,
+          "TOV": 0,
+          "PF": 0,
+          "FGA": 0,
+          "FGM": 0,
+          "3PA": 0,
+          "3PM": 0,
+          "FTA": 0,
+          "FTM": 0,
+          "OREB": 0,
+          "DRB": 0,
+          "REB": 0
+        }
+      },
+      "lineup_audit": {
+        "minutes_plus_minus": {
+          "rows": 25706,
+          "minutes_mismatches": 1,
+          "minutes_outliers": 0,
+          "plus_minus_mismatches": 104,
+          "minutes_outlier_threshold": 0.5
+        },
+        "problem_games": 38,
+        "event_on_court": {
+          "games": 38,
+          "issue_rows": 0,
+          "issue_games": 0,
+          "status_counts": {}
+        },
+        "timings": {
+          "minutes_audit_seconds": 1.611102,
+          "event_on_court_seconds": 12.576818,
+          "total_wall_seconds": 14.266163
+        },
+        "resource_usage": {
+          "peak_rss_mb": 2522.328
+        }
+      },
+      "timings": {
+        "pbp_load_seconds": 1.224062,
+        "game_processing_seconds": 196.877616,
+        "parquet_write_seconds": 0.072052,
+        "error_write_seconds": 1e-05,
+        "rebound_export_seconds": 0.001032,
+        "boxscore_audit_seconds": 0.029371,
+        "total_wall_seconds": 212.556713,
+        "lineup_audit_seconds": 14.266163
+      },
+      "resource_usage": {
+        "peak_rss_mb": 2522.328
+      }
+    },
+    {
+      "season": 2004,
+      "player_rows": 28078,
+      "failed_games": 0,
+      "event_stats_errors": 0,
+      "strict_mode": false,
+      "tolerance": 2,
+      "boxscore_audit": {
+        "season": 2004,
+        "games_requested": 1271,
+        "games_audited": 1271,
+        "audit_failures": 0,
+        "games_with_team_mismatch": 0,
+        "team_rows_with_mismatch": 0,
+        "games_with_player_mismatch": 0,
+        "player_rows_with_mismatch": 0,
+        "team_mismatch_counts_by_stat": {
+          "PTS": 0,
+          "AST": 0,
+          "STL": 0,
+          "BLK": 0,
+          "TOV": 0,
+          "PF": 0,
+          "FGA": 0,
+          "FGM": 0,
+          "3PA": 0,
+          "3PM": 0,
+          "FTA": 0,
+          "FTM": 0,
+          "OREB": 0,
+          "DRB": 0,
+          "REB": 0
+        },
+        "player_mismatch_counts_by_stat": {
+          "PTS": 0,
+          "AST": 0,
+          "STL": 0,
+          "BLK": 0,
+          "TOV": 0,
+          "PF": 0,
+          "FGA": 0,
+          "FGM": 0,
+          "3PA": 0,
+          "3PM": 0,
+          "FTA": 0,
+          "FTM": 0,
+          "OREB": 0,
+          "DRB": 0,
+          "REB": 0
+        }
+      },
+      "lineup_audit": {
+        "minutes_plus_minus": {
+          "rows": 25550,
+          "minutes_mismatches": 23,
+          "minutes_outliers": 0,
+          "plus_minus_mismatches": 101,
+          "minutes_outlier_threshold": 0.5
+        },
+        "problem_games": 29,
+        "event_on_court": {
+          "games": 29,
+          "issue_rows": 1,
+          "issue_games": 1,
+          "status_counts": {
+            "sub_out_player_missing_from_previous_lineup": 1
+          }
+        },
+        "timings": {
+          "minutes_audit_seconds": 1.61901,
+          "event_on_court_seconds": 9.989654,
+          "total_wall_seconds": 11.687152
+        },
+        "resource_usage": {
+          "peak_rss_mb": 2522.328
+        }
+      },
+      "timings": {
+        "pbp_load_seconds": 1.264033,
+        "game_processing_seconds": 195.617102,
+        "parquet_write_seconds": 0.072255,
+        "error_write_seconds": 1.4e-05,
+        "rebound_export_seconds": 2e-06,
+        "boxscore_audit_seconds": 0.030945,
+        "total_wall_seconds": 208.757977,
+        "lineup_audit_seconds": 11.687152
+      },
+      "resource_usage": {
+        "peak_rss_mb": 2522.328
+      }
+    },
+    {
+      "season": 2005,
+      "player_rows": 29219,
+      "failed_games": 0,
+      "event_stats_errors": 0,
+      "strict_mode": false,
+      "tolerance": 2,
+      "boxscore_audit": {
+        "season": 2005,
+        "games_requested": 1314,
+        "games_audited": 1314,
+        "audit_failures": 0,
+        "games_with_team_mismatch": 0,
+        "team_rows_with_mismatch": 0,
+        "games_with_player_mismatch": 0,
+        "player_rows_with_mismatch": 0,
+        "team_mismatch_counts_by_stat": {
+          "PTS": 0,
+          "AST": 0,
+          "STL": 0,
+          "BLK": 0,
+          "TOV": 0,
+          "PF": 0,
+          "FGA": 0,
+          "FGM": 0,
+          "3PA": 0,
+          "3PM": 0,
+          "FTA": 0,
+          "FTM": 0,
+          "OREB": 0,
+          "DRB": 0,
+          "REB": 0
+        },
+        "player_mismatch_counts_by_stat": {
+          "PTS": 0,
+          "AST": 0,
+          "STL": 0,
+          "BLK": 0,
+          "TOV": 0,
+          "PF": 0,
+          "FGA": 0,
+          "FGM": 0,
+          "3PA": 0,
+          "3PM": 0,
+          "FTA": 0,
+          "FTM": 0,
+          "OREB": 0,
+          "DRB": 0,
+          "REB": 0
+        }
+      },
+      "lineup_audit": {
+        "minutes_plus_minus": {
+          "rows": 26604,
+          "minutes_mismatches": 5,
+          "minutes_outliers": 2,
+          "plus_minus_mismatches": 96,
+          "minutes_outlier_threshold": 0.5
+        },
+        "problem_games": 40,
+        "event_on_court": {
+          "games": 40,
+          "issue_rows": 1,
+          "issue_games": 1,
+          "status_counts": {
+            "off_court_event_credit": 1
+          }
+        },
+        "timings": {
+          "minutes_audit_seconds": 1.650548,
+          "event_on_court_seconds": 13.825935,
+          "total_wall_seconds": 15.555929
+        },
+        "resource_usage": {
+          "peak_rss_mb": 2522.328
+        }
+      },
+      "timings": {
+        "pbp_load_seconds": 1.267164,
+        "game_processing_seconds": 204.055795,
+        "parquet_write_seconds": 0.074319,
+        "error_write_seconds": 2.2e-05,
+        "rebound_export_seconds": 0.001621,
+        "boxscore_audit_seconds": 0.032434,
+        "total_wall_seconds": 221.080927,
+        "lineup_audit_seconds": 15.555929
+      },
+      "resource_usage": {
+        "peak_rss_mb": 2522.328
+      }
+    },
+    {
+      "season": 2006,
+      "player_rows": 29251,
+      "failed_games": 0,
+      "event_stats_errors": 0,
+      "strict_mode": false,
+      "tolerance": 2,
+      "boxscore_audit": {
+        "season": 2006,
+        "games_requested": 1319,
+        "games_audited": 1319,
+        "audit_failures": 0,
+        "games_with_team_mismatch": 0,
+        "team_rows_with_mismatch": 0,
+        "games_with_player_mismatch": 0,
+        "player_rows_with_mismatch": 0,
+        "team_mismatch_counts_by_stat": {
+          "PTS": 0,
+          "AST": 0,
+          "STL": 0,
+          "BLK": 0,
+          "TOV": 0,
+          "PF": 0,
+          "FGA": 0,
+          "FGM": 0,
+          "3PA": 0,
+          "3PM": 0,
+          "FTA": 0,
+          "FTM": 0,
+          "OREB": 0,
+          "DRB": 0,
+          "REB": 0
+        },
+        "player_mismatch_counts_by_stat": {
+          "PTS": 0,
+          "AST": 0,
+          "STL": 0,
+          "BLK": 0,
+          "TOV": 0,
+          "PF": 0,
+          "FGA": 0,
+          "FGM": 0,
+          "3PA": 0,
+          "3PM": 0,
+          "FTA": 0,
+          "FTM": 0,
+          "OREB": 0,
+          "DRB": 0,
+          "REB": 0
+        }
+      },
+      "lineup_audit": {
+        "minutes_plus_minus": {
+          "rows": 26640,
+          "minutes_mismatches": 1,
+          "minutes_outliers": 0,
+          "plus_minus_mismatches": 58,
+          "minutes_outlier_threshold": 0.5
+        },
+        "problem_games": 17,
+        "event_on_court": {
+          "games": 17,
+          "issue_rows": 0,
+          "issue_games": 0,
+          "status_counts": {}
+        },
+        "timings": {
+          "minutes_audit_seconds": 1.697312,
+          "event_on_court_seconds": 7.073188,
+          "total_wall_seconds": 8.850522
+        },
+        "resource_usage": {
+          "peak_rss_mb": 2562.688
+        }
+      },
+      "timings": {
+        "pbp_load_seconds": 1.303546,
+        "game_processing_seconds": 201.931017,
+        "parquet_write_seconds": 0.074615,
+        "error_write_seconds": 1.4e-05,
+        "rebound_export_seconds": 2e-06,
+        "boxscore_audit_seconds": 0.031572,
+        "total_wall_seconds": 212.28882,
+        "lineup_audit_seconds": 8.850522
+      },
+      "resource_usage": {
+        "peak_rss_mb": 2562.688
+      }
+    },
+    {
+      "season": 2007,
+      "player_rows": 29254,
+      "failed_games": 0,
+      "event_stats_errors": 0,
+      "strict_mode": false,
+      "tolerance": 2,
+      "boxscore_audit": {
+        "season": 2007,
+        "games_requested": 1309,
+        "games_audited": 1309,
+        "audit_failures": 0,
+        "games_with_team_mismatch": 0,
+        "team_rows_with_mismatch": 0,
+        "games_with_player_mismatch": 0,
+        "player_rows_with_mismatch": 0,
+        "team_mismatch_counts_by_stat": {
+          "PTS": 0,
+          "AST": 0,
+          "STL": 0,
+          "BLK": 0,
+          "TOV": 0,
+          "PF": 0,
+          "FGA": 0,
+          "FGM": 0,
+          "3PA": 0,
+          "3PM": 0,
+          "FTA": 0,
+          "FTM": 0,
+          "OREB": 0,
+          "DRB": 0,
+          "REB": 0
+        },
+        "player_mismatch_counts_by_stat": {
+          "PTS": 0,
+          "AST": 0,
+          "STL": 0,
+          "BLK": 0,
+          "TOV": 0,
+          "PF": 0,
+          "FGA": 0,
+          "FGM": 0,
+          "3PA": 0,
+          "3PM": 0,
+          "FTA": 0,
+          "FTM": 0,
+          "OREB": 0,
+          "DRB": 0,
+          "REB": 0
+        }
+      },
+      "lineup_audit": {
+        "minutes_plus_minus": {
+          "rows": 26650,
+          "minutes_mismatches": 1,
+          "minutes_outliers": 0,
+          "plus_minus_mismatches": 58,
+          "minutes_outlier_threshold": 0.5
+        },
+        "problem_games": 26,
+        "event_on_court": {
+          "games": 26,
+          "issue_rows": 0,
+          "issue_games": 0,
+          "status_counts": {}
+        },
+        "timings": {
+          "minutes_audit_seconds": 1.673888,
+          "event_on_court_seconds": 9.59071,
+          "total_wall_seconds": 11.347264
+        },
+        "resource_usage": {
+          "peak_rss_mb": 2608.141
+        }
+      },
+      "timings": {
+        "pbp_load_seconds": 1.265544,
+        "game_processing_seconds": 201.581086,
+        "parquet_write_seconds": 0.072818,
+        "error_write_seconds": 1e-05,
+        "rebound_export_seconds": 0.00154,
+        "boxscore_audit_seconds": 0.032182,
+        "total_wall_seconds": 214.398984,
+        "lineup_audit_seconds": 11.347264
+      },
+      "resource_usage": {
+        "peak_rss_mb": 2608.141
+      }
+    },
+    {
+      "season": 2008,
+      "player_rows": 29261,
+      "failed_games": 0,
+      "event_stats_errors": 0,
+      "strict_mode": false,
+      "tolerance": 2,
+      "boxscore_audit": {
+        "season": 2008,
+        "games_requested": 1316,
+        "games_audited": 1316,
+        "audit_failures": 0,
+        "games_with_team_mismatch": 0,
+        "team_rows_with_mismatch": 0,
+        "games_with_player_mismatch": 0,
+        "player_rows_with_mismatch": 0,
+        "team_mismatch_counts_by_stat": {
+          "PTS": 0,
+          "AST": 0,
+          "STL": 0,
+          "BLK": 0,
+          "TOV": 0,
+          "PF": 0,
+          "FGA": 0,
+          "FGM": 0,
+          "3PA": 0,
+          "3PM": 0,
+          "FTA": 0,
+          "FTM": 0,
+          "OREB": 0,
+          "DRB": 0,
+          "REB": 0
+        },
+        "player_mismatch_counts_by_stat": {
+          "PTS": 0,
+          "AST": 0,
+          "STL": 0,
+          "BLK": 0,
+          "TOV": 0,
+          "PF": 0,
+          "FGA": 0,
+          "FGM": 0,
+          "3PA": 0,
+          "3PM": 0,
+          "FTA": 0,
+          "FTM": 0,
+          "OREB": 0,
+          "DRB": 0,
+          "REB": 0
+        }
+      },
+      "lineup_audit": {
+        "minutes_plus_minus": {
+          "rows": 26653,
+          "minutes_mismatches": 2,
+          "minutes_outliers": 0,
+          "plus_minus_mismatches": 82,
+          "minutes_outlier_threshold": 0.5
+        },
+        "problem_games": 29,
+        "event_on_court": {
+          "games": 29,
+          "issue_rows": 0,
+          "issue_games": 0,
+          "status_counts": {}
+        },
+        "timings": {
+          "minutes_audit_seconds": 1.714198,
+          "event_on_court_seconds": 10.552018,
+          "total_wall_seconds": 12.348302
+        },
+        "resource_usage": {
+          "peak_rss_mb": 2608.141
+        }
+      },
+      "timings": {
+        "pbp_load_seconds": 1.34342,
+        "game_processing_seconds": 201.92229,
+        "parquet_write_seconds": 0.077406,
+        "error_write_seconds": 1.2e-05,
+        "rebound_export_seconds": 2e-06,
+        "boxscore_audit_seconds": 0.031883,
+        "total_wall_seconds": 215.828978,
+        "lineup_audit_seconds": 12.348302
+      },
+      "resource_usage": {
+        "peak_rss_mb": 2608.141
+      }
+    },
+    {
+      "season": 2009,
+      "player_rows": 28971,
+      "failed_games": 0,
+      "event_stats_errors": 0,
+      "strict_mode": false,
+      "tolerance": 2,
+      "boxscore_audit": {
+        "season": 2009,
+        "games_requested": 1315,
+        "games_audited": 1315,
+        "audit_failures": 0,
+        "games_with_team_mismatch": 0,
+        "team_rows_with_mismatch": 0,
+        "games_with_player_mismatch": 0,
+        "player_rows_with_mismatch": 0,
+        "team_mismatch_counts_by_stat": {
+          "PTS": 0,
+          "AST": 0,
+          "STL": 0,
+          "BLK": 0,
+          "TOV": 0,
+          "PF": 0,
+          "FGA": 0,
+          "FGM": 0,
+          "3PA": 0,
+          "3PM": 0,
+          "FTA": 0,
+          "FTM": 0,
+          "OREB": 0,
+          "DRB": 0,
+          "REB": 0
+        },
+        "player_mismatch_counts_by_stat": {
+          "PTS": 0,
+          "AST": 0,
+          "STL": 0,
+          "BLK": 0,
+          "TOV": 0,
+          "PF": 0,
+          "FGA": 0,
+          "FGM": 0,
+          "3PA": 0,
+          "3PM": 0,
+          "FTA": 0,
+          "FTM": 0,
+          "OREB": 0,
+          "DRB": 0,
+          "REB": 0
+        }
+      },
+      "lineup_audit": {
+        "minutes_plus_minus": {
+          "rows": 26374,
+          "minutes_mismatches": 0,
+          "minutes_outliers": 0,
+          "plus_minus_mismatches": 88,
+          "minutes_outlier_threshold": 0.5
+        },
+        "problem_games": 22,
+        "event_on_court": {
+          "games": 22,
+          "issue_rows": 0,
+          "issue_games": 0,
+          "status_counts": {}
+        },
+        "timings": {
+          "minutes_audit_seconds": 1.687653,
+          "event_on_court_seconds": 7.754017,
+          "total_wall_seconds": 9.525938
+        },
+        "resource_usage": {
+          "peak_rss_mb": 2608.141
+        }
+      },
+      "timings": {
+        "pbp_load_seconds": 1.266896,
+        "game_processing_seconds": 201.273668,
+        "parquet_write_seconds": 0.074798,
+        "error_write_seconds": 1.2e-05,
+        "rebound_export_seconds": 0.000722,
+        "boxscore_audit_seconds": 0.030908,
+        "total_wall_seconds": 212.275447,
+        "lineup_audit_seconds": 9.525938
+      },
+      "resource_usage": {
+        "peak_rss_mb": 2608.141
+      }
+    },
+    {
+      "season": 2010,
+      "player_rows": 29078,
+      "failed_games": 0,
+      "event_stats_errors": 0,
+      "strict_mode": false,
+      "tolerance": 2,
+      "boxscore_audit": {
+        "season": 2010,
+        "games_requested": 1312,
+        "games_audited": 1312,
+        "audit_failures": 0,
+        "games_with_team_mismatch": 0,
+        "team_rows_with_mismatch": 0,
+        "games_with_player_mismatch": 0,
+        "player_rows_with_mismatch": 0,
+        "team_mismatch_counts_by_stat": {
+          "PTS": 0,
+          "AST": 0,
+          "STL": 0,
+          "BLK": 0,
+          "TOV": 0,
+          "PF": 0,
+          "FGA": 0,
+          "FGM": 0,
+          "3PA": 0,
+          "3PM": 0,
+          "FTA": 0,
+          "FTM": 0,
+          "OREB": 0,
+          "DRB": 0,
+          "REB": 0
+        },
+        "player_mismatch_counts_by_stat": {
+          "PTS": 0,
+          "AST": 0,
+          "STL": 0,
+          "BLK": 0,
+          "TOV": 0,
+          "PF": 0,
+          "FGA": 0,
+          "FGM": 0,
+          "3PA": 0,
+          "3PM": 0,
+          "FTA": 0,
+          "FTM": 0,
+          "OREB": 0,
+          "DRB": 0,
+          "REB": 0
+        }
+      },
+      "lineup_audit": {
+        "minutes_plus_minus": {
+          "rows": 26489,
+          "minutes_mismatches": 0,
+          "minutes_outliers": 0,
+          "plus_minus_mismatches": 101,
+          "minutes_outlier_threshold": 0.5
+        },
+        "problem_games": 35,
+        "event_on_court": {
+          "games": 35,
+          "issue_rows": 1,
+          "issue_games": 1,
+          "status_counts": {
+            "sub_out_player_missing_from_previous_lineup": 1
+          }
+        },
+        "timings": {
+          "minutes_audit_seconds": 1.679951,
+          "event_on_court_seconds": 12.179722,
+          "total_wall_seconds": 13.94049
+        },
+        "resource_usage": {
+          "peak_rss_mb": 2608.141
+        }
+      },
+      "timings": {
+        "pbp_load_seconds": 1.322951,
+        "game_processing_seconds": 200.549481,
+        "parquet_write_seconds": 0.074077,
+        "error_write_seconds": 1.1e-05,
+        "rebound_export_seconds": 2e-06,
+        "boxscore_audit_seconds": 0.031771,
+        "total_wall_seconds": 216.027405,
+        "lineup_audit_seconds": 13.94049
+      },
+      "resource_usage": {
+        "peak_rss_mb": 2608.141
+      }
+    },
+    {
+      "season": 2011,
+      "player_rows": 29370,
+      "failed_games": 0,
+      "event_stats_errors": 0,
+      "strict_mode": false,
+      "tolerance": 2,
+      "boxscore_audit": {
+        "season": 2011,
+        "games_requested": 1311,
+        "games_audited": 1311,
+        "audit_failures": 0,
+        "games_with_team_mismatch": 0,
+        "team_rows_with_mismatch": 0,
+        "games_with_player_mismatch": 0,
+        "player_rows_with_mismatch": 0,
+        "team_mismatch_counts_by_stat": {
+          "PTS": 0,
+          "AST": 0,
+          "STL": 0,
+          "BLK": 0,
+          "TOV": 0,
+          "PF": 0,
+          "FGA": 0,
+          "FGM": 0,
+          "3PA": 0,
+          "3PM": 0,
+          "FTA": 0,
+          "FTM": 0,
+          "OREB": 0,
+          "DRB": 0,
+          "REB": 0
+        },
+        "player_mismatch_counts_by_stat": {
+          "PTS": 0,
+          "AST": 0,
+          "STL": 0,
+          "BLK": 0,
+          "TOV": 0,
+          "PF": 0,
+          "FGA": 0,
+          "FGM": 0,
+          "3PA": 0,
+          "3PM": 0,
+          "FTA": 0,
+          "FTM": 0,
+          "OREB": 0,
+          "DRB": 0,
+          "REB": 0
+        }
+      },
+      "lineup_audit": {
+        "minutes_plus_minus": {
+          "rows": 26771,
+          "minutes_mismatches": 0,
+          "minutes_outliers": 0,
+          "plus_minus_mismatches": 82,
+          "minutes_outlier_threshold": 0.5
+        },
+        "problem_games": 31,
+        "event_on_court": {
+          "games": 31,
+          "issue_rows": 0,
+          "issue_games": 0,
+          "status_counts": {}
+        },
+        "timings": {
+          "minutes_audit_seconds": 1.668454,
+          "event_on_court_seconds": 10.99333,
+          "total_wall_seconds": 12.742941
+        },
+        "resource_usage": {
+          "peak_rss_mb": 2646.766
+        }
+      },
+      "timings": {
+        "pbp_load_seconds": 1.318618,
+        "game_processing_seconds": 201.644335,
+        "parquet_write_seconds": 0.075977,
+        "error_write_seconds": 1.1e-05,
+        "rebound_export_seconds": 2e-06,
+        "boxscore_audit_seconds": 0.030274,
+        "total_wall_seconds": 215.917712,
+        "lineup_audit_seconds": 12.742941
+      },
+      "resource_usage": {
+        "peak_rss_mb": 2646.766
+      }
+    },
+    {
+      "season": 2012,
+      "player_rows": 24640,
+      "failed_games": 0,
+      "event_stats_errors": 0,
+      "strict_mode": false,
+      "tolerance": 2,
+      "boxscore_audit": {
+        "season": 2012,
+        "games_requested": 1074,
+        "games_audited": 1074,
+        "audit_failures": 0,
+        "games_with_team_mismatch": 0,
+        "team_rows_with_mismatch": 0,
+        "games_with_player_mismatch": 0,
+        "player_rows_with_mismatch": 0,
+        "team_mismatch_counts_by_stat": {
+          "PTS": 0,
+          "AST": 0,
+          "STL": 0,
+          "BLK": 0,
+          "TOV": 0,
+          "PF": 0,
+          "FGA": 0,
+          "FGM": 0,
+          "3PA": 0,
+          "3PM": 0,
+          "FTA": 0,
+          "FTM": 0,
+          "OREB": 0,
+          "DRB": 0,
+          "REB": 0
+        },
+        "player_mismatch_counts_by_stat": {
+          "PTS": 0,
+          "AST": 0,
+          "STL": 0,
+          "BLK": 0,
+          "TOV": 0,
+          "PF": 0,
+          "FGA": 0,
+          "FGM": 0,
+          "3PA": 0,
+          "3PM": 0,
+          "FTA": 0,
+          "FTM": 0,
+          "OREB": 0,
+          "DRB": 0,
+          "REB": 0
+        }
+      },
+      "lineup_audit": {
+        "minutes_plus_minus": {
+          "rows": 22504,
+          "minutes_mismatches": 0,
+          "minutes_outliers": 0,
+          "plus_minus_mismatches": 16,
+          "minutes_outlier_threshold": 0.5
+        },
+        "problem_games": 8,
+        "event_on_court": {
+          "games": 8,
+          "issue_rows": 0,
+          "issue_games": 0,
+          "status_counts": {}
+        },
+        "timings": {
+          "minutes_audit_seconds": 1.371206,
+          "event_on_court_seconds": 3.558785,
+          "total_wall_seconds": 4.999286
+        },
+        "resource_usage": {
+          "peak_rss_mb": 2646.766
+        }
+      },
+      "timings": {
+        "pbp_load_seconds": 1.034966,
+        "game_processing_seconds": 164.208226,
+        "parquet_write_seconds": 0.066763,
+        "error_write_seconds": 2.6e-05,
+        "rebound_export_seconds": 3e-06,
+        "boxscore_audit_seconds": 0.026459,
+        "total_wall_seconds": 170.422036,
+        "lineup_audit_seconds": 4.999286
+      },
+      "resource_usage": {
+        "peak_rss_mb": 2646.766
+      }
+    },
+    {
+      "season": 2013,
+      "player_rows": 30134,
+      "failed_games": 0,
+      "event_stats_errors": 0,
+      "strict_mode": false,
+      "tolerance": 2,
+      "boxscore_audit": {
+        "season": 2013,
+        "games_requested": 1314,
+        "games_audited": 1314,
+        "audit_failures": 0,
+        "games_with_team_mismatch": 0,
+        "team_rows_with_mismatch": 0,
+        "games_with_player_mismatch": 0,
+        "player_rows_with_mismatch": 0,
+        "team_mismatch_counts_by_stat": {
+          "PTS": 0,
+          "AST": 0,
+          "STL": 0,
+          "BLK": 0,
+          "TOV": 0,
+          "PF": 0,
+          "FGA": 0,
+          "FGM": 0,
+          "3PA": 0,
+          "3PM": 0,
+          "FTA": 0,
+          "FTM": 0,
+          "OREB": 0,
+          "DRB": 0,
+          "REB": 0
+        },
+        "player_mismatch_counts_by_stat": {
+          "PTS": 0,
+          "AST": 0,
+          "STL": 0,
+          "BLK": 0,
+          "TOV": 0,
+          "PF": 0,
+          "FGA": 0,
+          "FGM": 0,
+          "3PA": 0,
+          "3PM": 0,
+          "FTA": 0,
+          "FTM": 0,
+          "OREB": 0,
+          "DRB": 0,
+          "REB": 0
+        }
+      },
+      "lineup_audit": {
+        "minutes_plus_minus": {
+          "rows": 27538,
+          "minutes_mismatches": 0,
+          "minutes_outliers": 0,
+          "plus_minus_mismatches": 54,
+          "minutes_outlier_threshold": 0.5
+        },
+        "problem_games": 22,
+        "event_on_court": {
+          "games": 22,
+          "issue_rows": 0,
+          "issue_games": 0,
+          "status_counts": {}
+        },
+        "timings": {
+          "minutes_audit_seconds": 1.695193,
+          "event_on_court_seconds": 7.971624,
+          "total_wall_seconds": 9.751319
+        },
+        "resource_usage": {
+          "peak_rss_mb": 2646.766
+        }
+      },
+      "timings": {
+        "pbp_load_seconds": 1.325178,
+        "game_processing_seconds": 202.082306,
+        "parquet_write_seconds": 0.07969,
+        "error_write_seconds": 1.1e-05,
+        "rebound_export_seconds": 2e-06,
+        "boxscore_audit_seconds": 0.031399,
+        "total_wall_seconds": 213.37169,
+        "lineup_audit_seconds": 9.751319
+      },
+      "resource_usage": {
+        "peak_rss_mb": 2646.766
+      }
+    },
+    {
+      "season": 2014,
+      "player_rows": 30138,
+      "failed_games": 0,
+      "event_stats_errors": 0,
+      "strict_mode": false,
+      "tolerance": 2,
+      "boxscore_audit": {
+        "season": 2014,
+        "games_requested": 1319,
+        "games_audited": 1319,
+        "audit_failures": 0,
+        "games_with_team_mismatch": 0,
+        "team_rows_with_mismatch": 0,
+        "games_with_player_mismatch": 0,
+        "player_rows_with_mismatch": 0,
+        "team_mismatch_counts_by_stat": {
+          "PTS": 0,
+          "AST": 0,
+          "STL": 0,
+          "BLK": 0,
+          "TOV": 0,
+          "PF": 0,
+          "FGA": 0,
+          "FGM": 0,
+          "3PA": 0,
+          "3PM": 0,
+          "FTA": 0,
+          "FTM": 0,
+          "OREB": 0,
+          "DRB": 0,
+          "REB": 0
+        },
+        "player_mismatch_counts_by_stat": {
+          "PTS": 0,
+          "AST": 0,
+          "STL": 0,
+          "BLK": 0,
+          "TOV": 0,
+          "PF": 0,
+          "FGA": 0,
+          "FGM": 0,
+          "3PA": 0,
+          "3PM": 0,
+          "FTA": 0,
+          "FTM": 0,
+          "OREB": 0,
+          "DRB": 0,
+          "REB": 0
+        }
+      },
+      "lineup_audit": {
+        "minutes_plus_minus": {
+          "rows": 27526,
+          "minutes_mismatches": 0,
+          "minutes_outliers": 0,
+          "plus_minus_mismatches": 60,
+          "minutes_outlier_threshold": 0.5
+        },
+        "problem_games": 22,
+        "event_on_court": {
+          "games": 22,
+          "issue_rows": 0,
+          "issue_games": 0,
+          "status_counts": {}
+        },
+        "timings": {
+          "minutes_audit_seconds": 1.685215,
+          "event_on_court_seconds": 8.289686,
+          "total_wall_seconds": 10.058747
+        },
+        "resource_usage": {
+          "peak_rss_mb": 2646.766
+        }
+      },
+      "timings": {
+        "pbp_load_seconds": 1.288829,
+        "game_processing_seconds": 203.737478,
+        "parquet_write_seconds": 0.079185,
+        "error_write_seconds": 9e-06,
+        "rebound_export_seconds": 0.000705,
+        "boxscore_audit_seconds": 0.031455,
+        "total_wall_seconds": 215.305354,
+        "lineup_audit_seconds": 10.058747
+      },
+      "resource_usage": {
+        "peak_rss_mb": 2646.766
+      }
+    },
+    {
+      "season": 2015,
+      "player_rows": 30236,
+      "failed_games": 0,
+      "event_stats_errors": 0,
+      "strict_mode": false,
+      "tolerance": 2,
+      "boxscore_audit": {
+        "season": 2015,
+        "games_requested": 1311,
+        "games_audited": 1311,
+        "audit_failures": 0,
+        "games_with_team_mismatch": 0,
+        "team_rows_with_mismatch": 0,
+        "games_with_player_mismatch": 0,
+        "player_rows_with_mismatch": 0,
+        "team_mismatch_counts_by_stat": {
+          "PTS": 0,
+          "AST": 0,
+          "STL": 0,
+          "BLK": 0,
+          "TOV": 0,
+          "PF": 0,
+          "FGA": 0,
+          "FGM": 0,
+          "3PA": 0,
+          "3PM": 0,
+          "FTA": 0,
+          "FTM": 0,
+          "OREB": 0,
+          "DRB": 0,
+          "REB": 0
+        },
+        "player_mismatch_counts_by_stat": {
+          "PTS": 0,
+          "AST": 0,
+          "STL": 0,
+          "BLK": 0,
+          "TOV": 0,
+          "PF": 0,
+          "FGA": 0,
+          "FGM": 0,
+          "3PA": 0,
+          "3PM": 0,
+          "FTA": 0,
+          "FTM": 0,
+          "OREB": 0,
+          "DRB": 0,
+          "REB": 0
+        }
+      },
+      "lineup_audit": {
+        "minutes_plus_minus": {
+          "rows": 27636,
+          "minutes_mismatches": 0,
+          "minutes_outliers": 0,
+          "plus_minus_mismatches": 26,
+          "minutes_outlier_threshold": 0.5
+        },
+        "problem_games": 12,
+        "event_on_court": {
+          "games": 12,
+          "issue_rows": 0,
+          "issue_games": 0,
+          "status_counts": {}
+        },
+        "timings": {
+          "minutes_audit_seconds": 1.677593,
+          "event_on_court_seconds": 5.416569,
+          "total_wall_seconds": 7.178293
+        },
+        "resource_usage": {
+          "peak_rss_mb": 2646.766
+        }
+      },
+      "timings": {
+        "pbp_load_seconds": 1.364297,
+        "game_processing_seconds": 202.483384,
+        "parquet_write_seconds": 0.078749,
+        "error_write_seconds": 1.7e-05,
+        "rebound_export_seconds": 0.001633,
+        "boxscore_audit_seconds": 0.030923,
+        "total_wall_seconds": 211.248994,
+        "lineup_audit_seconds": 7.178293
+      },
+      "resource_usage": {
+        "peak_rss_mb": 2646.766
+      }
+    },
+    {
+      "season": 2016,
+      "player_rows": 30597,
+      "failed_games": 0,
+      "event_stats_errors": 0,
+      "strict_mode": false,
+      "tolerance": 2,
+      "boxscore_audit": {
+        "season": 2016,
+        "games_requested": 1316,
+        "games_audited": 1316,
+        "audit_failures": 0,
+        "games_with_team_mismatch": 0,
+        "team_rows_with_mismatch": 0,
+        "games_with_player_mismatch": 0,
+        "player_rows_with_mismatch": 0,
+        "team_mismatch_counts_by_stat": {
+          "PTS": 0,
+          "AST": 0,
+          "STL": 0,
+          "BLK": 0,
+          "TOV": 0,
+          "PF": 0,
+          "FGA": 0,
+          "FGM": 0,
+          "3PA": 0,
+          "3PM": 0,
+          "FTA": 0,
+          "FTM": 0,
+          "OREB": 0,
+          "DRB": 0,
+          "REB": 0
+        },
+        "player_mismatch_counts_by_stat": {
+          "PTS": 0,
+          "AST": 0,
+          "STL": 0,
+          "BLK": 0,
+          "TOV": 0,
+          "PF": 0,
+          "FGA": 0,
+          "FGM": 0,
+          "3PA": 0,
+          "3PM": 0,
+          "FTA": 0,
+          "FTM": 0,
+          "OREB": 0,
+          "DRB": 0,
+          "REB": 0
+        }
+      },
+      "lineup_audit": {
+        "minutes_plus_minus": {
+          "rows": 27980,
+          "minutes_mismatches": 0,
+          "minutes_outliers": 0,
+          "plus_minus_mismatches": 60,
+          "minutes_outlier_threshold": 0.5
+        },
+        "problem_games": 16,
+        "event_on_court": {
+          "games": 16,
+          "issue_rows": 0,
+          "issue_games": 0,
+          "status_counts": {}
+        },
+        "timings": {
+          "minutes_audit_seconds": 1.722116,
+          "event_on_court_seconds": 6.52096,
+          "total_wall_seconds": 8.330632
+        },
+        "resource_usage": {
+          "peak_rss_mb": 2646.766
+        }
+      },
+      "timings": {
+        "pbp_load_seconds": 1.317553,
+        "game_processing_seconds": 206.207157,
+        "parquet_write_seconds": 0.08044,
+        "error_write_seconds": 1.1e-05,
+        "rebound_export_seconds": 0.000854,
+        "boxscore_audit_seconds": 0.032907,
+        "total_wall_seconds": 216.085014,
+        "lineup_audit_seconds": 8.330632
+      },
+      "resource_usage": {
+        "peak_rss_mb": 2646.766
+      }
+    },
+    {
+      "season": 2017,
+      "player_rows": 30477,
+      "failed_games": 0,
+      "event_stats_errors": 0,
+      "strict_mode": false,
+      "tolerance": 2,
+      "boxscore_audit": {
+        "season": 2017,
+        "games_requested": 1309,
+        "games_audited": 1309,
+        "audit_failures": 0,
+        "games_with_team_mismatch": 0,
+        "team_rows_with_mismatch": 0,
+        "games_with_player_mismatch": 0,
+        "player_rows_with_mismatch": 0,
+        "team_mismatch_counts_by_stat": {
+          "PTS": 0,
+          "AST": 0,
+          "STL": 0,
+          "BLK": 0,
+          "TOV": 0,
+          "PF": 0,
+          "FGA": 0,
+          "FGM": 0,
+          "3PA": 0,
+          "3PM": 0,
+          "FTA": 0,
+          "FTM": 0,
+          "OREB": 0,
+          "DRB": 0,
+          "REB": 0
+        },
+        "player_mismatch_counts_by_stat": {
+          "PTS": 0,
+          "AST": 0,
+          "STL": 0,
+          "BLK": 0,
+          "TOV": 0,
+          "PF": 0,
+          "FGA": 0,
+          "FGM": 0,
+          "3PA": 0,
+          "3PM": 0,
+          "FTA": 0,
+          "FTM": 0,
+          "OREB": 0,
+          "DRB": 0,
+          "REB": 0
+        }
+      },
+      "lineup_audit": {
+        "minutes_plus_minus": {
+          "rows": 27876,
+          "minutes_mismatches": 0,
+          "minutes_outliers": 0,
+          "plus_minus_mismatches": 70,
+          "minutes_outlier_threshold": 0.5
+        },
+        "problem_games": 26,
+        "event_on_court": {
+          "games": 26,
+          "issue_rows": 0,
+          "issue_games": 0,
+          "status_counts": {}
+        },
+        "timings": {
+          "minutes_audit_seconds": 1.707402,
+          "event_on_court_seconds": 9.732228,
+          "total_wall_seconds": 11.523046
+        },
+        "resource_usage": {
+          "peak_rss_mb": 2646.766
+        }
+      },
+      "timings": {
+        "pbp_load_seconds": 1.349639,
+        "game_processing_seconds": 205.048557,
+        "parquet_write_seconds": 0.080236,
+        "error_write_seconds": 2e-05,
+        "rebound_export_seconds": 0.000862,
+        "boxscore_audit_seconds": 0.032196,
+        "total_wall_seconds": 218.147005,
+        "lineup_audit_seconds": 11.523046
+      },
+      "resource_usage": {
+        "peak_rss_mb": 2646.766
+      }
+    },
+    {
+      "season": 2018,
+      "player_rows": 30447,
+      "failed_games": 0,
+      "event_stats_errors": 0,
+      "strict_mode": false,
+      "tolerance": 2,
+      "boxscore_audit": {
+        "season": 2018,
+        "games_requested": 1312,
+        "games_audited": 1312,
+        "audit_failures": 0,
+        "games_with_team_mismatch": 0,
+        "team_rows_with_mismatch": 0,
+        "games_with_player_mismatch": 0,
+        "player_rows_with_mismatch": 0,
+        "team_mismatch_counts_by_stat": {
+          "PTS": 0,
+          "AST": 0,
+          "STL": 0,
+          "BLK": 0,
+          "TOV": 0,
+          "PF": 0,
+          "FGA": 0,
+          "FGM": 0,
+          "3PA": 0,
+          "3PM": 0,
+          "FTA": 0,
+          "FTM": 0,
+          "OREB": 0,
+          "DRB": 0,
+          "REB": 0
+        },
+        "player_mismatch_counts_by_stat": {
+          "PTS": 0,
+          "AST": 0,
+          "STL": 0,
+          "BLK": 0,
+          "TOV": 0,
+          "PF": 0,
+          "FGA": 0,
+          "FGM": 0,
+          "3PA": 0,
+          "3PM": 0,
+          "FTA": 0,
+          "FTM": 0,
+          "OREB": 0,
+          "DRB": 0,
+          "REB": 0
+        }
+      },
+      "lineup_audit": {
+        "minutes_plus_minus": {
+          "rows": 27843,
+          "minutes_mismatches": 2,
+          "minutes_outliers": 0,
+          "plus_minus_mismatches": 205,
+          "minutes_outlier_threshold": 0.5
+        },
+        "problem_games": 65,
+        "event_on_court": {
+          "games": 65,
+          "issue_rows": 6,
+          "issue_games": 3,
+          "status_counts": {
+            "sub_out_player_missing_from_previous_lineup": 2,
+            "sub_in_player_missing_from_current_lineup": 1,
+            "off_court_event_credit": 3
+          }
+        },
+        "timings": {
+          "minutes_audit_seconds": 1.675709,
+          "event_on_court_seconds": 22.683182,
+          "total_wall_seconds": 24.45314
+        },
+        "resource_usage": {
+          "peak_rss_mb": 2646.766
+        }
+      },
+      "timings": {
+        "pbp_load_seconds": 1.305991,
+        "game_processing_seconds": 208.504938,
+        "parquet_write_seconds": 0.079588,
+        "error_write_seconds": 1.2e-05,
+        "rebound_export_seconds": 2e-06,
+        "boxscore_audit_seconds": 0.033103,
+        "total_wall_seconds": 234.494409,
+        "lineup_audit_seconds": 24.45314
+      },
+      "resource_usage": {
+        "peak_rss_mb": 2646.766
+      }
+    },
+    {
+      "season": 2019,
+      "player_rows": 30474,
+      "failed_games": 0,
+      "event_stats_errors": 0,
+      "strict_mode": false,
+      "tolerance": 2,
+      "boxscore_audit": {
+        "season": 2019,
+        "games_requested": 1312,
+        "games_audited": 1312,
+        "audit_failures": 0,
+        "games_with_team_mismatch": 0,
+        "team_rows_with_mismatch": 0,
+        "games_with_player_mismatch": 0,
+        "player_rows_with_mismatch": 0,
+        "team_mismatch_counts_by_stat": {
+          "PTS": 0,
+          "AST": 0,
+          "STL": 0,
+          "BLK": 0,
+          "TOV": 0,
+          "PF": 0,
+          "FGA": 0,
+          "FGM": 0,
+          "3PA": 0,
+          "3PM": 0,
+          "FTA": 0,
+          "FTM": 0,
+          "OREB": 0,
+          "DRB": 0,
+          "REB": 0
+        },
+        "player_mismatch_counts_by_stat": {
+          "PTS": 0,
+          "AST": 0,
+          "STL": 0,
+          "BLK": 0,
+          "TOV": 0,
+          "PF": 0,
+          "FGA": 0,
+          "FGM": 0,
+          "3PA": 0,
+          "3PM": 0,
+          "FTA": 0,
+          "FTM": 0,
+          "OREB": 0,
+          "DRB": 0,
+          "REB": 0
+        }
+      },
+      "lineup_audit": {
+        "minutes_plus_minus": {
+          "rows": 27868,
+          "minutes_mismatches": 0,
+          "minutes_outliers": 0,
+          "plus_minus_mismatches": 130,
+          "minutes_outlier_threshold": 0.5
+        },
+        "problem_games": 39,
+        "event_on_court": {
+          "games": 39,
+          "issue_rows": 0,
+          "issue_games": 0,
+          "status_counts": {}
+        },
+        "timings": {
+          "minutes_audit_seconds": 1.690388,
+          "event_on_court_seconds": 15.196146,
+          "total_wall_seconds": 16.967623
+        },
+        "resource_usage": {
+          "peak_rss_mb": 2646.766
+        }
+      },
+      "timings": {
+        "pbp_load_seconds": 1.426263,
+        "game_processing_seconds": 205.284045,
+        "parquet_write_seconds": 0.076798,
+        "error_write_seconds": 1e-05,
+        "rebound_export_seconds": 0.001585,
+        "boxscore_audit_seconds": 0.030932,
+        "total_wall_seconds": 223.934393,
+        "lineup_audit_seconds": 16.967623
+      },
+      "resource_usage": {
+        "peak_rss_mb": 2646.766
+      }
+    },
+    {
+      "season": 2020,
+      "player_rows": 26291,
+      "failed_games": 0,
+      "event_stats_errors": 0,
+      "strict_mode": false,
+      "tolerance": 2,
+      "boxscore_audit": {
+        "season": 2020,
+        "games_requested": 1139,
+        "games_audited": 1139,
+        "audit_failures": 0,
+        "games_with_team_mismatch": 0,
+        "team_rows_with_mismatch": 0,
+        "games_with_player_mismatch": 0,
+        "player_rows_with_mismatch": 0,
+        "team_mismatch_counts_by_stat": {
+          "PTS": 0,
+          "AST": 0,
+          "STL": 0,
+          "BLK": 0,
+          "TOV": 0,
+          "PF": 0,
+          "FGA": 0,
+          "FGM": 0,
+          "3PA": 0,
+          "3PM": 0,
+          "FTA": 0,
+          "FTM": 0,
+          "OREB": 0,
+          "DRB": 0,
+          "REB": 0
+        },
+        "player_mismatch_counts_by_stat": {
+          "PTS": 0,
+          "AST": 0,
+          "STL": 0,
+          "BLK": 0,
+          "TOV": 0,
+          "PF": 0,
+          "FGA": 0,
+          "FGM": 0,
+          "3PA": 0,
+          "3PM": 0,
+          "FTA": 0,
+          "FTM": 0,
+          "OREB": 0,
+          "DRB": 0,
+          "REB": 0
+        }
+      },
+      "lineup_audit": {
+        "minutes_plus_minus": {
+          "rows": 24024,
+          "minutes_mismatches": 0,
+          "minutes_outliers": 0,
+          "plus_minus_mismatches": 96,
+          "minutes_outlier_threshold": 0.5
+        },
+        "problem_games": 35,
+        "event_on_court": {
+          "games": 35,
+          "issue_rows": 0,
+          "issue_games": 0,
+          "status_counts": {}
+        },
+        "timings": {
+          "minutes_audit_seconds": 1.45547,
+          "event_on_court_seconds": 14.093095,
+          "total_wall_seconds": 15.627317
+        },
+        "resource_usage": {
+          "peak_rss_mb": 2646.766
+        }
+      },
+      "timings": {
+        "pbp_load_seconds": 1.246103,
+        "game_processing_seconds": 184.342515,
+        "parquet_write_seconds": 0.072132,
+        "error_write_seconds": 1e-05,
+        "rebound_export_seconds": 2e-06,
+        "boxscore_audit_seconds": 0.030748,
+        "total_wall_seconds": 201.423146,
+        "lineup_audit_seconds": 15.627317
+      },
+      "resource_usage": {
+        "peak_rss_mb": 2646.766
+      }
+    }
+  ]
+}

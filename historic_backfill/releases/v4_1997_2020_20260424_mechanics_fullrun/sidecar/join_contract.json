@@ -1,0 +1,21 @@
+{
+  "consumer_rule": "If a game_id is absent from the sidecar, apply default_absent_row_values.",
+  "coverage": "sparse_problem_or_reviewed_games_only",
+  "default_absent_row_values": {
+    "blocks_release": false,
+    "execution_lane": "exact",
+    "policy_source": "auto_default",
+    "primary_quality_status": "exact",
+    "release_gate_status": "exact",
+    "release_reason_code": "exact",
+    "research_open": false
+  },
+  "join_key": "game_id",
+  "join_strategy": "left_join_sparse_game_quality_sidecar",
+  "join_target": "historical_darko_player_rows",
+  "notes": [
+    "This pass does not add a per-row quality column to parquet.",
+    "Release-facing game flags come from the sparse sidecar.",
+    "Reviewed frontier and PM artifacts remain separate audit surfaces."
+  ]
+}

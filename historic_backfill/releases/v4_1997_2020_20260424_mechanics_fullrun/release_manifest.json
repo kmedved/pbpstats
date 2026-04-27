@@ -1,0 +1,71 @@
+{
+  "release_id": "v4_1997_2020_20260424_mechanics_fullrun",
+  "release_date": "2026-04-25",
+  "description": "Historic NBA 1997-2020 mechanics fullrun with reviewed frontier overlay and sparse release-quality sidecar.",
+  "source_workspace": "/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev",
+  "git": {
+    "starting_pbpstats_commit_full": "e53dab5ac6ad12e4d6fc59d634c4bbc89d6be6ee",
+    "integration_branch": "integrate-historic-backfill-pipeline",
+    "release_tag": "historic-backfill-v4-1997-2020-20260424",
+    "final_commit_sha_recorded_in": "git tag annotation"
+  },
+  "seasons": [
+    1997,
+    1998,
+    1999,
+    2000,
+    2001,
+    2002,
+    2003,
+    2004,
+    2005,
+    2006,
+    2007,
+    2008,
+    2009,
+    2010,
+    2011,
+    2012,
+    2013,
+    2014,
+    2015,
+    2016,
+    2017,
+    2018,
+    2019,
+    2020
+  ],
+  "validation": {
+    "failed_games": 0,
+    "event_stats_errors": 0,
+    "raw_open_games": 13,
+    "reviewed_release_blocking_game_count": 0,
+    "reviewed_research_open_game_count": 0,
+    "tier1_release_ready": true,
+    "tier2_frontier_closed": true,
+    "reviewed_override_game_count": 13
+  },
+  "canaries": {
+    "synthetic_sub_game_id": "0020400335",
+    "synthetic_sub_event_num": 148,
+    "synthetic_sub_action": "insert_sub_before"
+  },
+  "path_policy": {
+    "summary_files": "original_absolute_paths_preserved",
+    "original_workspace_root": "/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev"
+  },
+  "authoritative_files": {
+    "closure_note": "historic_backfill/releases/v4_1997_2020_20260424_mechanics_fullrun/closure_note.md",
+    "reviewed_policy_overlay": "historic_backfill/releases/v4_1997_2020_20260424_mechanics_fullrun/policy/reviewed_frontier_policy_overlay_20260424_mechanics_fullrun_v4.csv",
+    "open_blocker_inventory": "historic_backfill/releases/v4_1997_2020_20260424_mechanics_fullrun/inventories/phase7_open_blocker_inventory_20260424_mechanics_fullrun_v4.csv",
+    "true_blocker_shortlist": "historic_backfill/releases/v4_1997_2020_20260424_mechanics_fullrun/inventories/phase7_true_blocker_shortlist_20260424_mechanics_fullrun_v4.csv",
+    "full_history_summary_original": "historic_backfill/releases/v4_1997_2020_20260424_mechanics_fullrun/summaries/original/full_history_summary.original.json",
+    "raw_residuals_summary_original": "historic_backfill/releases/v4_1997_2020_20260424_mechanics_fullrun/summaries/original/raw_residuals_summary.original.json",
+    "reviewed_residuals_summary_original": "historic_backfill/releases/v4_1997_2020_20260424_mechanics_fullrun/summaries/original/reviewed_residuals_summary.original.json",
+    "pm_reference_summary_original": "historic_backfill/releases/v4_1997_2020_20260424_mechanics_fullrun/summaries/original/pm_reference_summary.original.json",
+    "sidecar_summary": "historic_backfill/releases/v4_1997_2020_20260424_mechanics_fullrun/sidecar/summary.json",
+    "sidecar_join_contract": "historic_backfill/releases/v4_1997_2020_20260424_mechanics_fullrun/sidecar/join_contract.json",
+    "sidecar_game_quality_sparse": "historic_backfill/releases/v4_1997_2020_20260424_mechanics_fullrun/sidecar/game_quality_sparse.csv",
+    "catalog_snapshot_pbp_row_overrides": "historic_backfill/releases/v4_1997_2020_20260424_mechanics_fullrun/catalog_snapshot/pbp_row_overrides.csv"
+  }
+}

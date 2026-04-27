@@ -1,0 +1,45 @@
+{
+  "coverage": "sparse_problem_or_reviewed_games_only",
+  "default_absent_row_values": {
+    "blocks_release": false,
+    "execution_lane": "exact",
+    "policy_source": "auto_default",
+    "primary_quality_status": "exact",
+    "release_gate_status": "exact",
+    "release_reason_code": "exact",
+    "research_open": false
+  },
+  "execution_lane_counts": {
+    "exact": 10,
+    "local_override_chosen": 2,
+    "override_corrected": 36,
+    "policy_frontier_non_local": 676,
+    "policy_overlay_chosen": 2,
+    "source_limited": 18,
+    "status_quo_chosen": 8,
+    "synthetic_sub_chosen": 1
+  },
+  "frontier_inventory_snapshot_id": "phase7_open_blocker_inventory_20260424_mechanics_fullrun_v4",
+  "policy_source_counts": {
+    "auto_default": 740,
+    "reviewed_override": 13
+  },
+  "release_blocking_game_count": 0,
+  "release_blocking_game_ids": [],
+  "release_gate_status_counts": {
+    "accepted_boundary_difference": 677,
+    "accepted_unresolvable_contradiction": 12,
+    "exact": 10,
+    "override_corrected": 36,
+    "source_limited_upstream_error": 18
+  },
+  "research_open_game_count": 0,
+  "research_open_game_ids": [],
+  "residual_dirs": [
+    "/Users/konstantinmedvedovsky/migrate_tpdev/replace_tpdev/phase7_reviewed_residuals_1997_2020_20260424_mechanics_fullrun_v4"
+  ],
+  "reviewed_override_game_count": 13,
+  "reviewed_policy_overlay_version": "reviewed_release_policy_20260424_mechanics_fullrun_v4",
+  "row_count": 753,
+  "unique_game_count": 753
+}
