@@ -1,13 +1,14 @@
-import sys
 from pathlib import Path
 
 import pandas as pd
 
-sys.path.append(str(Path(__file__).resolve().parents[1]))
-
-from historic_backfill.catalogs.pbp_row_overrides import (
+from historic_backfill.catalogs.loader import (
+    DEFAULT_HISTORIC_PBP_ROW_OVERRIDES_PATH,
+    load_historic_pbp_row_overrides,
+)
+from pbpstats.offline.row_overrides import (
+    PBP_ROW_OVERRIDE_ACTION_COLUMN,
     apply_pbp_row_overrides,
-    _resolve_default_pbp_row_overrides_path,
 )
 
 
@@ -178,11 +179,24 @@ def test_apply_pbp_row_overrides_can_insert_synthetic_sub_before_anchor():
     assert inserted["HOMEDESCRIPTION"] == "SUB: Junior Harrington FOR JR Smith"
     assert inserted["description"] == "SUB: Junior Harrington FOR JR Smith"
     assert inserted["clock_seconds_remaining"] == 479.0
-    assert inserted["PBP_ROW_OVERRIDE_ACTION"] == "insert_sub_before"
+    assert inserted[PBP_ROW_OVERRIDE_ACTION_COLUMN] == "insert_sub_before"
 
 
-def test_default_pbp_row_override_path_resolves_out_of_pycache():
-    repo_root = Path(__file__).resolve().parents[1]
-    pyc_path = repo_root / "__pycache__" / "pbp_row_overrides.cpython-312.pyc"
+def test_historic_pbp_row_override_catalog_path_is_explicit():
+    expected = Path(__file__).resolve().parents[1] / "catalogs" / "pbp_row_overrides.csv"
 
-    assert _resolve_default_pbp_row_overrides_path(pyc_path) == repo_root / "pbp_row_overrides.csv"
+    assert DEFAULT_HISTORIC_PBP_ROW_OVERRIDES_PATH == expected
+
+
+def test_historic_pbp_row_override_catalog_contains_synthetic_canary():
+    overrides = load_historic_pbp_row_overrides()
+    canaries = [
+        row
+        for row in overrides["0020400335"]
+        if row["event_num"] == 148 and row["action"] == "insert_sub_before"
+    ]
+
+    assert len(canaries) == 1
+    assert canaries[0]["anchor_event_num"] == 149
+    assert canaries[0]["player_out_id"] == "2747"
+    assert canaries[0]["player_in_id"] == "2454"

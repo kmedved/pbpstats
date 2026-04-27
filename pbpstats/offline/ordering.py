@@ -5,6 +5,8 @@ from typing import Callable, Dict, List
 import numpy as np
 import pandas as pd
 
+from pbpstats.offline.row_overrides import PBP_ROW_OVERRIDE_ACTION_COLUMN
+
 FetchPbpV3Fn = Callable[[str], pd.DataFrame]
 
 
@@ -76,9 +78,9 @@ def dedupe_with_v3(
     valid_nums = set(df_v3["actionNumber"].astype(int).tolist())
 
     explicit_override_mask = pd.Series(False, index=df.index)
-    if "PBP_ROW_OVERRIDE_ACTION" in df.columns:
+    if PBP_ROW_OVERRIDE_ACTION_COLUMN in df.columns:
         explicit_override_mask = (
-            df["PBP_ROW_OVERRIDE_ACTION"].fillna("").astype(str).str.strip() != ""
+            df[PBP_ROW_OVERRIDE_ACTION_COLUMN].fillna("").astype(str).str.strip() != ""
         )
 
     df = df[df["EVENTNUM"].isin(valid_nums) | explicit_override_mask].copy()
