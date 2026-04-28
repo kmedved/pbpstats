@@ -22,6 +22,7 @@ from historic_backfill.catalogs.pbp_row_overrides import apply_pbp_row_overrides
 from historic_backfill.catalogs.pbp_stat_overrides import apply_pbp_stat_overrides
 from historic_backfill.common.player_id_normalization import normalize_single_game_player_ids
 from historic_backfill.common.team_event_normalization import normalize_single_game_team_events
+from pbpstats.offline.row_overrides import normalize_game_id
 from historic_backfill.audits.core.boxscore import (
     AUDIT_ERROR_COLUMNS,
     FOUL_KEYS as AUDIT_FOUL_KEYS,
@@ -364,8 +365,13 @@ def load_pbp_from_parquet(
         except Exception:
             print(f"Filter pushdown failed, loading full file...")
             df = pd.read_parquet(parquet_path)
-            if "SEASON" in df.columns:
-                df = df[df["SEASON"] == season].copy()
+            season_columns = {
+                str(column).upper(): column
+                for column in df.columns
+            }
+            season_column = season_columns.get("SEASON")
+            if season_column is not None:
+                df = df[df[season_column] == season].copy()
         print(f"Found {len(df)} rows for season {season}")
     else:
         df = pd.read_parquet(parquet_path)
@@ -388,7 +394,7 @@ def load_pbp_from_parquet(
             df[col] = df[col].fillna("")
     
     if "GAME_ID" in df.columns:
-        df["GAME_ID"] = df["GAME_ID"].astype(str).str.zfill(10)
+        df["GAME_ID"] = df["GAME_ID"].map(normalize_game_id)
     
     int_cols = ["EVENTNUM", "EVENTMSGTYPE", "EVENTMSGACTIONTYPE", "PERIOD"]
     for col in int_cols:

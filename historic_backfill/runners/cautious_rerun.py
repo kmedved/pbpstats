@@ -574,7 +574,7 @@ def prepare_local_runtime_inputs(
         hydrated_path, record = _hydrate_or_fallback(
             Path(path),
             allow_empty_fallback=False,
-            required=False,
+            required=True,
         )
         hydrated_period_starter_paths.append(hydrated_path)
         runtime_input_provenance["period_starter_parquet_inputs"].append(record)
@@ -1119,6 +1119,34 @@ def parse_args(argv: Iterable[str] | None = None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
+def _runner_failure_reasons(final_summary: dict[str, Any]) -> list[str]:
+    reasons: list[str] = []
+    failed_games = int(final_summary.get("failed_games", 0) or 0)
+    event_stats_errors = int(final_summary.get("event_stats_errors", 0) or 0)
+    if failed_games > 0:
+        reasons.append(f"failed_games={failed_games}")
+    if event_stats_errors > 0:
+        reasons.append(f"event_stats_errors={event_stats_errors}")
+
+    zero_row_seasons = [
+        int(summary.get("season"))
+        for summary in final_summary.get("seasons", [])
+        if int(summary.get("player_rows", 0) or 0) == 0
+    ]
+    if zero_row_seasons:
+        reasons.append(f"zero_player_row_seasons={zero_row_seasons}")
+
+    if final_summary.get("run_boxscore_audit"):
+        audit_failure_seasons = []
+        for summary in final_summary.get("seasons", []):
+            audit_summary = summary.get("boxscore_audit") or {}
+            if int(audit_summary.get("audit_failures", 0) or 0) > 0:
+                audit_failure_seasons.append(int(summary.get("season")))
+        if audit_failure_seasons:
+            reasons.append(f"boxscore_audit_failure_seasons={audit_failure_seasons}")
+    return reasons
+
+
 def main(argv: Iterable[str] | None = None) -> int:
     args = parse_args(argv)
     output_dir = args.output_dir.resolve()
@@ -1245,10 +1273,16 @@ def main(argv: Iterable[str] | None = None) -> int:
         },
         "seasons": season_summaries,
     }
+    failure_reasons = _runner_failure_reasons(final_summary)
+    final_summary["ok"] = not failure_reasons
+    final_summary["failure_reasons"] = failure_reasons
     (output_dir / "summary.json").write_text(
         json.dumps(final_summary, indent=2) + "\n", encoding="utf-8"
     )
     print(json.dumps(final_summary, indent=2))
+    if failure_reasons:
+        print(f"[RUNNER] Completed with failures: {failure_reasons}")
+        return 1
     print("[RUNNER] All requested seasons complete")
     return 0
 

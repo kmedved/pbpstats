@@ -128,6 +128,28 @@ def test_prepare_local_runtime_inputs_fails_early_for_missing_required_inputs(
         )
 
 
+def test_prepare_local_runtime_inputs_fails_for_missing_period_starter_parquet(
+    tmp_path: Path,
+) -> None:
+    files = _write_runtime_sources(tmp_path)
+    files["period_starters_v6"].unlink()
+
+    with pytest.raises(FileNotFoundError, match="period_starters_v6.parquet"):
+        runner.prepare_local_runtime_inputs(
+            tmp_path / "run" / "_local_runtime_cache",
+            db_path=files["db_path"],
+            parquet_path=files["parquet_path"],
+            overrides_path=files["overrides_path"],
+            boxscore_source_overrides_path=files["boxscore_source_overrides_path"],
+            period_starter_parquet_paths=[
+                files["period_starters_v6"],
+                files["period_starters_v5"],
+            ],
+            file_directory=files["db_path"].parent,
+            catalog_overrides_dir=files["db_path"].parent / "overrides",
+        )
+
+
 def test_prepare_local_runtime_inputs_can_reuse_global_cache_when_explicitly_requested(
     tmp_path: Path,
     monkeypatch,
@@ -457,3 +479,71 @@ def test_v9b_namespace_uses_historic_pbp_row_override_catalog():
     inserted = result[result["EVENTNUM"] == 148].iloc[0]
 
     assert inserted[PBP_ROW_OVERRIDE_ACTION_COLUMN] == "insert_sub_before"
+
+
+def test_load_pbp_from_parquet_filters_lowercase_season_and_normalizes_game_id(
+    monkeypatch,
+):
+    namespace = runner.load_v9b_namespace()
+
+    def fake_read_parquet(_path, filters=None):
+        if filters is not None:
+            raise RuntimeError("predicate pushdown unavailable")
+        return pd.DataFrame(
+            {
+                "season": [1997, 1998],
+                "game_id": [29700001.0, "0029800002"],
+                "eventnum": [1, 2],
+                "eventmsgtype": [12, 1],
+                "eventmsgactiontype": [0, 0],
+                "period": [1, 1],
+            }
+        )
+
+    monkeypatch.setattr(namespace["pd"], "read_parquet", fake_read_parquet)
+
+    result = namespace["load_pbp_from_parquet"]("fake.parq", season=1997)
+
+    assert len(result) == 1
+    assert result.iloc[0]["GAME_ID"] == "0029700001"
+
+
+@pytest.mark.parametrize(
+    "summary",
+    [
+        {"failed_games": 1, "event_stats_errors": 0, "seasons": []},
+        {"failed_games": 0, "event_stats_errors": 2, "seasons": []},
+        {
+            "failed_games": 0,
+            "event_stats_errors": 0,
+            "seasons": [{"season": 1997, "player_rows": 0}],
+        },
+        {
+            "failed_games": 0,
+            "event_stats_errors": 0,
+            "run_boxscore_audit": True,
+            "seasons": [
+                {
+                    "season": 1997,
+                    "player_rows": 1,
+                    "boxscore_audit": {"audit_failures": 1},
+                }
+            ],
+        },
+    ],
+)
+def test_runner_failure_reasons_fail_failed_or_empty_outputs(summary):
+    assert runner._runner_failure_reasons(summary)
+
+
+def test_runner_failure_reasons_allows_successful_nonempty_seasons():
+    assert (
+        runner._runner_failure_reasons(
+            {
+                "failed_games": 0,
+                "event_stats_errors": 0,
+                "seasons": [{"season": 1997, "player_rows": 1}],
+            }
+        )
+        == []
+    )

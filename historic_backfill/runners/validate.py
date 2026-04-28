@@ -5,11 +5,13 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import sqlite3
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Iterable
 
 from historic_backfill.catalogs.lineup_correction_manifest import (
+    validate_compiled_runtime_views,
     validate_manifest_schema,
 )
 from historic_backfill.catalogs.loader import validate_historic_pbp_row_override_catalog
@@ -20,6 +22,8 @@ ROOT = Path(__file__).resolve().parents[1]
 CORE_INPUTS = (
     "data/nba_raw.db",
     "data/playbyplayv2.parq",
+    "data/period_starters_v6.parquet",
+    "data/period_starters_v5.parquet",
 )
 OPTIONAL_CROSS_SOURCE_INPUTS = (
     "data/bbr/bbref_boxscores.db",
@@ -33,7 +37,10 @@ CORE_CATALOG_INPUTS = (
     "catalogs/pbp_stat_overrides.csv",
     "catalogs/validation_overrides.csv",
     "catalogs/overrides/correction_manifest.json",
+    "catalogs/overrides/period_starters_overrides.json",
+    "catalogs/overrides/lineup_window_overrides.json",
 )
+REQUIRED_RAW_RESPONSE_ENDPOINTS = {"boxscore", "summary", "pbpv3"}
 PBP_STAT_OVERRIDE_REQUIRED_COLUMNS = {
     "game_id",
     "team_id",
@@ -199,6 +206,54 @@ def _validate_json_keys(path: Path, required_keys: set[str]) -> None:
         raise ValueError(f"{path} missing keys: {sorted(missing_keys)}")
 
 
+def _validate_nba_raw_db(path: Path) -> None:
+    if not path.exists():
+        return
+    try:
+        conn = sqlite3.connect(path)
+    except sqlite3.Error as exc:
+        raise ValueError(f"{path} is not a readable SQLite database: {exc}") from exc
+    try:
+        table = conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='raw_responses'"
+        ).fetchone()
+        if table is None:
+            raise ValueError(f"{path} missing required table raw_responses")
+        columns = {row[1] for row in conn.execute("PRAGMA table_info(raw_responses)")}
+        required_columns = {"game_id", "endpoint", "team_id", "data"}
+        missing_columns = required_columns - columns
+        if missing_columns:
+            raise ValueError(
+                f"{path} raw_responses missing columns: {sorted(missing_columns)}"
+            )
+        observed = {
+            str(row[0])
+            for row in conn.execute(
+                "SELECT DISTINCT endpoint FROM raw_responses WHERE endpoint IS NOT NULL"
+            )
+        }
+        missing_endpoints = REQUIRED_RAW_RESPONSE_ENDPOINTS - observed
+        if missing_endpoints:
+            raise ValueError(
+                f"{path} raw_responses missing required endpoints: {sorted(missing_endpoints)}"
+            )
+    except sqlite3.Error as exc:
+        raise ValueError(f"{path} failed raw_responses validation: {exc}") from exc
+    finally:
+        conn.close()
+
+
+def _validate_core_nba_inputs(root: Path) -> list[str]:
+    errors: list[str] = []
+    db_path = root / "data" / "nba_raw.db"
+    if db_path.exists():
+        try:
+            _validate_nba_raw_db(db_path)
+        except Exception as exc:  # noqa: BLE001 - report plainly in CLI output.
+            errors.append(str(exc))
+    return errors
+
+
 def _validate_core_catalogs(root: Path) -> list[str]:
     validators = [
         (
@@ -218,7 +273,16 @@ def _validate_core_catalogs(root: Path) -> list[str]:
             lambda path: (
                 _validate_json_keys(path, CORRECTION_MANIFEST_REQUIRED_KEYS),
                 validate_manifest_schema(path),
+                validate_compiled_runtime_views(path, path.parent),
             ),
+        ),
+        (
+            root / "catalogs" / "overrides" / "period_starters_overrides.json",
+            lambda path: json.loads(path.read_text(encoding="utf-8")),
+        ),
+        (
+            root / "catalogs" / "overrides" / "lineup_window_overrides.json",
+            lambda path: json.loads(path.read_text(encoding="utf-8")),
         ),
     ]
     errors: list[str] = []
@@ -238,7 +302,10 @@ def validate_scope(scope: str, root: Path = ROOT) -> ValidationResult:
     root = root.resolve()
     if scope == "core":
         missing_required = _missing(root, (*CORE_INPUTS, *CORE_CATALOG_INPUTS))
-        validation_errors = _validate_core_catalogs(root)
+        validation_errors = [
+            *_validate_core_nba_inputs(root),
+            *_validate_core_catalogs(root),
+        ]
         return ValidationResult(
             scope=scope,
             ok=not missing_required and not validation_errors,

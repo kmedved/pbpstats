@@ -1,4 +1,5 @@
 from pathlib import Path
+import sqlite3
 
 import pytest
 
@@ -9,6 +10,37 @@ def _touch(root: Path, rel_path: str) -> None:
     path = root / rel_path
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("fixture\n", encoding="utf-8")
+
+
+def _write_valid_nba_db(
+    root: Path,
+    endpoints: tuple[str, ...] = ("boxscore", "summary", "pbpv3"),
+) -> None:
+    path = root / "data" / "nba_raw.db"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(path)
+    try:
+        conn.execute(
+            "CREATE TABLE raw_responses (game_id TEXT, endpoint TEXT, team_id INTEGER, data BLOB)"
+        )
+        for endpoint in endpoints:
+            conn.execute(
+                "INSERT INTO raw_responses (game_id, endpoint, team_id, data) VALUES (?, ?, NULL, ?)",
+                ("0029700001", endpoint, b"{}"),
+            )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def _write_core_inputs(root: Path) -> None:
+    _write_valid_nba_db(root)
+    for rel_path in (
+        "data/playbyplayv2.parq",
+        "data/period_starters_v6.parquet",
+        "data/period_starters_v5.parquet",
+    ):
+        _touch(root, rel_path)
 
 
 def _write_core_catalogs(root: Path) -> None:
@@ -33,14 +65,18 @@ def _write_core_catalogs(root: Path) -> None:
         '{"manifest_version": "test", "corrections": [], "residual_annotations": []}\n',
         encoding="utf-8",
     )
+    (catalogs / "overrides" / "period_starters_overrides.json").write_text(
+        "{}\n",
+        encoding="utf-8",
+    )
+    (catalogs / "overrides" / "lineup_window_overrides.json").write_text(
+        "{}\n",
+        encoding="utf-8",
+    )
 
 
 def test_core_validation_requires_nba_inputs_without_checking_cross_source(tmp_path):
-    for rel_path in (
-        "data/nba_raw.db",
-        "data/playbyplayv2.parq",
-    ):
-        _touch(tmp_path, rel_path)
+    _write_core_inputs(tmp_path)
     _write_core_catalogs(tmp_path)
 
     result = validate_scope("core", root=tmp_path)
@@ -53,11 +89,7 @@ def test_core_validation_requires_nba_inputs_without_checking_cross_source(tmp_p
 
 
 def test_core_validation_reports_invalid_catalogs(tmp_path):
-    for rel_path in (
-        "data/nba_raw.db",
-        "data/playbyplayv2.parq",
-    ):
-        _touch(tmp_path, rel_path)
+    _write_core_inputs(tmp_path)
     _write_core_catalogs(tmp_path)
     (tmp_path / "catalogs" / "pbp_row_overrides.csv").write_text(
         "game_id,action,event_num,anchor_event_num,notes\n"
@@ -90,6 +122,18 @@ def test_core_validation_reports_invalid_catalogs_even_when_nba_inputs_are_missi
     )
 
 
+def test_core_validation_reports_invalid_nba_raw_db_contents(tmp_path):
+    _write_core_inputs(tmp_path)
+    _write_core_catalogs(tmp_path)
+    (tmp_path / "data" / "nba_raw.db").unlink()
+    _write_valid_nba_db(tmp_path, endpoints=("boxscore", "summary"))
+
+    result = validate_scope("core", root=tmp_path)
+
+    assert result.ok is False
+    assert any("pbpv3" in error for error in result.validation_errors)
+
+
 @pytest.mark.parametrize(
     ("rel_path", "bad_contents"),
     [
@@ -113,16 +157,14 @@ def test_core_validation_reports_invalid_catalogs_even_when_nba_inputs_are_missi
             "catalogs/overrides/correction_manifest.json",
             '{"manifest_version": "test"}\n',
         ),
+        ("catalogs/overrides/period_starters_overrides.json", "{not json\n"),
+        ("catalogs/overrides/lineup_window_overrides.json", "{not json\n"),
     ],
 )
 def test_core_validation_reports_invalid_non_pbp_row_catalogs(
     tmp_path, rel_path, bad_contents
 ):
-    for input_path in (
-        "data/nba_raw.db",
-        "data/playbyplayv2.parq",
-    ):
-        _touch(tmp_path, input_path)
+    _write_core_inputs(tmp_path)
     _write_core_catalogs(tmp_path)
     (tmp_path / rel_path).write_text(bad_contents, encoding="utf-8")
 
@@ -133,11 +175,7 @@ def test_core_validation_reports_invalid_non_pbp_row_catalogs(
 
 
 def test_core_validation_reports_invalid_correction_manifest_semantics(tmp_path):
-    for input_path in (
-        "data/nba_raw.db",
-        "data/playbyplayv2.parq",
-    ):
-        _touch(tmp_path, input_path)
+    _write_core_inputs(tmp_path)
     _write_core_catalogs(tmp_path)
     (tmp_path / "catalogs" / "overrides" / "correction_manifest.json").write_text(
         """
@@ -171,6 +209,45 @@ def test_core_validation_reports_invalid_correction_manifest_semantics(tmp_path)
     assert result.ok is False
     assert any(
         "does not resolve to 5 players" in error for error in result.validation_errors
+    )
+
+
+def test_core_validation_reports_stale_compiled_runtime_views(tmp_path):
+    _write_core_inputs(tmp_path)
+    _write_core_catalogs(tmp_path)
+    (tmp_path / "catalogs" / "overrides" / "correction_manifest.json").write_text(
+        """
+{
+  "manifest_version": "test",
+  "corrections": [
+    {
+      "correction_id": "period_start_fix",
+      "status": "active",
+      "domain": "lineup",
+      "scope_type": "period_start",
+      "authoring_mode": "explicit",
+      "game_id": "0029700001",
+      "period": 1,
+      "team_id": 1610612740,
+      "lineup_player_ids": [1, 2, 3, 4, 5],
+      "reason_code": "test",
+      "evidence_summary": "test",
+      "source_primary": "manual_trace",
+      "preferred_source": "manual_trace"
+    }
+  ],
+  "residual_annotations": []
+}
+""",
+        encoding="utf-8",
+    )
+
+    result = validate_scope("core", root=tmp_path)
+
+    assert result.ok is False
+    assert any(
+        "period_starters_overrides.json does not match" in error
+        for error in result.validation_errors
     )
 
 

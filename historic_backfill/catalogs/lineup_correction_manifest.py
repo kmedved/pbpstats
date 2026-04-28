@@ -70,7 +70,9 @@ def _read_csv_rows(path: Path) -> list[dict[str, str]]:
         return list(csv.DictReader(handle))
 
 
-def _write_csv_rows(path: Path, fieldnames: list[str], rows: list[dict[str, Any]]) -> None:
+def _write_csv_rows(
+    path: Path, fieldnames: list[str], rows: list[dict[str, Any]]
+) -> None:
     with path.open("w", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(handle, fieldnames=fieldnames)
         writer.writeheader()
@@ -97,7 +99,15 @@ def _normalize_runtime_game_id(value: str | int) -> str:
 
 def _normalize_source(value: str | None) -> str:
     raw = (value or "").strip().lower()
-    if raw in {"v5", "v6", "bbr", "tpdev", "raw_pbp", "boxscore_start_position", "period_boxscore_v3"}:
+    if raw in {
+        "v5",
+        "v6",
+        "bbr",
+        "tpdev",
+        "raw_pbp",
+        "boxscore_start_position",
+        "period_boxscore_v3",
+    }:
         return raw
     if raw in {"manual_local_review", "manual_trace"}:
         return "manual_trace"
@@ -134,10 +144,14 @@ def _window_correction_id(
     start_event_num: str,
     end_event_num: str,
 ) -> str:
-    return f"window__{game_id}__p{period}__t{team_id}__e{start_event_num}_{end_event_num}"
+    return (
+        f"window__{game_id}__p{period}__t{team_id}__e{start_event_num}_{end_event_num}"
+    )
 
 
-def _build_episode_id(game_id: str, scope_type: str, period: str, team_id: str, reason_code: str) -> str:
+def _build_episode_id(
+    game_id: str, scope_type: str, period: str, team_id: str, reason_code: str
+) -> str:
     safe_reason = (reason_code or "unspecified").replace(" ", "_")
     return f"{scope_type}__{game_id}__p{period}__t{team_id}__{safe_reason}"
 
@@ -165,7 +179,9 @@ def seed_manifest_from_runtime(
         corrections.append(
             {
                 "correction_id": correction_id,
-                "episode_id": _build_episode_id(game_id, "period_start", period, team_id, row.get("reason", "")),
+                "episode_id": _build_episode_id(
+                    game_id, "period_start", period, team_id, row.get("reason", "")
+                ),
                 "status": "active",
                 "domain": "lineup",
                 "scope_type": "period_start",
@@ -178,7 +194,9 @@ def seed_manifest_from_runtime(
                 "reason_code": row.get("reason", ""),
                 "evidence_summary": row.get("evidence_summary", ""),
                 "source_primary": preferred_source,
-                "source_secondary": "raw_pbp" if preferred_source != "raw_pbp" else "unknown",
+                "source_secondary": (
+                    "raw_pbp" if preferred_source != "raw_pbp" else "unknown"
+                ),
                 "preferred_source": preferred_source,
                 "confidence": "legacy",
                 "validation_artifacts": [],
@@ -189,7 +207,13 @@ def seed_manifest_from_runtime(
         )
 
     window_lookup = {
-        (game_id, str(window["period"]), str(window["team_id"]), str(window["start_event_num"]), str(window["end_event_num"])): window
+        (
+            game_id,
+            str(window["period"]),
+            str(window["team_id"]),
+            str(window["start_event_num"]),
+            str(window["end_event_num"]),
+        ): window
         for game_id, windows in window_overrides.items()
         for window in windows
     }
@@ -203,7 +227,9 @@ def seed_manifest_from_runtime(
         )
         window = window_lookup[key]
         correction_id = _window_correction_id(*key)
-        scope_type = "event" if row["start_event_num"] == row["end_event_num"] else "window"
+        scope_type = (
+            "event" if row["start_event_num"] == row["end_event_num"] else "window"
+        )
         confidence = _confidence_from_scores(
             row.get("local_confidence_score"),
             row.get("external_alignment_score"),
@@ -227,7 +253,9 @@ def seed_manifest_from_runtime(
                 "team_id": int(row["team_id"]),
                 "start_event_num": int(row["start_event_num"]),
                 "end_event_num": int(row["end_event_num"]),
-                "lineup_player_ids": [int(player_id) for player_id in window["lineup_player_ids"]],
+                "lineup_player_ids": [
+                    int(player_id) for player_id in window["lineup_player_ids"]
+                ],
                 "source_type": row.get("source_type", ""),
                 "reason_code": row.get("reason", ""),
                 "evidence_summary": row.get("evidence_summary", ""),
@@ -259,16 +287,28 @@ def load_manifest(path: Path = DEFAULT_MANIFEST_PATH) -> dict[str, Any]:
     return _read_json(path.resolve())
 
 
-def write_manifest(manifest: dict[str, Any], path: Path = DEFAULT_MANIFEST_PATH) -> None:
+def write_manifest(
+    manifest: dict[str, Any], path: Path = DEFAULT_MANIFEST_PATH
+) -> None:
     _write_json(path.resolve(), manifest)
 
 
 def validate_manifest_schema(path: Path = DEFAULT_MANIFEST_PATH) -> None:
     """Validate correction manifest structure without loading NBA runtime data."""
     manifest = load_manifest(path)
+    build_explicit_runtime_views(manifest)
+    _validate_residual_annotations(manifest)
+
+
+def build_explicit_runtime_views(
+    manifest: dict[str, Any],
+) -> tuple[dict[str, dict[str, dict[str, list[int]]]], dict[str, list[dict[str, Any]]]]:
+    """Build runtime override JSON views from explicit active corrections only."""
     seen_ids: set[str] = set()
     seen_period_keys: set[tuple[str, int, int]] = set()
     seen_window_ranges: dict[tuple[str, int, int], list[tuple[int, int, str]]] = {}
+    period_overrides: dict[str, dict[str, dict[str, list[int]]]] = {}
+    lineup_windows: dict[str, list[dict[str, Any]]] = {}
 
     for correction in sorted(manifest.get("corrections", []), key=_correction_sort_key):
         _validate_correction_record(correction, seen_ids)
@@ -281,19 +321,23 @@ def validate_manifest_schema(path: Path = DEFAULT_MANIFEST_PATH) -> None:
         team_id = int(correction["team_id"])
         scope_type = str(correction["scope_type"])
 
-        if correction.get("authoring_mode") == "explicit":
-            lineup = correction.get("lineup_player_ids")
-            if not isinstance(lineup, list):
-                raise ManifestValidationError(
-                    f"Correction {correction_id} is explicit but missing lineup_player_ids"
-                )
-            try:
-                parsed_lineup = [int(player_id) for player_id in lineup]
-            except (TypeError, ValueError) as exc:
-                raise ManifestValidationError(
-                    f"Correction {correction_id} has non-integer lineup_player_ids"
-                ) from exc
-            _validate_lineup_shape(parsed_lineup, correction_id)
+        if correction.get("authoring_mode") != "explicit":
+            raise ManifestValidationError(
+                f"Correction {correction_id} requires NBA data to compile; "
+                "core preflight only supports explicit active corrections"
+            )
+        lineup = correction.get("lineup_player_ids")
+        if not isinstance(lineup, list):
+            raise ManifestValidationError(
+                f"Correction {correction_id} is explicit but missing lineup_player_ids"
+            )
+        try:
+            parsed_lineup = [int(player_id) for player_id in lineup]
+        except (TypeError, ValueError) as exc:
+            raise ManifestValidationError(
+                f"Correction {correction_id} has non-integer lineup_player_ids"
+            ) from exc
+        _validate_lineup_shape(parsed_lineup, correction_id)
 
         if scope_type == "period_start":
             period_key = (game_id, period, team_id)
@@ -302,6 +346,9 @@ def validate_manifest_schema(path: Path = DEFAULT_MANIFEST_PATH) -> None:
                     f"Duplicate active period_start correction for {game_id} P{period} T{team_id}"
                 )
             seen_period_keys.add(period_key)
+            period_overrides.setdefault(game_id, {}).setdefault(str(period), {})[
+                str(team_id)
+            ] = parsed_lineup
             continue
 
         if scope_type in {"window", "event"}:
@@ -312,7 +359,9 @@ def validate_manifest_schema(path: Path = DEFAULT_MANIFEST_PATH) -> None:
                     f"Correction {correction_id} has end_event_num < start_event_num"
                 )
             range_key = (game_id, period, team_id)
-            for prior_start, prior_end, prior_id in seen_window_ranges.get(range_key, []):
+            for prior_start, prior_end, prior_id in seen_window_ranges.get(
+                range_key, []
+            ):
                 if max(prior_start, start_event_num) <= min(prior_end, end_event_num):
                     raise ManifestValidationError(
                         f"Correction {correction_id} overlaps active correction {prior_id} "
@@ -321,8 +370,62 @@ def validate_manifest_schema(path: Path = DEFAULT_MANIFEST_PATH) -> None:
             seen_window_ranges.setdefault(range_key, []).append(
                 (start_event_num, end_event_num, correction_id)
             )
+            lineup_windows.setdefault(game_id, []).append(
+                {
+                    "period": period,
+                    "team_id": team_id,
+                    "start_event_num": start_event_num,
+                    "end_event_num": end_event_num,
+                    "lineup_player_ids": parsed_lineup,
+                }
+            )
 
+    period_overrides = {
+        game_id: {
+            period: dict(sorted(team_map.items(), key=lambda item: int(item[0])))
+            for period, team_map in sorted(
+                period_map.items(), key=lambda item: int(item[0])
+            )
+        }
+        for game_id, period_map in sorted(period_overrides.items())
+    }
+    lineup_windows = {
+        game_id: sorted(
+            windows,
+            key=lambda row: (
+                int(row["period"]),
+                int(row["team_id"]),
+                int(row["start_event_num"]),
+                int(row["end_event_num"]),
+            ),
+        )
+        for game_id, windows in sorted(lineup_windows.items())
+    }
+    return period_overrides, lineup_windows
+
+
+def validate_compiled_runtime_views(
+    manifest_path: Path = DEFAULT_MANIFEST_PATH,
+    overrides_dir: Path = DEFAULT_OVERRIDES_DIR,
+) -> None:
+    """Assert committed runtime override JSONs match the manifest."""
+    manifest = load_manifest(manifest_path)
+    expected_period_overrides, expected_lineup_windows = build_explicit_runtime_views(
+        manifest
+    )
     _validate_residual_annotations(manifest)
+
+    overrides_dir = overrides_dir.resolve()
+    observed_period_overrides = _read_json(overrides_dir / PERIOD_STARTERS_JSON)
+    observed_lineup_windows = _read_json(overrides_dir / LINEUP_WINDOWS_JSON)
+    if observed_period_overrides != expected_period_overrides:
+        raise ManifestValidationError(
+            f"{PERIOD_STARTERS_JSON} does not match active explicit corrections in {manifest_path}"
+        )
+    if observed_lineup_windows != expected_lineup_windows:
+        raise ManifestValidationError(
+            f"{LINEUP_WINDOWS_JSON} does not match active explicit corrections in {manifest_path}"
+        )
 
 
 def _load_raw_boxscore_response(db_path: Path, game_id: str) -> dict[str, Any]:
@@ -345,7 +448,9 @@ def _load_raw_boxscore_response(db_path: Path, game_id: str) -> dict[str, Any]:
         return json.loads(blob)
 
 
-def _load_game_rosters(game_id: str, db_path: Path, cache: dict[str, dict[int, set[int]]]) -> dict[int, set[int]]:
+def _load_game_rosters(
+    game_id: str, db_path: Path, cache: dict[str, dict[int, set[int]]]
+) -> dict[int, set[int]]:
     normalized = _normalize_runtime_game_id(game_id)
     if normalized in cache:
         return cache[normalized]
@@ -356,14 +461,18 @@ def _load_game_rosters(game_id: str, db_path: Path, cache: dict[str, dict[int, s
             player_stats = result_set
             break
     if player_stats is None:
-        raise ManifestValidationError(f"PlayerStats missing from boxscore response for {game_id}")
+        raise ManifestValidationError(
+            f"PlayerStats missing from boxscore response for {game_id}"
+        )
     headers = player_stats.get("headers") or []
     rowset = player_stats.get("rowSet") or []
     try:
         team_id_index = headers.index("TEAM_ID")
         player_id_index = headers.index("PLAYER_ID")
     except ValueError as exc:
-        raise ManifestValidationError(f"Boxscore PlayerStats headers missing TEAM_ID/PLAYER_ID for {game_id}") from exc
+        raise ManifestValidationError(
+            f"Boxscore PlayerStats headers missing TEAM_ID/PLAYER_ID for {game_id}"
+        ) from exc
     rosters: dict[int, set[int]] = {}
     for row in rowset:
         team_id = int(row[team_id_index])
@@ -387,13 +496,19 @@ def _event_index_lookup(events: list[object]) -> dict[tuple[int, int], list[int]
 def _lineup_at_event(events: list[object], index: int, team_id: int) -> list[int]:
     if index < 0 or index >= len(events):
         return []
-    current = _normalize_lineups(getattr(events[index], "current_players", {})).get(int(team_id), [])
+    current = _normalize_lineups(getattr(events[index], "current_players", {})).get(
+        int(team_id), []
+    )
     if current:
         return list(current)
     previous_event = getattr(events[index], "previous_event", None)
     if previous_event is None:
         return []
-    return list(_normalize_lineups(getattr(previous_event, "current_players", {})).get(int(team_id), []))
+    return list(
+        _normalize_lineups(getattr(previous_event, "current_players", {})).get(
+            int(team_id), []
+        )
+    )
 
 
 def _resolve_base_lineup(
@@ -496,14 +611,21 @@ def _resolve_lineup_for_correction(
         raise ManifestValidationError(
             f"Delta correction {correction.get('correction_id')} swap_in {swap_in} already present in base lineup {base_lineup}"
         )
-    return [swap_in if player_id == swap_out else int(player_id) for player_id in base_lineup]
+    return [
+        swap_in if player_id == swap_out else int(player_id)
+        for player_id in base_lineup
+    ]
 
 
 def _validate_lineup_shape(lineup: list[int], correction_id: str) -> None:
     if len(lineup) != 5:
-        raise ManifestValidationError(f"Correction {correction_id} does not resolve to 5 players: {lineup}")
+        raise ManifestValidationError(
+            f"Correction {correction_id} does not resolve to 5 players: {lineup}"
+        )
     if len(set(lineup)) != 5:
-        raise ManifestValidationError(f"Correction {correction_id} does not resolve to 5 unique players: {lineup}")
+        raise ManifestValidationError(
+            f"Correction {correction_id} does not resolve to 5 unique players: {lineup}"
+        )
 
 
 def _validate_correction_record(correction: dict[str, Any], seen_ids: set[str]) -> None:
@@ -516,7 +638,9 @@ def _validate_correction_record(correction: dict[str, Any], seen_ids: set[str]) 
 
     status = str(correction.get("status") or "")
     if status not in CORRECTION_STATUS_VALUES:
-        raise ManifestValidationError(f"Correction {correction_id} has invalid status {status}")
+        raise ManifestValidationError(
+            f"Correction {correction_id} has invalid status {status}"
+        )
     if status != "active":
         return
 
@@ -527,13 +651,27 @@ def _validate_correction_record(correction: dict[str, Any], seen_ids: set[str]) 
         )
     scope_type = str(correction.get("scope_type") or "")
     if scope_type not in CORRECTION_SCOPE_VALUES:
-        raise ManifestValidationError(f"Correction {correction_id} has invalid scope_type {scope_type}")
+        raise ManifestValidationError(
+            f"Correction {correction_id} has invalid scope_type {scope_type}"
+        )
     confidence = str(correction.get("confidence") or "")
     if confidence and confidence not in CONFIDENCE_VALUES:
-        raise ManifestValidationError(f"Correction {correction_id} has invalid confidence {confidence}")
-    for field in ["game_id", "period", "team_id", "reason_code", "evidence_summary", "source_primary", "preferred_source"]:
+        raise ManifestValidationError(
+            f"Correction {correction_id} has invalid confidence {confidence}"
+        )
+    for field in [
+        "game_id",
+        "period",
+        "team_id",
+        "reason_code",
+        "evidence_summary",
+        "source_primary",
+        "preferred_source",
+    ]:
         if correction.get(field) in (None, ""):
-            raise ManifestValidationError(f"Correction {correction_id} is missing required field {field}")
+            raise ManifestValidationError(
+                f"Correction {correction_id} is missing required field {field}"
+            )
     for source_field in ["source_primary", "source_secondary", "preferred_source"]:
         source_value = correction.get(source_field)
         if source_value in (None, ""):
@@ -554,7 +692,9 @@ def _validate_residual_annotations(manifest: dict[str, Any]) -> None:
     for annotation in manifest.get("residual_annotations", []):
         annotation_id = str(annotation.get("annotation_id") or "").strip()
         if not annotation_id:
-            raise ManifestValidationError("Every residual annotation must have an annotation_id")
+            raise ManifestValidationError(
+                "Every residual annotation must have an annotation_id"
+            )
         if annotation_id in seen_ids:
             raise ManifestValidationError(f"Duplicate annotation_id: {annotation_id}")
         seen_ids.add(annotation_id)
@@ -615,7 +755,9 @@ def compile_runtime_views(
             raise ManifestValidationError(
                 f"Correction {correction_id} uses team_id {team_id} that is not in game {game_id}"
             )
-        invalid_players = [player_id for player_id in lineup if player_id not in rosters[team_id]]
+        invalid_players = [
+            player_id for player_id in lineup if player_id not in rosters[team_id]
+        ]
         if invalid_players:
             raise ManifestValidationError(
                 f"Correction {correction_id} includes players not on team {team_id} roster for game {game_id}: {invalid_players}"
@@ -629,7 +771,9 @@ def compile_runtime_views(
                     f"Duplicate active period_start correction for {game_id} P{period} T{team_id}"
                 )
             seen_period_keys.add(period_key)
-            period_overrides.setdefault(game_id, {}).setdefault(str(period), {})[str(team_id)] = lineup
+            period_overrides.setdefault(game_id, {}).setdefault(str(period), {})[
+                str(team_id)
+            ] = lineup
             starter_rows.append(
                 {
                     "game_id": game_id,
@@ -723,7 +867,9 @@ def compile_runtime_views(
     period_overrides = {
         game_id: {
             period: dict(sorted(team_map.items(), key=lambda item: int(item[0])))
-            for period, team_map in sorted(period_map.items(), key=lambda item: int(item[0]))
+            for period, team_map in sorted(
+                period_map.items(), key=lambda item: int(item[0])
+            )
         }
         for game_id, period_map in sorted(period_overrides.items())
     }

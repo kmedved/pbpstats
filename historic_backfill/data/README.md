@@ -8,8 +8,10 @@ are large local data products.
 
 | File | Required for | Notes |
 | --- | --- | --- |
-| `nba_raw.db` | core backfill, NBA official boxscore lookups, and v3 `pbpv3` actions | Local SQLite cache of NBA stats endpoint payloads. The bulk runner's `fetch_pbp_v3` reads the `pbpv3` endpoint from this DB. |
+| `nba_raw.db` | core backfill, NBA official boxscore lookups, and v3 `pbpv3` actions | Local SQLite cache of NBA stats endpoint payloads. Core validation opens this DB and checks that `raw_responses` contains `boxscore`, `summary`, and `pbpv3` endpoints. |
 | `playbyplayv2.parq` | v2 play-by-play DataFrame input | Historical NBA PBP source used by the backfill runner. |
+| `period_starters_v6.parquet` | period starter fallback, highest precedence | Gamerotation-backed period starter source used by the bulk runner. |
+| `period_starters_v5.parquet` | period starter fallback | Secondary period starter source used when v6 lacks a game/period. |
 
 Missing required NBA files should make core validation fail clearly.
 
@@ -43,6 +45,8 @@ Expected shape:
 historic_backfill/data/
   nba_raw.db
   playbyplayv2.parq
+  period_starters_v6.parquet
+  period_starters_v5.parquet
   playbyplayv3.parq          # optional parquet-direct companion
   bbr/
     bbref_boxscores.db
