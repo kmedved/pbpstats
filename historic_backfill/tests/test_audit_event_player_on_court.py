@@ -1,3 +1,7 @@
+import sys
+
+import pandas as pd
+
 from historic_backfill.audits.core.event_player_on_court import _check_event_players
 
 
@@ -195,3 +199,69 @@ def test_same_clock_sub_in_makes_rebound_control_eligible():
     issues = _check_event_players("0021700236", [sub, rebound], _player_team_map())
 
     assert issues.empty
+
+
+def test_event_player_on_court_cli_forwards_runtime_snapshot_args(
+    monkeypatch,
+    tmp_path,
+):
+    import historic_backfill.audits.core.event_player_on_court as module
+
+    observed = {}
+
+    def fake_audit_event_player_on_court(**kwargs):
+        observed.update(kwargs)
+        return pd.DataFrame(), {"games": 1, "issue_rows": 0}
+
+    paths = {
+        "output": tmp_path / "out",
+        "parquet": tmp_path / "playbyplayv2.parq",
+        "db": tmp_path / "nba_raw.db",
+        "file_directory": tmp_path / "file_directory",
+        "row": tmp_path / "pbp_row_overrides.csv",
+        "stat": tmp_path / "pbp_stat_overrides.csv",
+        "boxscore": tmp_path / "boxscore_source_overrides.csv",
+        "period_one": tmp_path / "period_starters_v6.parquet",
+        "period_two": tmp_path / "period_starters_v5.parquet",
+    }
+    monkeypatch.setattr(module, "audit_event_player_on_court", fake_audit_event_player_on_court)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "event_player_on_court",
+            "--game-ids",
+            "0029700001",
+            "--output-dir",
+            str(paths["output"]),
+            "--parquet-path",
+            str(paths["parquet"]),
+            "--db-path",
+            str(paths["db"]),
+            "--file-directory",
+            str(paths["file_directory"]),
+            "--pbp-row-overrides-path",
+            str(paths["row"]),
+            "--pbp-stat-overrides-path",
+            str(paths["stat"]),
+            "--boxscore-source-overrides-path",
+            str(paths["boxscore"]),
+            "--period-starter-parquet-paths",
+            str(paths["period_one"]),
+            str(paths["period_two"]),
+        ],
+    )
+
+    assert module.main() == 0
+
+    assert observed["game_ids"] == ["0029700001"]
+    assert observed["parquet_path"] == paths["parquet"]
+    assert observed["db_path"] == paths["db"]
+    assert observed["file_directory"] == paths["file_directory"]
+    assert observed["pbp_row_overrides_path"] == paths["row"]
+    assert observed["pbp_stat_overrides_path"] == paths["stat"]
+    assert observed["boxscore_source_overrides_path"] == paths["boxscore"]
+    assert observed["period_starter_parquet_paths"] == [
+        paths["period_one"],
+        paths["period_two"],
+    ]

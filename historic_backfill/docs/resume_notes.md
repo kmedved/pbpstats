@@ -1173,7 +1173,7 @@ python cautious_rerun.py --seasons 2013 2014 2015 2019 --output-dir pass0_openin
   - the live rerun still reproduces the broader `0029800606` current shape (`3` minute mismatches / `2` outliers / `3` PM mismatches), so the provenance fix improved auditability but did not by itself resolve that game’s narrow-vs-broad lineage split
 - Important usage note:
   - the old risky reuse path is no longer the default
-  - an explicit `reuse-latest-global-cache` mode still exists only as an operator-controlled escape hatch
+  - an explicit `reuse-latest-global-cache-unsafe` mode still exists only as an operator-controlled escape hatch
   - do **not** use that explicit reuse mode for validation gates or dated canary acceptance artifacts
 - Focused validation for the hardening pass:
   - `PYTHONPATH=. /opt/anaconda3/envs/darko311/bin/python -m pytest -q tests/test_cautious_rerun.py tests/test_rerun_selected_games.py tests/test_golden_canary_suite.py tests/test_build_plus_minus_reference_report.py`

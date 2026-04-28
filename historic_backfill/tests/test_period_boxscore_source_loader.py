@@ -2,7 +2,9 @@ from pathlib import Path
 
 import pandas as pd
 
-from historic_backfill.common.period_boxscore_source_loader import PeriodBoxscoreSourceLoader
+from historic_backfill.common.period_boxscore_source_loader import (
+    PeriodBoxscoreSourceLoader,
+)
 
 
 def _write_parquet(path: Path, rows: list[dict]) -> None:
@@ -61,7 +63,7 @@ def test_period_boxscore_loader_returns_parquet_rt2_payload(tmp_path):
                     {"personId": 227, "statistics": {"minutes": "0:01"}},
                 ],
             },
-        }
+        },
     }
 
 
@@ -126,7 +128,9 @@ def test_period_boxscore_loader_only_answers_rt2_requests(tmp_path):
     assert loader.load_data("0020100162", 6, "rt2_start_window") is None
 
 
-def test_period_boxscore_loader_uses_first_matching_parquet_in_precedence_order(tmp_path):
+def test_period_boxscore_loader_uses_first_matching_parquet_in_precedence_order(
+    tmp_path,
+):
     v6_path = tmp_path / "period_starters_v6.parquet"
     v5_path = tmp_path / "period_starters_v5.parquet"
     _write_parquet(
@@ -178,7 +182,10 @@ def test_period_boxscore_loader_uses_first_matching_parquet_in_precedence_order(
 
     payload = loader.load_data("0020100162", 5, "rt2_start_window")
 
-    assert [player["personId"] for player in payload["boxScoreTraditional"]["awayTeam"]["players"]] == [
+    assert [
+        player["personId"]
+        for player in payload["boxScoreTraditional"]["awayTeam"]["players"]
+    ] == [
         301,
         302,
         303,
@@ -188,7 +195,9 @@ def test_period_boxscore_loader_uses_first_matching_parquet_in_precedence_order(
     assert payload["periodStarterSource"] == {"name": "v6"}
 
 
-def test_period_boxscore_loader_falls_back_to_later_parquet_when_first_is_unresolved(tmp_path):
+def test_period_boxscore_loader_falls_back_to_later_parquet_when_first_is_unresolved(
+    tmp_path,
+):
     v6_path = tmp_path / "period_starters_v6.parquet"
     v5_path = tmp_path / "period_starters_v5.parquet"
     _write_parquet(
@@ -240,7 +249,10 @@ def test_period_boxscore_loader_falls_back_to_later_parquet_when_first_is_unreso
 
     payload = loader.load_data("0020100162", 5, "rt2_start_window")
 
-    assert [player["personId"] for player in payload["boxScoreTraditional"]["awayTeam"]["players"]] == [
+    assert [
+        player["personId"]
+        for player in payload["boxScoreTraditional"]["awayTeam"]["players"]
+    ] == [
         123,
         124,
         125,
@@ -292,7 +304,9 @@ def test_period_boxscore_loader_filters_to_allowed_seasons(tmp_path):
         ],
     )
 
-    loader = PeriodBoxscoreSourceLoader(parquet_path=parquet_path, allowed_seasons=[1997])
+    loader = PeriodBoxscoreSourceLoader(
+        parquet_path=parquet_path, allowed_seasons=[1997]
+    )
 
     assert loader.load_data("0029600060", 5, "rt2_start_window") is not None
     assert loader.load_data("0021800143", 6, "rt2_start_window") is None
@@ -343,6 +357,57 @@ def test_period_boxscore_loader_filters_to_allowed_game_ids(tmp_path):
     loader = PeriodBoxscoreSourceLoader(
         parquet_path=parquet_path,
         allowed_game_ids=["0029700060"],
+    )
+
+    assert loader.load_data("0029700060", 5, "rt2_start_window") is not None
+    assert loader.load_data("0029700061", 5, "rt2_start_window") is None
+
+
+def test_period_boxscore_loader_normalizes_float_like_game_ids(tmp_path):
+    parquet_path = tmp_path / "period_starters_v6.parquet"
+    _write_parquet(
+        parquet_path,
+        [
+            {
+                "game_id": 29700060.0,
+                "period": 5,
+                "away_team_id": 1610612737,
+                "away_player1": 1,
+                "away_player2": 2,
+                "away_player3": 3,
+                "away_player4": 4,
+                "away_player5": 5,
+                "home_team_id": 1610612748,
+                "home_player1": 6,
+                "home_player2": 7,
+                "home_player3": 8,
+                "home_player4": 9,
+                "home_player5": 10,
+                "resolved": True,
+            },
+            {
+                "game_id": 29700061.0,
+                "period": 5,
+                "away_team_id": 1610612737,
+                "away_player1": 11,
+                "away_player2": 12,
+                "away_player3": 13,
+                "away_player4": 14,
+                "away_player5": 15,
+                "home_team_id": 1610612748,
+                "home_player1": 16,
+                "home_player2": 17,
+                "home_player3": 18,
+                "home_player4": 19,
+                "home_player5": 20,
+                "resolved": True,
+            },
+        ],
+    )
+
+    loader = PeriodBoxscoreSourceLoader(
+        parquet_path=parquet_path,
+        allowed_game_ids=["29700060.0"],
     )
 
     assert loader.load_data("0029700060", 5, "rt2_start_window") is not None

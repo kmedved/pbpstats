@@ -91,9 +91,12 @@ def _coerce_optional_int(value: object) -> int | None:
     if not raw:
         return None
     try:
-        return int(float(raw))
+        parsed = float(raw)
     except ValueError:
         return None
+    if not parsed.is_integer():
+        return None
+    return int(parsed)
 
 
 def normalize_game_id(value: object) -> str:
@@ -105,7 +108,10 @@ def normalize_game_id(value: object) -> str:
         return raw.zfill(10)
     if raw.endswith(".0") and raw[:-2].isdigit():
         return raw[:-2].zfill(10)
-    return str(int(float(raw))).zfill(10)
+    parsed = float(raw)
+    if not parsed.is_integer():
+        raise ValueError(f"game_id must be integral: {raw!r}")
+    return str(int(parsed)).zfill(10)
 
 
 def _clock_seconds_from_pctimestring(value: str) -> float | None:
@@ -133,13 +139,20 @@ def _parse_int(
             raise ValueError(f"Row {row_number} is missing required field {field}")
         return None
     try:
-        return int(float(value))
+        parsed = float(value)
     except ValueError:
         if strict:
             raise ValueError(
                 f"Row {row_number} has invalid integer field {field}: {value!r}"
             )
         return None
+    if not parsed.is_integer():
+        if strict:
+            raise ValueError(
+                f"Row {row_number} has non-integer field {field}: {value!r}"
+            )
+        return None
+    return int(parsed)
 
 
 def _validate_parsed_override(row: dict, row_number: int, strict: bool) -> bool:

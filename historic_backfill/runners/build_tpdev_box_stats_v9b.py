@@ -19,10 +19,18 @@ import pandas as pd
 from joblib import Parallel, delayed
 from historic_backfill.catalogs.boxscore_source_overrides import apply_boxscore_response_overrides
 from historic_backfill.catalogs.pbp_row_overrides import apply_pbp_row_overrides
-from historic_backfill.catalogs.pbp_stat_overrides import apply_pbp_stat_overrides
+from historic_backfill.catalogs.pbp_stat_overrides import (
+    apply_pbp_stat_overrides as apply_pbp_stat_overrides_with_catalog,
+)
+from historic_backfill.catalogs.validation_overrides import (
+    load_validation_overrides as load_validation_overrides_with_policy,
+)
 from historic_backfill.common.player_id_normalization import normalize_single_game_player_ids
 from historic_backfill.common.team_event_normalization import normalize_single_game_team_events
-from pbpstats.offline.row_overrides import normalize_game_id
+from pbpstats.offline.row_overrides import (
+    apply_pbp_row_overrides as apply_pbp_row_overrides_with_catalog,
+    normalize_game_id,
+)
 from historic_backfill.audits.core.boxscore import (
     AUDIT_ERROR_COLUMNS,
     FOUL_KEYS as AUDIT_FOUL_KEYS,
@@ -32,6 +40,9 @@ from historic_backfill.audits.core.boxscore import (
     build_pbp_boxscore_from_stat_rows,
     write_boxscore_audit_outputs,
 )
+
+# Global name used by generated v9b code. Runtime wrappers may replace this.
+apply_pbp_stat_overrides = apply_pbp_stat_overrides_with_catalog
 
 pd.set_option('display.max_columns', 500)
 pd.set_option('display.width', 1000)
@@ -89,6 +100,7 @@ def get_v3_cache() -> Dict[str, pd.DataFrame]:
 
 def load_response(game_id: str, endpoint: str, team_id: Optional[int] = None) -> Optional[Dict]:
     """Load and decompress a response from the database."""
+    game_id = normalize_game_id(game_id)
     conn = get_conn()
     if team_id is None:
         row = conn.execute(
@@ -121,7 +133,7 @@ def load_response(game_id: str, endpoint: str, team_id: Optional[int] = None) ->
 
 def fetch_boxscore_stats(game_id: str) -> pd.DataFrame:
     """Load boxscore from local DB."""
-    game_id = str(game_id).zfill(10)
+    game_id = normalize_game_id(game_id)
     data = load_response(game_id, "boxscore")
     
     if not data:
@@ -140,7 +152,7 @@ def fetch_boxscore_stats(game_id: str) -> pd.DataFrame:
 
 def fetch_game_summary(game_id: str) -> dict:
     """Load game summary from local DB."""
-    game_id = str(game_id).zfill(10)
+    game_id = normalize_game_id(game_id)
     data = load_response(game_id, "summary")
     
     if not data:
@@ -179,7 +191,7 @@ def _resolve_game_team_ids(summary: dict, df_box: pd.DataFrame) -> Tuple[int, in
 
 def fetch_pbp_v3(game_id: str, use_cache: bool = True) -> pd.DataFrame:
     """Load playbyplayv3 from local DB."""
-    game_id = str(game_id).zfill(10)
+    game_id = normalize_game_id(game_id)
     
     cache = get_v3_cache()
     if use_cache and game_id in cache:
@@ -210,14 +222,14 @@ def clear_v3_cache(game_id: Optional[str] = None) -> None:
     if game_id is None:
         cache.clear()
     else:
-        cache.pop(str(game_id).zfill(10), None)
+        cache.pop(normalize_game_id(game_id), None)
 
 
 def log_event_stats_error(game_id: str, event_repr: str, error_msg: str) -> None:
     """Log an event_stats error for later export (thread-safe)."""
     with _error_lock:
         _event_stats_errors.append({
-            "game_id": str(game_id).zfill(10),
+            "game_id": normalize_game_id(game_id),
             "event": event_repr,
             "error": error_msg,
         })
@@ -268,28 +280,11 @@ def load_validation_overrides(filepath: str = "validation_overrides.csv") -> Dic
     CSV format:
         game_id,action,tolerance,notes
         0029900712,allow,5,Fortson missing from boxscore but present in PBP
-        0020100543,skip,,Known bad data - skip validation entirely
     
     Actions:
         - allow: use custom tolerance for this game
-        - skip: skip validation entirely (still process the game)
     """
-    overrides: Dict[str, Dict] = {}
-    path = Path(filepath)
-    if not path.exists():
-        return overrides
-    
-    df = pd.read_csv(path)
-    for _, row in df.iterrows():
-        raw_gid = row["game_id"]
-        if pd.isna(raw_gid):
-            continue
-        game_id = str(int(float(raw_gid))).zfill(10)
-        overrides[game_id] = {
-            "action": row.get("action", "allow"),
-            "tolerance": int(row["tolerance"]) if pd.notna(row.get("tolerance")) else None,
-            "notes": row.get("notes", ""),
-        }
+    overrides = load_validation_overrides_with_policy(filepath, release_safe=True)
     print(f"[OVERRIDES] Loaded {len(overrides)} validation overrides from {filepath}")
     return overrides
 
@@ -343,7 +338,7 @@ def load_shufinskiy_pbp_df(csv_path: str) -> pd.DataFrame:
             df[col] = df[col].fillna("")
 
     if "GAME_ID" in df.columns:
-        df["GAME_ID"] = df["GAME_ID"].astype(str).str.zfill(10)
+        df["GAME_ID"] = df["GAME_ID"].map(normalize_game_id)
 
     return df
 
@@ -636,7 +631,7 @@ def _build_game_boxscore_audit_rows(
     official_box: pd.DataFrame,
 ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]], List[Dict[str, str]]]:
     if official_box.empty:
-        return [], [], [{"game_id": str(game_id).zfill(10), "error": "Official boxscore unavailable"}]
+        return [], [], [{"game_id": normalize_game_id(game_id), "error": "Official boxscore unavailable"}]
 
     player_name_map: Dict[int, str] = {}
     if {"PLAYER_ID", "PLAYER_NAME"}.issubset(official_box.columns):
@@ -687,7 +682,8 @@ def generate_darko_hybrid(
         pid_to_start = dict(zip(df_box['PLAYER_ID'], df_box['IS_STARTER']))
         pid_to_pos = dict(zip(df_box['PLAYER_ID'], df_box['START_POSITION']))
 
-    single_game_df = season_pbp_df[season_pbp_df['GAME_ID'] == str(game_id).zfill(10)]
+    game_id = normalize_game_id(game_id)
+    single_game_df = season_pbp_df[season_pbp_df['GAME_ID'] == game_id]
     if single_game_df.empty:
         raise ValueError(f"Game ID {game_id} not found in provided Local DataFrame.")
 
@@ -983,14 +979,16 @@ def assert_team_totals_match(
     overrides: Optional[Dict[str, Dict]] = None,
 ) -> None:
     """Assert that PBP-derived team PTS matches official boxscore within tolerance."""
-    game_id = str(game_id).zfill(10)
-    
-    override = (overrides or _validation_overrides).get(game_id)
+    game_id = normalize_game_id(game_id)
+
+    override_source = _validation_overrides if overrides is None else overrides
+    override = override_source.get(game_id)
     if override:
-        action = override.get("action", "allow")
+        action = str(override.get("action", "allow")).strip().lower()
         if action == "skip":
-            print(f"[VALIDATION SKIPPED] Game {game_id}: {override.get('notes', 'manual override')}")
-            return
+            raise AssertionError(
+                f"[VALIDATION] skip override is not release-safe for {game_id}"
+            )
         elif action == "allow" and override.get("tolerance") is not None:
             tolerance = override["tolerance"]
             print(f"[VALIDATION OVERRIDE] Game {game_id}: using tolerance={tolerance}")
@@ -1069,7 +1067,8 @@ def _generate_darko_hybrid_with_fetchers(
         pid_to_start = dict(zip(df_box['PLAYER_ID'], df_box['IS_STARTER']))
         pid_to_pos = dict(zip(df_box['PLAYER_ID'], df_box['START_POSITION']))
 
-    single_game_df = season_pbp_df[season_pbp_df['GAME_ID'] == str(game_id).zfill(10)]
+    game_id = normalize_game_id(game_id)
+    single_game_df = season_pbp_df[season_pbp_df['GAME_ID'] == game_id]
     if single_game_df.empty:
         raise ValueError(f"Game ID {game_id} not found in provided DataFrame.")
 
@@ -1103,7 +1102,7 @@ def _generate_darko_hybrid_with_fetchers(
                 _ = ev.event_stats
             except Exception as e:
                 error_list.append({
-                    "game_id": str(game_id).zfill(10),
+                    "game_id": game_id,
                     "event": repr(ev),
                     "error": str(e),
                 })
@@ -1371,14 +1370,15 @@ def _assert_team_totals_with_fetcher(
     overrides: Optional[Dict[str, Dict]] = None,
 ) -> None:
     """Version of assert_team_totals_match that uses provided fetcher and supports overrides."""
-    game_id = str(game_id).zfill(10)
+    game_id = normalize_game_id(game_id)
     
     override = (overrides or {}).get(game_id)
     if override:
-        action = override.get("action", "allow")
+        action = str(override.get("action", "allow")).strip().lower()
         if action == "skip":
-            print(f"[VALIDATION SKIPPED] Game {game_id}: {override.get('notes', 'manual override')}")
-            return
+            raise AssertionError(
+                f"[VALIDATION] skip override is not release-safe for {game_id}"
+            )
         elif action == "allow" and override.get("tolerance") is not None:
             tolerance = override["tolerance"]
             print(f"[VALIDATION OVERRIDE] Game {game_id}: using tolerance={tolerance}")
@@ -1439,13 +1439,17 @@ def _process_single_game_worker(
     overrides: Optional[Dict[str, Dict]] = None,
     strict_mode: Optional[bool] = None,
     run_boxscore_audit: bool = False,
+    boxscore_source_overrides: Optional[pd.DataFrame] = None,
+    pbp_row_overrides: Optional[Dict[str, List[dict]]] = None,
+    pbp_stat_overrides: Optional[Dict[str, List[dict]]] = None,
 ) -> Tuple[str, Optional[pd.DataFrame], Optional[str], List[Dict], List[Dict], Dict[str, List[Dict[str, Any]]]]:
     """
     Worker function for parallel processing.
     Fully self-contained - creates own DB connection.
     Returns (game_id, darko_df, error_msg, event_stats_errors, rebound_deletions, audit_payload).
     """
-    game_id = str(game_id).zfill(10)
+    game_id = normalize_game_id(game_id)
+    game_df = _normalize_worker_game_df(game_df)
     local_errors: List[Dict] = []
     local_rebound_deletions: List[Dict] = []
     audit_payload: Dict[str, List[Dict[str, Any]]] = {
@@ -1459,6 +1463,29 @@ def _process_single_game_worker(
         set_rebound_strict_mode(strict_mode)
     
     local_conn = sqlite3.connect(db_path, timeout=30)
+    global apply_pbp_row_overrides, apply_pbp_stat_overrides
+    original_apply_pbp_row_overrides = apply_pbp_row_overrides
+    original_apply_pbp_stat_overrides = apply_pbp_stat_overrides
+
+    if pbp_row_overrides is not None:
+        def apply_pbp_row_overrides_runtime(game_df: pd.DataFrame) -> pd.DataFrame:
+            return apply_pbp_row_overrides_with_catalog(
+                game_df,
+                pbp_row_overrides,
+                strict_lookup=True,
+            )
+
+        apply_pbp_row_overrides = apply_pbp_row_overrides_runtime
+
+    if pbp_stat_overrides is not None:
+        def apply_pbp_stat_overrides_runtime(gid: str | int, stat_rows):
+            return apply_pbp_stat_overrides_with_catalog(
+                gid,
+                stat_rows,
+                overrides=pbp_stat_overrides,
+            )
+
+        apply_pbp_stat_overrides = apply_pbp_stat_overrides_runtime
     
     def local_load_response(gid: str, endpoint: str, team_id: Optional[int] = None) -> Optional[Dict]:
         if team_id is None:
@@ -1481,12 +1508,16 @@ def _process_single_game_worker(
                 else:
                     data = json.loads(blob)
             if endpoint == "boxscore":
-                return apply_boxscore_response_overrides(gid, data)
+                return apply_boxscore_response_overrides(
+                    gid,
+                    data,
+                    overrides=boxscore_source_overrides,
+                )
             return data
         return None
     
     def local_fetch_boxscore(gid: str) -> pd.DataFrame:
-        gid = str(gid).zfill(10)
+        gid = normalize_game_id(gid)
         data = local_load_response(gid, "boxscore")
         if not data:
             return pd.DataFrame()
@@ -1497,7 +1528,7 @@ def _process_single_game_worker(
             return pd.DataFrame()
     
     def local_fetch_summary(gid: str) -> dict:
-        gid = str(gid).zfill(10)
+        gid = normalize_game_id(gid)
         data = local_load_response(gid, "summary")
         if not data:
             return {}
@@ -1512,7 +1543,7 @@ def _process_single_game_worker(
             return {}
     
     def local_fetch_pbp_v3(gid: str) -> pd.DataFrame:
-        gid = str(gid).zfill(10)
+        gid = normalize_game_id(gid)
         data = local_load_response(gid, "pbpv3")
         if not data:
             return pd.DataFrame()
@@ -1568,7 +1599,17 @@ def _process_single_game_worker(
             })
         return (game_id, None, str(e), local_errors, local_rebound_deletions, audit_payload)
     finally:
+        apply_pbp_row_overrides = original_apply_pbp_row_overrides
+        apply_pbp_stat_overrides = original_apply_pbp_stat_overrides
         local_conn.close()
+
+
+def _normalize_worker_game_df(game_df: pd.DataFrame) -> pd.DataFrame:
+    if game_df.empty or "GAME_ID" not in game_df.columns:
+        return game_df
+    normalized = game_df.copy()
+    normalized["GAME_ID"] = normalized["GAME_ID"].map(normalize_game_id)
+    return normalized
 
 
 def process_single_game(
@@ -1581,7 +1622,7 @@ def process_single_game(
     Process a single game (non-parallel version).
     Returns (game_id, darko_df, error_msg).
     """
-    game_id = str(game_id).zfill(10)
+    game_id = normalize_game_id(game_id)
     try:
         darko_df, possessions = generate_darko_hybrid(game_id, season_pbp_df)
         
@@ -1606,6 +1647,9 @@ def process_games_parallel(
     overrides: Optional[Dict[str, Dict]] = None,
     strict_mode: Optional[bool] = None,
     run_boxscore_audit: bool = False,
+    boxscore_source_overrides: Optional[pd.DataFrame] = None,
+    pbp_row_overrides: Optional[Dict[str, List[dict]]] = None,
+    pbp_stat_overrides: Optional[Dict[str, List[dict]]] = None,
 ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """
     Process multiple games in parallel using joblib.
@@ -1619,28 +1663,42 @@ def process_games_parallel(
     Returns:
         (combined_darko_df, error_df, team_audit_df, player_mismatch_df, audit_error_df)
     """
+    if backend == "threading" and (pbp_row_overrides is not None or pbp_stat_overrides is not None):
+        raise ValueError("runtime row/stat catalog overrides require a process-based joblib backend; use loky or multiprocessing")
+
     db_path_str = str(DB_PATH)
     
     print(f"[PREP] Pre-filtering {len(game_ids)} games...")
-    game_dfs: Dict[str, pd.DataFrame] = {
-        str(gid).zfill(10): group.copy()
-        for gid, group in season_pbp_df.groupby("GAME_ID")
-    }
+    normalized_game_ids = [normalize_game_id(gid) for gid in game_ids]
+    row_positions_by_game: dict[str, list[int]] = {}
+    for row_index, raw_game_id in enumerate(season_pbp_df["GAME_ID"].tolist()):
+        normalized = normalize_game_id(raw_game_id)
+        row_positions_by_game.setdefault(normalized, []).append(row_index)
+    missing_game_ids = sorted(
+        gid for gid in normalized_game_ids if gid not in row_positions_by_game
+    )
+    if missing_game_ids:
+        raise ValueError(
+            f"Requested games missing from season dataframe: {missing_game_ids}"
+        )
     
     print(f"[RUN] Processing with {max_workers} workers (backend={backend})...")
     
     results_list = Parallel(n_jobs=max_workers, backend=backend, verbose=10)(
         delayed(_process_single_game_worker)(
             gid,
-            game_dfs[str(gid).zfill(10)],
+            season_pbp_df.iloc[row_positions_by_game[gid]].copy(),
             db_path_str,
             validate,
             tolerance,
             overrides,
             strict_mode,
             run_boxscore_audit,
+            boxscore_source_overrides,
+            pbp_row_overrides,
+            pbp_stat_overrides,
         )
-        for gid in game_ids
+        for gid in normalized_game_ids
     )
     
     results: List[pd.DataFrame] = []
@@ -1697,6 +1755,9 @@ def process_season(
     overrides_path: str = "validation_overrides.csv",
     strict_mode: bool | None = None,
     run_boxscore_audit: bool = False,
+    boxscore_source_overrides: Optional[pd.DataFrame] = None,
+    pbp_row_overrides: Optional[Dict[str, List[dict]]] = None,
+    pbp_stat_overrides: Optional[Dict[str, List[dict]]] = None,
 ) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """
     Process all games for a single season.
@@ -1740,6 +1801,9 @@ def process_season(
         overrides=overrides,
         strict_mode=strict_mode,
         run_boxscore_audit=run_boxscore_audit,
+        boxscore_source_overrides=boxscore_source_overrides,
+        pbp_row_overrides=pbp_row_overrides,
+        pbp_stat_overrides=pbp_stat_overrides,
     )
     
     if not combined_df.empty:

@@ -241,6 +241,23 @@ def test_historic_pbp_row_override_catalog_validates_strictly():
     validate_historic_pbp_row_override_catalog()
 
 
+def test_historic_pbp_row_override_validation_rejects_drop_move_conflicts(tmp_path):
+    catalog_path = tmp_path / "pbp_row_overrides.csv"
+    catalog_path.write_text(
+        "game_id,action,event_num,anchor_event_num,notes\n"
+        "0021900261,drop,367,,drop stranded row\n"
+        "0021900261,move_before,367,368,stale move for dropped row\n",
+        encoding="utf-8",
+    )
+
+    try:
+        validate_historic_pbp_row_override_catalog(catalog_path)
+    except ValueError as exc:
+        assert "moved after it was dropped" in str(exc)
+    else:
+        raise AssertionError("expected drop/move conflict validation to fail")
+
+
 def test_historic_pbp_row_override_application_is_strict():
     df = _game_df([1, 2, 3])
     overrides = {

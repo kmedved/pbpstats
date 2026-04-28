@@ -95,6 +95,18 @@ def test_load_pbp_row_overrides_rejects_non_numeric_synthetic_ids(tmp_path):
         load_pbp_row_overrides(path)
 
 
+def test_load_pbp_row_overrides_rejects_non_integral_numbers(tmp_path):
+    path = tmp_path / "overrides.csv"
+    path.write_text(
+        "game_id,action,event_num,anchor_event_num,notes\n"
+        "0029600442,move_before,148.9,149,bad event\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="non-integer field event_num"):
+        load_pbp_row_overrides(path)
+
+
 def test_load_pbp_row_overrides_rejects_self_anchor_move(tmp_path):
     path = tmp_path / "overrides.csv"
     path.write_text(
@@ -189,6 +201,11 @@ def test_apply_pbp_row_overrides_strict_lookup_rejects_existing_synthetic_event(
 def test_normalize_game_id_preserves_plain_digit_strings():
     assert normalize_game_id("0020400335") == "0020400335"
     assert normalize_game_id("29600442.0") == "0029600442"
+
+
+def test_normalize_game_id_rejects_non_integral_float_like_values():
+    with pytest.raises(ValueError, match="integral"):
+        normalize_game_id("29600442.9")
 
 
 def test_apply_pbp_row_overrides_rejects_direct_self_anchor_move():

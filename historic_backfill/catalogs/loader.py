@@ -24,6 +24,33 @@ PBP_ROW_OVERRIDE_REQUIRED_COLUMNS = {
 }
 
 
+def _validate_no_conflicting_row_override_actions(
+    parsed: Dict[str, List[dict]],
+) -> None:
+    for game_id, rows in parsed.items():
+        actions_by_event: dict[int, set[str]] = {}
+        dropped_events: set[int] = set()
+        for row in rows:
+            action = str(row["action"])
+            event_num = int(row["event_num"])
+            actions_by_event.setdefault(event_num, set()).add(action)
+
+            if action in {"move_before", "move_after"} and event_num in dropped_events:
+                raise ValueError(
+                    f"{game_id} event {event_num} is moved after it was dropped"
+                )
+            if action == "drop":
+                dropped_events.add(event_num)
+
+        for event_num, actions in actions_by_event.items():
+            if "drop" in actions and actions.intersection(
+                {"move_before", "move_after"}
+            ):
+                raise ValueError(
+                    f"{game_id} event {event_num} has conflicting drop and move actions"
+                )
+
+
 @lru_cache(maxsize=1)
 def load_historic_pbp_row_overrides(
     path: str | Path = DEFAULT_HISTORIC_PBP_ROW_OVERRIDES_PATH,
@@ -45,6 +72,7 @@ def validate_historic_pbp_row_override_catalog(
         )
 
     parsed = load_pbp_row_overrides(catalog_path, strict=True)
+    _validate_no_conflicting_row_override_actions(parsed)
     parsed_row_count = sum(len(rows) for rows in parsed.values())
     if parsed_row_count != len(raw_df):
         raise ValueError(

@@ -5,10 +5,11 @@ import json
 import sqlite3
 import zlib
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterable
 
 from historic_backfill.common.game_context import _load_game_context
 from historic_backfill.common.lineups import _collect_game_events, _normalize_lineups
+from pbpstats.offline.row_overrides import normalize_game_id
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -93,8 +94,8 @@ def _correction_sort_key(correction: dict[str, Any]) -> tuple[Any, ...]:
     )
 
 
-def _normalize_runtime_game_id(value: str | int) -> str:
-    return str(int(value)).zfill(10)
+def _normalize_runtime_game_id(value: object) -> str:
+    return normalize_game_id(value)
 
 
 def _normalize_source(value: str | None) -> str:
@@ -316,7 +317,7 @@ def build_explicit_runtime_views(
             continue
 
         correction_id = str(correction["correction_id"])
-        game_id = str(correction["game_id"])
+        game_id = _normalize_runtime_game_id(correction["game_id"])
         period = int(correction["period"])
         team_id = int(correction["team_id"])
         scope_type = str(correction["scope_type"])
@@ -517,6 +518,10 @@ def _resolve_base_lineup(
     parquet_path: Path,
     db_path: Path,
     file_directory: Path,
+    pbp_row_overrides_path: Path | None,
+    pbp_stat_overrides_path: Path | None,
+    boxscore_source_overrides_path: Path | None,
+    period_starter_parquet_paths: Iterable[Path] | None,
     game_cache: dict[str, tuple[list[object], dict[tuple[int, int], list[int]]]],
 ) -> list[int]:
     runtime_game_id = _normalize_runtime_game_id(correction["game_id"])
@@ -526,6 +531,10 @@ def _resolve_base_lineup(
             parquet_path=parquet_path.resolve(),
             db_path=db_path.resolve(),
             file_directory=file_directory.resolve(),
+            pbp_row_overrides_path=pbp_row_overrides_path,
+            pbp_stat_overrides_path=pbp_stat_overrides_path,
+            boxscore_source_overrides_path=boxscore_source_overrides_path,
+            period_starter_parquet_paths=period_starter_parquet_paths,
         )
         events = _collect_game_events(possessions)
         game_cache[runtime_game_id] = (events, _event_index_lookup(events))
@@ -569,6 +578,10 @@ def _resolve_lineup_for_correction(
     parquet_path: Path,
     db_path: Path,
     file_directory: Path,
+    pbp_row_overrides_path: Path | None,
+    pbp_stat_overrides_path: Path | None,
+    boxscore_source_overrides_path: Path | None,
+    period_starter_parquet_paths: Iterable[Path] | None,
     game_cache: dict[str, tuple[list[object], dict[tuple[int, int], list[int]]]],
 ) -> list[int]:
     authoring_mode = str(correction.get("authoring_mode") or "")
@@ -594,6 +607,10 @@ def _resolve_lineup_for_correction(
         parquet_path=parquet_path,
         db_path=db_path,
         file_directory=file_directory,
+        pbp_row_overrides_path=pbp_row_overrides_path,
+        pbp_stat_overrides_path=pbp_stat_overrides_path,
+        boxscore_source_overrides_path=boxscore_source_overrides_path,
+        period_starter_parquet_paths=period_starter_parquet_paths,
         game_cache=game_cache,
     )
     try:
@@ -731,6 +748,10 @@ def compile_runtime_views(
     db_path: Path = DEFAULT_DB_PATH,
     parquet_path: Path = DEFAULT_PARQUET_PATH,
     file_directory: Path = DEFAULT_FILE_DIRECTORY,
+    pbp_row_overrides_path: Path | None = None,
+    pbp_stat_overrides_path: Path | None = None,
+    boxscore_source_overrides_path: Path | None = None,
+    period_starter_parquet_paths: Iterable[Path] | None = None,
 ) -> dict[str, Any]:
     output_dir = output_dir.resolve()
     seen_ids: set[str] = set()
@@ -752,7 +773,7 @@ def compile_runtime_views(
             continue
 
         correction_id = str(correction["correction_id"])
-        game_id = str(correction["game_id"])
+        game_id = _normalize_runtime_game_id(correction["game_id"])
         period = int(correction["period"])
         team_id = int(correction["team_id"])
         lineup = _resolve_lineup_for_correction(
@@ -760,6 +781,10 @@ def compile_runtime_views(
             parquet_path=parquet_path,
             db_path=db_path,
             file_directory=file_directory,
+            pbp_row_overrides_path=pbp_row_overrides_path,
+            pbp_stat_overrides_path=pbp_stat_overrides_path,
+            boxscore_source_overrides_path=boxscore_source_overrides_path,
+            period_starter_parquet_paths=period_starter_parquet_paths,
             game_cache=game_cache,
         )
         _validate_lineup_shape(lineup, correction_id)

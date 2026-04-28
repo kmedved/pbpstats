@@ -68,6 +68,12 @@
     "sidecar_summary": "historic_backfill/releases/v4_1997_2020_20260424_mechanics_fullrun/sidecar/summary.json",
     "sidecar_join_contract": "historic_backfill/releases/v4_1997_2020_20260424_mechanics_fullrun/sidecar/join_contract.json",
     "sidecar_game_quality_sparse": "historic_backfill/releases/v4_1997_2020_20260424_mechanics_fullrun/sidecar/game_quality_sparse.csv",
-    "catalog_snapshot_pbp_row_overrides": "historic_backfill/releases/v4_1997_2020_20260424_mechanics_fullrun/catalog_snapshot/pbp_row_overrides.csv"
+    "catalog_snapshot_pbp_row_overrides": "historic_backfill/releases/v4_1997_2020_20260424_mechanics_fullrun/catalog_snapshot/pbp_row_overrides.csv",
+    "catalog_snapshot_pbp_stat_overrides": "historic_backfill/releases/v4_1997_2020_20260424_mechanics_fullrun/catalog_snapshot/pbp_stat_overrides.csv",
+    "catalog_snapshot_validation_overrides": "historic_backfill/releases/v4_1997_2020_20260424_mechanics_fullrun/catalog_snapshot/validation_overrides.csv",
+    "catalog_snapshot_boxscore_source_overrides": "historic_backfill/releases/v4_1997_2020_20260424_mechanics_fullrun/catalog_snapshot/boxscore_source_overrides.csv",
+    "catalog_snapshot_correction_manifest": "historic_backfill/releases/v4_1997_2020_20260424_mechanics_fullrun/catalog_snapshot/overrides/correction_manifest.json",
+    "catalog_snapshot_period_starters_overrides": "historic_backfill/releases/v4_1997_2020_20260424_mechanics_fullrun/catalog_snapshot/overrides/period_starters_overrides.json",
+    "catalog_snapshot_lineup_window_overrides": "historic_backfill/releases/v4_1997_2020_20260424_mechanics_fullrun/catalog_snapshot/overrides/lineup_window_overrides.json"
   }
 }

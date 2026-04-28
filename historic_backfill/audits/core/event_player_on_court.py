@@ -323,6 +323,10 @@ def audit_event_player_on_court(
     parquet_path: Path = DEFAULT_PARQUET_PATH,
     db_path: Path = DEFAULT_DB_PATH,
     file_directory: Path = DEFAULT_FILE_DIRECTORY,
+    pbp_row_overrides_path: Path | None = None,
+    pbp_stat_overrides_path: Path | None = None,
+    boxscore_source_overrides_path: Path | None = None,
+    period_starter_parquet_paths: Iterable[Path] | None = None,
 ) -> tuple[pd.DataFrame, dict[str, Any]]:
     issue_frames: List[pd.DataFrame] = []
 
@@ -333,6 +337,10 @@ def audit_event_player_on_court(
             parquet_path=parquet_path,
             db_path=db_path,
             file_directory=file_directory,
+            pbp_row_overrides_path=pbp_row_overrides_path,
+            pbp_stat_overrides_path=pbp_stat_overrides_path,
+            boxscore_source_overrides_path=boxscore_source_overrides_path,
+            period_starter_parquet_paths=period_starter_parquet_paths,
         )
         events = _collect_game_events(possessions)
         player_team_map = _build_player_team_map(darko_df)
@@ -388,6 +396,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--parquet-path", type=Path, default=DEFAULT_PARQUET_PATH)
     parser.add_argument("--db-path", type=Path, default=DEFAULT_DB_PATH)
     parser.add_argument("--file-directory", type=Path, default=DEFAULT_FILE_DIRECTORY)
+    parser.add_argument("--pbp-row-overrides-path", type=Path)
+    parser.add_argument("--pbp-stat-overrides-path", type=Path)
+    parser.add_argument("--boxscore-source-overrides-path", type=Path)
+    parser.add_argument("--period-starter-parquet-paths", type=Path, nargs="*")
     return parser.parse_args()
 
 
@@ -400,6 +412,10 @@ def main() -> int:
         parquet_path=args.parquet_path,
         db_path=args.db_path,
         file_directory=args.file_directory,
+        pbp_row_overrides_path=args.pbp_row_overrides_path,
+        pbp_stat_overrides_path=args.pbp_stat_overrides_path,
+        boxscore_source_overrides_path=args.boxscore_source_overrides_path,
+        period_starter_parquet_paths=args.period_starter_parquet_paths,
     )
     issues_df.to_csv(args.output_dir / "event_player_on_court_issues.csv", index=False)
     (args.output_dir / "summary.json").write_text(

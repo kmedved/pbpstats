@@ -9,14 +9,18 @@ from typing import Any, Dict, Iterable, List
 
 import pandas as pd
 
-from historic_backfill.catalogs.boxscore_source_overrides import apply_boxscore_response_overrides
+from historic_backfill.catalogs.boxscore_source_overrides import (
+    apply_boxscore_response_overrides,
+    load_boxscore_source_overrides,
+)
+from pbpstats.offline.row_overrides import normalize_game_id
 
 
 MINUTE_OUTLIER_THRESHOLD = 0.5
 
 
 def _normalize_game_id(value: str | int) -> str:
-    return str(int(value)).zfill(10)
+    return normalize_game_id(value)
 
 
 def parse_official_minutes(value: Any) -> float:
@@ -81,8 +85,17 @@ def _empty_official_boxscore_df() -> pd.DataFrame:
     )
 
 
-def _build_official_boxscore_df(game_id: str, raw: Dict[str, Any] | None) -> pd.DataFrame:
-    raw = apply_boxscore_response_overrides(game_id, raw)
+def _build_official_boxscore_df(
+    game_id: str,
+    raw: Dict[str, Any] | None,
+    *,
+    boxscore_source_overrides: pd.DataFrame | None = None,
+) -> pd.DataFrame:
+    raw = apply_boxscore_response_overrides(
+        game_id,
+        raw,
+        overrides=boxscore_source_overrides,
+    )
     if not raw:
         return _empty_official_boxscore_df()
 
@@ -136,6 +149,7 @@ def load_official_boxscore_batch_df(
     game_ids: Iterable[str | int],
     *,
     chunk_size: int = 500,
+    boxscore_source_overrides: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
     normalized_game_ids = sorted({_normalize_game_id(game_id) for game_id in game_ids})
     if not normalized_game_ids:
@@ -158,7 +172,13 @@ def load_official_boxscore_batch_df(
                 for game_id, blob in rows
             }
             for game_id in chunk:
-                frames.append(_build_official_boxscore_df(game_id, raw_by_game_id.get(game_id)))
+                frames.append(
+                    _build_official_boxscore_df(
+                        game_id,
+                        raw_by_game_id.get(game_id),
+                        boxscore_source_overrides=boxscore_source_overrides,
+                    )
+                )
     finally:
         conn.close()
 
@@ -170,9 +190,18 @@ def load_official_boxscore_batch_df(
     return combined.sort_values(["game_id", "team_id", "player_id"]).reset_index(drop=True)
 
 
-def load_official_boxscore_df(db_path: Path, game_id: str) -> pd.DataFrame:
+def load_official_boxscore_df(
+    db_path: Path,
+    game_id: str,
+    *,
+    boxscore_source_overrides: pd.DataFrame | None = None,
+) -> pd.DataFrame:
     raw = _load_raw_response(db_path, game_id, "boxscore")
-    return _build_official_boxscore_df(game_id, raw)
+    return _build_official_boxscore_df(
+        game_id,
+        raw,
+        boxscore_source_overrides=boxscore_source_overrides,
+    )
 
 
 def _prepare_darko_df(darko_df: pd.DataFrame) -> pd.DataFrame:
@@ -213,7 +242,13 @@ def build_minutes_plus_minus_audit(
     darko_df: pd.DataFrame,
     db_path: Path,
     minute_outlier_threshold: float = MINUTE_OUTLIER_THRESHOLD,
+    boxscore_source_overrides_path: Path | None = None,
+    boxscore_source_overrides: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
+    if boxscore_source_overrides is None and boxscore_source_overrides_path is not None:
+        boxscore_source_overrides = load_boxscore_source_overrides(
+            boxscore_source_overrides_path
+        )
     prepared = _prepare_darko_df(darko_df)
     if prepared.empty:
         return pd.DataFrame(
@@ -238,6 +273,7 @@ def build_minutes_plus_minus_audit(
     official = load_official_boxscore_batch_df(
         db_path,
         sorted(prepared["game_id"].unique()),
+        boxscore_source_overrides=boxscore_source_overrides,
     )
 
     merged = prepared.merge(
@@ -339,13 +375,17 @@ def main() -> None:
     parser.add_argument("input_path", type=Path)
     parser.add_argument("--db-path", type=Path, default=Path(__file__).with_name("nba_raw.db"))
     parser.add_argument("--output-dir", type=Path, required=True)
+    parser.add_argument("--boxscore-source-overrides-path", type=Path)
     parser.add_argument("--minute-outlier-threshold", type=float, default=MINUTE_OUTLIER_THRESHOLD)
     args = parser.parse_args()
 
     parquet_paths = _discover_parquet_paths(args.input_path)
     darko_df = _load_darko_frames(parquet_paths)
     audit_df = build_minutes_plus_minus_audit(
-        darko_df, db_path=args.db_path, minute_outlier_threshold=args.minute_outlier_threshold
+        darko_df,
+        db_path=args.db_path,
+        minute_outlier_threshold=args.minute_outlier_threshold,
+        boxscore_source_overrides_path=args.boxscore_source_overrides_path,
     )
     summary = summarize_minutes_plus_minus_audit(audit_df)
 

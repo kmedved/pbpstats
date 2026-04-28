@@ -17,10 +17,17 @@ import zlib
 from pathlib import Path
 from typing import Any, Dict, Iterable, Tuple
 
+from pbpstats.offline.row_overrides import normalize_game_id
+
 from historic_backfill.catalogs.boxscore_source_overrides import (
+    BOXSCORE_SOURCE_OVERRIDE_COLUMNS,
     apply_boxscore_response_overrides,
     load_boxscore_source_overrides,
     set_boxscore_source_overrides,
+    validate_boxscore_source_overrides,
+)
+from historic_backfill.catalogs.validation_overrides import (
+    validate_validation_overrides,
 )
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -34,16 +41,17 @@ DEFAULT_OVERRIDES = CATALOGS_ROOT / "validation_overrides.csv"
 DEFAULT_BOXSCORE_SOURCE_OVERRIDES = CATALOGS_ROOT / "boxscore_source_overrides.csv"
 DEFAULT_FILE_DIRECTORY = DATA_ROOT
 DEFAULT_RUNTIME_CATALOG_OVERRIDES_DIR = CATALOGS_ROOT / "overrides"
+DEFAULT_PBP_ROW_OVERRIDES = CATALOGS_ROOT / "pbp_row_overrides.csv"
+DEFAULT_PBP_STAT_OVERRIDES = CATALOGS_ROOT / "pbp_stat_overrides.csv"
 DEFAULT_RUNTIME_INPUT_CACHE_MODE = "fresh-copy"
 DEFAULT_AUDIT_PROFILE = "full"
 RUNTIME_INPUT_CACHE_MODES = {
     "fresh-copy",
-    "reuse-latest-global-cache",
+    "reuse-latest-global-cache-unsafe",
     "reuse-validated-cache",
 }
 AUDIT_PROFILES = {"full", "counting_only"}
 VALIDATED_CACHE_MANIFEST_NAME = "validated_runtime_input_manifest.json"
-SMALL_RUNTIME_INPUT_HASH_LIMIT_BYTES = 1024 * 1024
 # Runtime starter precedence is now gamerotation-backed v6, then v5 as fallback.
 DEFAULT_PERIOD_STARTERS_PARQUETS = [
     DATA_ROOT / "period_starters_v6.parquet",
@@ -56,6 +64,11 @@ RUNTIME_FILE_DIRECTORY_LINK_NAMES = [
     "raw_responses",
     "schedule",
 ]
+REQUIRED_RUNTIME_OVERRIDE_FILES = {
+    "correction_manifest.json",
+    "period_starters_overrides.json",
+    "lineup_window_overrides.json",
+}
 
 NOTEBOOK_LOCAL_IMPORT_PRELOADS: list[str] = []
 
@@ -133,9 +146,13 @@ def _preload_local_module(module_name: str, module_path: Path) -> None:
 
 
 def _load_raw_response(
-    db_path: Path, game_id: str, endpoint: str
+    db_path: Path,
+    game_id: str,
+    endpoint: str,
+    *,
+    boxscore_source_overrides: Any | None = None,
 ) -> Dict[str, Any] | None:
-    game_id = str(game_id).zfill(10)
+    game_id = normalize_game_id(game_id)
     conn = sqlite3.connect(db_path, timeout=30)
     try:
         row = conn.execute(
@@ -153,7 +170,11 @@ def _load_raw_response(
             else:
                 data = json.loads(blob)
         if endpoint == "boxscore":
-            return apply_boxscore_response_overrides(game_id, data)
+            return apply_boxscore_response_overrides(
+                game_id,
+                data,
+                overrides=boxscore_source_overrides,
+            )
         return data
     finally:
         conn.close()
@@ -172,6 +193,10 @@ def _hydrate_runtime_input(source_path: Path, cache_dir: Path) -> Path:
                 dst.write(chunk)
         return cached_path
     return source_path
+
+
+def _runtime_catalog_cache_dir(cache_dir: Path) -> Path:
+    return cache_dir / "catalogs"
 
 
 def _validated_cache_manifest_path(cache_dir: Path) -> Path:
@@ -204,6 +229,14 @@ def _write_validated_cache_manifest(cache_dir: Path, manifest: dict[str, Any]) -
     return manifest_path
 
 
+def _sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
 def _source_fingerprint(path: Path) -> dict[str, Any]:
     resolved = path.resolve()
     if not resolved.exists():
@@ -217,6 +250,7 @@ def _source_fingerprint(path: Path) -> dict[str, Any]:
         "exists": True,
         "size_bytes": int(stat.st_size),
         "mtime_ns": int(stat.st_mtime_ns),
+        "sha256": _sha256_file(resolved),
     }
 
 
@@ -229,9 +263,8 @@ def _cached_fingerprint(path: Path) -> dict[str, Any]:
         "exists": True,
         "size_bytes": int(stat.st_size),
         "mtime_ns": int(stat.st_mtime_ns),
+        "sha256": _sha256_file(resolved),
     }
-    if stat.st_size <= SMALL_RUNTIME_INPUT_HASH_LIMIT_BYTES:
-        fingerprint["sha256"] = hashlib.sha256(resolved.read_bytes()).hexdigest()
     return fingerprint
 
 
@@ -272,7 +305,7 @@ def _record_validated_cache_entry(
 
 def _latest_cached_runtime_copy(filename: str) -> Path | None:
     cached_matches = sorted(
-        ROOT.glob(f"**/_local_runtime_cache/{filename}"),
+        ROOT.glob(f"**/_local_runtime_cache/**/{filename}"),
         key=lambda path: path.stat().st_mtime if path.exists() else 0,
         reverse=True,
     )
@@ -324,15 +357,32 @@ def _remove_existing_path(path: Path) -> None:
 
 
 def _link_or_copy_path(source_path: Path, target_path: Path) -> str:
-    try:
-        target_path.symlink_to(source_path, target_is_directory=source_path.is_dir())
-        return "symlink"
-    except OSError:
-        if source_path.is_dir():
-            shutil.copytree(source_path, target_path)
-            return "copytree"
-        shutil.copy2(source_path, target_path)
-        return "copy2"
+    if source_path.is_dir():
+        shutil.copytree(source_path, target_path)
+        return "copytree"
+    shutil.copy2(source_path, target_path)
+    return "copy2"
+
+
+def _validate_runtime_overrides_dir(path: Path) -> None:
+    from historic_backfill.catalogs.lineup_correction_manifest import (
+        validate_compiled_runtime_views,
+        validate_manifest_schema,
+    )
+
+    if not path.is_dir():
+        raise FileNotFoundError(f"Runtime overrides directory not found: {path}")
+    missing = sorted(
+        name for name in REQUIRED_RUNTIME_OVERRIDE_FILES if not (path / name).exists()
+    )
+    if missing:
+        raise FileNotFoundError(
+            f"Runtime overrides directory {path} missing required files: {missing}"
+        )
+
+    manifest_path = path / "correction_manifest.json"
+    validate_manifest_schema(manifest_path)
+    validate_compiled_runtime_views(manifest_path, path)
 
 
 def prepare_local_runtime_file_directory(
@@ -348,40 +398,68 @@ def prepare_local_runtime_file_directory(
         if catalog_overrides_dir is not None
         else None
     )
-    _remove_existing_path(runtime_file_directory)
-    runtime_file_directory.mkdir(parents=True, exist_ok=True)
-
-    linked_paths = []
-    for name in RUNTIME_FILE_DIRECTORY_LINK_NAMES:
-        source_path = live_file_directory / name
-        if not source_path.exists():
-            continue
-        target_path = runtime_file_directory / name
-        link_mode = _link_or_copy_path(source_path, target_path)
-        linked_paths.append(
-            {
-                "name": name,
-                "link_mode": link_mode,
-                "source": _path_metadata(source_path),
-                "target": _path_metadata(target_path),
-            }
-        )
-
     live_overrides_source = live_file_directory / "overrides"
-    overrides_source_kind = "empty"
-    if catalog_overrides_dir is not None and catalog_overrides_dir.exists():
+    if catalog_overrides_dir is not None:
         overrides_source = catalog_overrides_dir
         overrides_source_kind = "catalogs"
-    elif live_overrides_source.exists():
+        _validate_runtime_overrides_dir(overrides_source)
+    else:
         overrides_source = live_overrides_source
         overrides_source_kind = "file_directory"
-    else:
-        overrides_source = live_overrides_source
+        _validate_runtime_overrides_dir(overrides_source)
+
+    build_directory = runtime_file_directory.with_name(
+        f"{runtime_file_directory.name}.tmp-{os.getpid()}"
+    )
+    backup_directory = runtime_file_directory.with_name(
+        f"{runtime_file_directory.name}.bak"
+    )
+    _remove_existing_path(build_directory)
+    build_directory.mkdir(parents=True, exist_ok=True)
+
+    linked_paths = []
+    try:
+        for name in RUNTIME_FILE_DIRECTORY_LINK_NAMES:
+            source_path = live_file_directory / name
+            if not source_path.exists():
+                continue
+            target_path = build_directory / name
+            link_mode = _link_or_copy_path(source_path, target_path)
+            linked_paths.append(
+                {
+                    "name": name,
+                    "link_mode": link_mode,
+                    "source": _path_metadata(source_path),
+                }
+            )
+
+        shutil.copytree(overrides_source, build_directory / "overrides")
+
+        _remove_existing_path(backup_directory)
+        had_existing_runtime_directory = runtime_file_directory.exists()
+        if had_existing_runtime_directory:
+            runtime_file_directory.rename(backup_directory)
+        try:
+            build_directory.rename(runtime_file_directory)
+        except Exception:
+            if (
+                had_existing_runtime_directory
+                and backup_directory.exists()
+                and not runtime_file_directory.exists()
+            ):
+                backup_directory.rename(runtime_file_directory)
+            raise
+        _remove_existing_path(backup_directory)
+    except Exception:
+        _remove_existing_path(build_directory)
+        raise
+
+    for linked_path in linked_paths:
+        linked_path["target"] = _path_metadata(
+            runtime_file_directory / str(linked_path["name"])
+        )
+
     overrides_target = runtime_file_directory / "overrides"
-    if overrides_source.exists():
-        shutil.copytree(overrides_source, overrides_target)
-    else:
-        overrides_target.mkdir(parents=True, exist_ok=True)
 
     return {
         "live_file_directory": _path_metadata(live_file_directory),
@@ -422,6 +500,9 @@ def prepare_local_runtime_inputs(
         "build_tpdev_box_stats_v9b.py",
         "nba_raw.db",
         "playbyplayv2.parq",
+        "pbp_row_overrides.csv",
+        "pbp_stat_overrides.csv",
+        "validation_overrides.csv",
         "boxscore_source_overrides.csv",
         "period_starters_v6.parquet",
         "period_starters_v5.parquet",
@@ -443,13 +524,15 @@ def prepare_local_runtime_inputs(
         *,
         allow_empty_fallback: bool,
         required: bool = True,
+        target_dir: Path | None = None,
     ) -> tuple[Path, Dict[str, Any]]:
         source_path = Path(source_path).resolve()
-        cached_path = cache_dir / source_path.name
+        local_cache_dir = target_dir or cache_dir
+        cached_path = local_cache_dir / source_path.name
         if required and not source_path.exists():
             raise FileNotFoundError(f"Required runtime input not found: {source_path}")
         if (
-            runtime_input_cache_mode == "reuse-latest-global-cache"
+            runtime_input_cache_mode == "reuse-latest-global-cache-unsafe"
             and source_path.name in reuse_cached_names
         ):
             cached_copy = _latest_cached_runtime_copy(source_path.name)
@@ -472,7 +555,7 @@ def prepare_local_runtime_inputs(
                 )
         try:
             had_cached_copy = cached_path.exists()
-            hydrated_path = _hydrate_runtime_input(source_path, cache_dir)
+            hydrated_path = _hydrate_runtime_input(source_path, local_cache_dir)
             if (
                 runtime_input_cache_mode == "reuse-validated-cache"
                 and hydrated_path != source_path
@@ -501,8 +584,20 @@ def prepare_local_runtime_inputs(
         except OSError as exc:
             if not allow_empty_fallback or not allow_unreadable_csv_fallback:
                 raise
-            fallback_path = cache_dir / source_path.name
-            fallback_path.unlink(missing_ok=True)
+            fallback_path = local_cache_dir / source_path.name
+            fallback_path.parent.mkdir(parents=True, exist_ok=True)
+            if source_path.name == "boxscore_source_overrides.csv":
+                fallback_path.write_text(
+                    ",".join(BOXSCORE_SOURCE_OVERRIDE_COLUMNS) + "\n",
+                    encoding="utf-8",
+                )
+            elif source_path.name == "validation_overrides.csv":
+                fallback_path.write_text(
+                    "game_id,action,tolerance,notes\n",
+                    encoding="utf-8",
+                )
+            else:
+                fallback_path.unlink(missing_ok=True)
             print(
                 f"[RUNNER] WARNING: using empty fallback for unreadable runtime input {source_path}: {exc}"
             )
@@ -536,6 +631,7 @@ def prepare_local_runtime_inputs(
         _hydrate_or_fallback(
             overrides_path,
             allow_empty_fallback=True,
+            target_dir=_runtime_catalog_cache_dir(cache_dir),
         )
     )
     (
@@ -544,6 +640,23 @@ def prepare_local_runtime_inputs(
     ) = _hydrate_or_fallback(
         boxscore_source_overrides_path,
         allow_empty_fallback=True,
+        target_dir=_runtime_catalog_cache_dir(cache_dir),
+    )
+    (
+        hydrated_pbp_row_overrides_path,
+        runtime_input_provenance["inputs"]["pbp_row_overrides_path"],
+    ) = _hydrate_or_fallback(
+        DEFAULT_PBP_ROW_OVERRIDES,
+        allow_empty_fallback=False,
+        target_dir=_runtime_catalog_cache_dir(cache_dir),
+    )
+    (
+        hydrated_pbp_stat_overrides_path,
+        runtime_input_provenance["inputs"]["pbp_stat_overrides_path"],
+    ) = _hydrate_or_fallback(
+        DEFAULT_PBP_STAT_OVERRIDES,
+        allow_empty_fallback=False,
+        target_dir=_runtime_catalog_cache_dir(cache_dir),
     )
     hydrated_preload_module_paths: Dict[str, Path] = {}
     for module_name in NOTEBOOK_LOCAL_IMPORT_PRELOADS:
@@ -579,6 +692,22 @@ def prepare_local_runtime_inputs(
         hydrated_period_starter_paths.append(hydrated_path)
         runtime_input_provenance["period_starter_parquet_inputs"].append(record)
 
+    from historic_backfill.catalogs.loader import (
+        validate_historic_pbp_row_override_catalog,
+    )
+    from historic_backfill.catalogs.pbp_stat_overrides import load_pbp_stat_overrides
+    from historic_backfill.runners.validate import validate_core_runtime_data_inputs
+
+    validate_validation_overrides(hydrated_overrides_path)
+    validate_boxscore_source_overrides(hydrated_boxscore_source_path)
+    validate_historic_pbp_row_override_catalog(hydrated_pbp_row_overrides_path)
+    load_pbp_stat_overrides(hydrated_pbp_stat_overrides_path, strict=True)
+    validate_core_runtime_data_inputs(
+        db_path=hydrated_db_path,
+        parquet_path=hydrated_parquet_path,
+        period_starter_parquet_paths=hydrated_period_starter_paths,
+    )
+
     file_directory_provenance = prepare_local_runtime_file_directory(
         cache_dir.parent / "_local_runtime_file_directory",
         live_file_directory=file_directory,
@@ -601,6 +730,8 @@ def prepare_local_runtime_inputs(
         "preload_module_paths": hydrated_preload_module_paths,
         "overrides_path": hydrated_overrides_path,
         "boxscore_source_overrides_path": hydrated_boxscore_source_path,
+        "pbp_row_overrides_path": hydrated_pbp_row_overrides_path,
+        "pbp_stat_overrides_path": hydrated_pbp_stat_overrides_path,
         "period_starter_parquet_paths": hydrated_period_starter_paths,
         "file_directory": Path(
             file_directory_provenance["runtime_file_directory"]["path"]
@@ -622,16 +753,27 @@ def _patch_v9b_runtime_namespace(namespace: Dict[str, Any]) -> None:
         overrides: Dict[str, Dict] | None = None,
         strict_mode: bool | None = None,
         run_boxscore_audit: bool = False,
+        boxscore_source_overrides: Any | None = None,
+        pbp_row_overrides: Any | None = None,
+        pbp_stat_overrides: Any | None = None,
     ) -> Tuple[Any, Any, Any, Any, Any]:
+        if backend == "threading" and (
+            pbp_row_overrides is not None or pbp_stat_overrides is not None
+        ):
+            raise ValueError(
+                "runtime row/stat catalog overrides require a process-based "
+                "joblib backend; use loky or multiprocessing"
+            )
+
         db_path_str = str(namespace["DB_PATH"])
-        normalized_game_ids = [str(gid).zfill(10) for gid in game_ids]
+        normalized_game_ids = [normalize_game_id(gid) for gid in game_ids]
         print(
             f"[PREP] Building lazy row slices for {len(normalized_game_ids)} games..."
         )
 
         row_positions_by_game: dict[str, list[int]] = {}
         for row_index, raw_game_id in enumerate(season_pbp_df["GAME_ID"].tolist()):
-            normalized = str(raw_game_id).zfill(10)
+            normalized = normalize_game_id(raw_game_id)
             row_positions_by_game.setdefault(normalized, []).append(row_index)
 
         missing_game_ids = sorted(
@@ -655,6 +797,9 @@ def _patch_v9b_runtime_namespace(namespace: Dict[str, Any]) -> None:
                 overrides,
                 strict_mode,
                 run_boxscore_audit,
+                boxscore_source_overrides,
+                pbp_row_overrides,
+                pbp_stat_overrides,
             )
             for gid in normalized_game_ids
         )
@@ -778,6 +923,9 @@ def _patch_v9b_runtime_namespace(namespace: Dict[str, Any]) -> None:
             overrides=overrides,
             strict_mode=strict_mode,
             run_boxscore_audit=run_boxscore_audit,
+            boxscore_source_overrides=namespace.get("_boxscore_source_overrides"),
+            pbp_row_overrides=namespace.get("_pbp_row_overrides"),
+            pbp_stat_overrides=namespace.get("_pbp_stat_overrides"),
         )
         timings["game_processing_seconds"] = round(
             time.perf_counter() - game_processing_start, 6
@@ -842,6 +990,55 @@ def _patch_v9b_runtime_namespace(namespace: Dict[str, Any]) -> None:
     namespace["process_season"] = process_season_patched
 
 
+def install_runtime_catalog_wrappers(
+    namespace: Dict[str, Any],
+    *,
+    pbp_row_overrides_path: Path,
+    pbp_stat_overrides_path: Path,
+) -> None:
+    from historic_backfill.catalogs.loader import (
+        validate_historic_pbp_row_override_catalog,
+    )
+    from historic_backfill.catalogs.pbp_stat_overrides import (
+        apply_pbp_stat_overrides,
+        load_pbp_stat_overrides,
+    )
+    from pbpstats.offline.row_overrides import (
+        apply_pbp_row_overrides,
+        load_pbp_row_overrides,
+    )
+
+    validate_historic_pbp_row_override_catalog(pbp_row_overrides_path)
+    row_overrides = load_pbp_row_overrides(pbp_row_overrides_path, strict=True)
+    stat_overrides = load_pbp_stat_overrides(pbp_stat_overrides_path)
+
+    def apply_pbp_row_overrides_snapshot(
+        game_df: Any,
+        overrides: Any | None = None,
+    ) -> Any:
+        return apply_pbp_row_overrides(
+            game_df,
+            row_overrides if overrides is None else overrides,
+            strict_lookup=True,
+        )
+
+    def apply_pbp_stat_overrides_snapshot(
+        game_id: str | int,
+        stat_rows: Any,
+        overrides: Any | None = None,
+    ) -> Any:
+        return apply_pbp_stat_overrides(
+            game_id,
+            stat_rows,
+            overrides=stat_overrides if overrides is None else overrides,
+        )
+
+    namespace["apply_pbp_row_overrides"] = apply_pbp_row_overrides_snapshot
+    namespace["apply_pbp_stat_overrides"] = apply_pbp_stat_overrides_snapshot
+    namespace["_pbp_row_overrides"] = row_overrides
+    namespace["_pbp_stat_overrides"] = stat_overrides
+
+
 def load_v9b_namespace(
     *,
     notebook_dump_path: Path = NOTEBOOK_DUMP,
@@ -875,6 +1072,7 @@ def install_local_boxscore_wrapper(
     allowed_seasons: Iterable[int] | None = None,
     allowed_game_ids: Iterable[str | int] | None = None,
     period_starter_parquet_paths: Iterable[Path] | None = None,
+    boxscore_source_overrides: Any | None = None,
 ) -> None:
     from historic_backfill.common.period_boxscore_source_loader import (
         PeriodBoxscoreSourceLoader,
@@ -899,8 +1097,13 @@ def install_local_boxscore_wrapper(
         pbp_df = args[0] if args else kwargs.get("pbp_df")
         loader = None
         if pbp_df is not None and not pbp_df.empty and "GAME_ID" in pbp_df.columns:
-            game_id = str(pbp_df["GAME_ID"].iloc[0]).zfill(10)
-            raw_boxscore = _load_raw_response(db_path, game_id, "boxscore")
+            game_id = normalize_game_id(pbp_df["GAME_ID"].iloc[0])
+            raw_boxscore = _load_raw_response(
+                db_path,
+                game_id,
+                "boxscore",
+                boxscore_source_overrides=boxscore_source_overrides,
+            )
             if raw_boxscore is not None:
                 loader = _BoxscoreSourceLoader(raw_boxscore)
 
@@ -921,6 +1124,10 @@ def run_lineup_audits(
     db_path: Path,
     parquet_path: Path,
     file_directory: Path = DEFAULT_FILE_DIRECTORY,
+    pbp_row_overrides_path: Path | None = None,
+    pbp_stat_overrides_path: Path | None = None,
+    boxscore_source_overrides_path: Path | None = None,
+    period_starter_parquet_paths: Iterable[Path] | None = None,
 ) -> Dict[str, Any]:
     from historic_backfill.audits.core.event_player_on_court import (
         audit_event_player_on_court,
@@ -933,7 +1140,11 @@ def run_lineup_audits(
     overall_start = time.perf_counter()
 
     minutes_audit_start = time.perf_counter()
-    minutes_audit_df = build_minutes_plus_minus_audit(combined_df, db_path=db_path)
+    minutes_audit_df = build_minutes_plus_minus_audit(
+        combined_df,
+        db_path=db_path,
+        boxscore_source_overrides_path=boxscore_source_overrides_path,
+    )
     minutes_summary = summarize_minutes_plus_minus_audit(minutes_audit_df)
     minutes_audit_seconds = round(time.perf_counter() - minutes_audit_start, 6)
     minutes_audit_df.to_csv(
@@ -946,7 +1157,7 @@ def run_lineup_audits(
 
     problem_game_ids = sorted(
         {
-            str(game_id).zfill(10)
+            normalize_game_id(game_id)
             for game_id in minutes_audit_df.loc[
                 minutes_audit_df["has_minutes_mismatch"]
                 | minutes_audit_df["has_plus_minus_mismatch"],
@@ -965,6 +1176,10 @@ def run_lineup_audits(
         parquet_path=parquet_path,
         db_path=db_path,
         file_directory=file_directory,
+        pbp_row_overrides_path=pbp_row_overrides_path,
+        pbp_stat_overrides_path=pbp_stat_overrides_path,
+        boxscore_source_overrides_path=boxscore_source_overrides_path,
+        period_starter_parquet_paths=period_starter_parquet_paths,
     )
     event_on_court_seconds = round(time.perf_counter() - event_on_court_start, 6)
     issues_df.to_csv(
@@ -998,6 +1213,10 @@ def run_season(
     db_path: Path,
     file_directory: Path,
     overrides_path: Path,
+    pbp_row_overrides_path: Path,
+    pbp_stat_overrides_path: Path,
+    boxscore_source_overrides_path: Path,
+    period_starter_parquet_paths: Iterable[Path],
     strict_mode: bool,
     tolerance: int,
     max_workers: int,
@@ -1048,6 +1267,10 @@ def run_season(
                 db_path=db_path,
                 parquet_path=parquet_path,
                 file_directory=file_directory,
+                pbp_row_overrides_path=pbp_row_overrides_path,
+                pbp_stat_overrides_path=pbp_stat_overrides_path,
+                boxscore_source_overrides_path=boxscore_source_overrides_path,
+                period_starter_parquet_paths=period_starter_parquet_paths,
             )
             print(
                 f"[LINEUP AUDIT] Finished season {season}: "
@@ -1162,10 +1385,18 @@ def _runner_failure_reasons(final_summary: dict[str, Any]) -> list[str]:
 
     if final_summary.get("run_boxscore_audit"):
         audit_failure_seasons = []
+        missing_audit_summary_seasons = []
         for summary in final_summary.get("seasons", []):
-            audit_summary = summary.get("boxscore_audit") or {}
+            audit_summary = summary.get("boxscore_audit")
+            if not audit_summary:
+                missing_audit_summary_seasons.append(int(summary.get("season")))
+                continue
             if int(audit_summary.get("audit_failures", 0) or 0) > 0:
                 audit_failure_seasons.append(int(summary.get("season")))
+        if missing_audit_summary_seasons:
+            reasons.append(
+                f"missing_boxscore_audit_summary_seasons={missing_audit_summary_seasons}"
+            )
         if audit_failure_seasons:
             reasons.append(f"boxscore_audit_failure_seasons={audit_failure_seasons}")
     return reasons
@@ -1204,12 +1435,21 @@ def main(argv: Iterable[str] | None = None) -> int:
         notebook_dump_path=runtime_inputs["notebook_dump_path"],
         preload_module_paths=runtime_inputs["preload_module_paths"],
     )
+    install_runtime_catalog_wrappers(
+        namespace,
+        pbp_row_overrides_path=runtime_inputs["pbp_row_overrides_path"],
+        pbp_stat_overrides_path=runtime_inputs["pbp_stat_overrides_path"],
+    )
+    namespace["_boxscore_source_overrides"] = load_boxscore_source_overrides(
+        runtime_inputs["boxscore_source_overrides_path"]
+    )
     install_local_boxscore_wrapper(
         namespace,
         runtime_inputs["db_path"],
         file_directory=runtime_inputs["file_directory"],
         allowed_seasons=args.seasons,
         period_starter_parquet_paths=runtime_inputs["period_starter_parquet_paths"],
+        boxscore_source_overrides=namespace["_boxscore_source_overrides"],
     )
     namespace_load_seconds = round(time.perf_counter() - namespace_load_start, 6)
 
@@ -1252,6 +1492,14 @@ def main(argv: Iterable[str] | None = None) -> int:
                 db_path=runtime_inputs["db_path"],
                 file_directory=runtime_inputs["file_directory"],
                 overrides_path=runtime_inputs["overrides_path"],
+                pbp_row_overrides_path=runtime_inputs["pbp_row_overrides_path"],
+                pbp_stat_overrides_path=runtime_inputs["pbp_stat_overrides_path"],
+                boxscore_source_overrides_path=runtime_inputs[
+                    "boxscore_source_overrides_path"
+                ],
+                period_starter_parquet_paths=runtime_inputs[
+                    "period_starter_parquet_paths"
+                ],
                 strict_mode=args.strict_mode,
                 tolerance=args.tolerance,
                 max_workers=args.max_workers,

@@ -1,0 +1,88 @@
+{
+  "0021700886": [
+    {
+      "period": 3,
+      "team_id": 1610612752,
+      "start_event_num": 482,
+      "end_event_num": 482,
+      "lineup_player_ids": [
+        1626144,
+        203501,
+        201563,
+        203124,
+        1628373
+      ]
+    }
+  ],
+  "0029700159": [
+    {
+      "period": 3,
+      "team_id": 1610612743,
+      "start_event_num": 349,
+      "end_event_num": 366,
+      "lineup_player_ids": [
+        1517,
+        111,
+        271,
+        1504,
+        968
+      ]
+    },
+    {
+      "period": 3,
+      "team_id": 1610612743,
+      "start_event_num": 367,
+      "end_event_num": 372,
+      "lineup_player_ids": [
+        1517,
+        111,
+        271,
+        1504,
+        924
+      ]
+    }
+  ],
+  "0029700367": [
+    {
+      "period": 4,
+      "team_id": 1610612761,
+      "start_event_num": 464,
+      "end_event_num": 464,
+      "lineup_player_ids": [
+        757,
+        948,
+        57,
+        961,
+        932
+      ]
+    }
+  ],
+  "0049700045": [
+    {
+      "period": 1,
+      "team_id": 1610612741,
+      "start_event_num": 1,
+      "end_event_num": 1,
+      "lineup_player_ids": [
+        166,
+        893,
+        389,
+        23,
+        937
+      ]
+    },
+    {
+      "period": 1,
+      "team_id": 1610612766,
+      "start_event_num": 1,
+      "end_event_num": 1,
+      "lineup_player_ids": [
+        124,
+        193,
+        779,
+        133,
+        184
+      ]
+    }
+  ]
+}

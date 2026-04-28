@@ -3,12 +3,15 @@
 Reads pre-scraped period starters from one or more parquet files and
 synthesizes V3-shaped responses for the pbpstats starter fallback chain.
 """
+
 from __future__ import annotations
 
 from pathlib import Path
 from typing import Any, Dict, Iterable, Tuple
 
 import pandas as pd
+
+from pbpstats.offline.row_overrides import normalize_game_id
 
 STARTER_LOOKUP_COLUMNS = [
     "game_id",
@@ -29,6 +32,7 @@ def _build_v3_response_from_starters(
     source_name: str,
 ) -> Dict[str, Any]:
     """Synthesize a V3-shaped response dict from resolved starter lists."""
+
     def _team_block(team_id, player_ids):
         return {
             "teamId": int(team_id),
@@ -37,12 +41,13 @@ def _build_v3_response_from_starters(
                 for pid in player_ids
             ],
         }
+
     return {
         "periodStarterSource": {"name": source_name},
         "boxScoreTraditional": {
             "awayTeam": _team_block(away_team_id, away_player_ids),
             "homeTeam": _team_block(home_team_id, home_player_ids),
-        }
+        },
     }
 
 
@@ -56,14 +61,20 @@ class _ParquetStarterLookup:
         allowed_game_ids: set[str] | None = None,
     ):
         self._source_name = parquet_path.stem.removeprefix("period_starters_")
-        self._lookup: Dict[Tuple[str, int], Tuple[int, tuple[int, ...], int, tuple[int, ...]]] = {}
+        self._lookup: Dict[
+            Tuple[str, int], Tuple[int, tuple[int, ...], int, tuple[int, ...]]
+        ] = {}
         if not parquet_path.exists():
             return
 
         parquet_read_kwargs: Dict[str, Any] = {"columns": STARTER_LOOKUP_COLUMNS}
         if allowed_game_ids:
-            normalized_allowed_ids = {str(game_id).zfill(10) for game_id in allowed_game_ids}
-            parquet_read_kwargs["filters"] = self._build_game_id_filters(parquet_path, normalized_allowed_ids)
+            normalized_allowed_ids = {
+                normalize_game_id(game_id) for game_id in allowed_game_ids
+            }
+            parquet_read_kwargs["filters"] = self._build_game_id_filters(
+                parquet_path, normalized_allowed_ids
+            )
 
         df = pd.read_parquet(parquet_path, **parquet_read_kwargs)
         if "resolved" in df.columns:
@@ -72,7 +83,7 @@ class _ParquetStarterLookup:
         if df.empty:
             return
 
-        normalized_game_ids = df["game_id"].astype(str).str.zfill(10)
+        normalized_game_ids = df["game_id"].map(normalize_game_id)
         if allowed_game_ids:
             df = df[normalized_game_ids.isin(allowed_game_ids)].copy()
             normalized_game_ids = normalized_game_ids.loc[df.index]
@@ -111,22 +122,46 @@ class _ParquetStarterLookup:
                 )
 
     @staticmethod
-    def _build_game_id_filters(parquet_path: Path, normalized_allowed_ids: set[str]) -> list[tuple[str, str, list[Any]]]:
+    def _build_game_id_filters(
+        parquet_path: Path, normalized_allowed_ids: set[str]
+    ) -> list[tuple[str, str, list[Any]]]:
         try:
             import pyarrow.parquet as pq
         except ImportError:
             return [("game_id", "in", sorted(normalized_allowed_ids))]
 
         game_id_type = pq.read_schema(parquet_path).field("game_id").type
-        if getattr(game_id_type, "id", None) in {"int32", "int64"} or "int" in str(game_id_type):
-            return [("game_id", "in", sorted({int(game_id) for game_id in normalized_allowed_ids}))]
+        if getattr(game_id_type, "id", None) in {"int32", "int64"} or "int" in str(
+            game_id_type
+        ):
+            return [
+                (
+                    "game_id",
+                    "in",
+                    sorted({int(game_id) for game_id in normalized_allowed_ids}),
+                )
+            ]
+        if "double" in str(game_id_type) or "float" in str(game_id_type):
+            return [
+                (
+                    "game_id",
+                    "in",
+                    sorted({float(int(game_id)) for game_id in normalized_allowed_ids}),
+                )
+            ]
 
         string_allowed_ids = set(normalized_allowed_ids)
-        string_allowed_ids.update(game_id.lstrip("0") or "0" for game_id in normalized_allowed_ids)
+        unpadded_ids = {
+            game_id.lstrip("0") or "0" for game_id in normalized_allowed_ids
+        }
+        string_allowed_ids.update(unpadded_ids)
+        string_allowed_ids.update(
+            f"{int(game_id)}.0" for game_id in normalized_allowed_ids
+        )
         return [("game_id", "in", sorted(string_allowed_ids))]
 
     def get(self, game_id: str, period: int) -> Dict[str, Any] | None:
-        starter_data = self._lookup.get((str(game_id).zfill(10), int(period)))
+        starter_data = self._lookup.get((normalize_game_id(game_id), int(period)))
         if starter_data is None:
             return None
         away_team_id, away_ids, home_team_id, home_ids = starter_data
@@ -160,7 +195,7 @@ class PeriodBoxscoreSourceLoader:
         ordered_paths: list[Path] = []
         seen_paths: set[Path] = set()
         normalized_game_ids = (
-            {str(int(game_id)).zfill(10) for game_id in allowed_game_ids}
+            {normalize_game_id(game_id) for game_id in allowed_game_ids}
             if allowed_game_ids is not None
             else None
         )

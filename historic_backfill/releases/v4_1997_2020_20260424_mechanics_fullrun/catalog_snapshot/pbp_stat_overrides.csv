@@ -1,0 +1,333 @@
+game_id,team_id,player_id,stat_key,stat_value,notes
+0029600332,1610612744,769,UnknownDistance2ptDefRebounds,1,Manual source fix: add Armstrong missing defensive rebound from incomplete historical PBP
+0029600332,1610612744,923,UnknownDistance2ptAssists,1,Manual source fix: add Marshall assist on the missing Fuller make
+0029600332,1610612744,957,AssistedUnknownDistance2pt,1,Manual source fix: add Fuller missing made field goal from incomplete historical PBP
+0029600370,1610612742,45,AssistedArc3,1,Manual source fix: add McCloud missing assisted three from incomplete historical PBP
+0029600370,1610612742,469,Arc3Assists,1,Manual source fix: add Mashburn assist on the missing McCloud three
+0029600370,1610612760,88,AssistedUnknownDistance2pt,1,Manual source fix: add Scheffler missing made field goal from incomplete historical PBP
+0029600370,1610612760,727,UnknownDistance2ptAssists,1,Manual source fix: add Snow assist on the missing Scheffler make
+0029600615,1610612746,448,UnknownDistance2ptDefRebounds,1,Manual source fix: restore the orphan Bo Outlaw defensive rebound missing from usable event context
+0029600040,1610612760,96,UnknownDistance2ptOffRebounds,1,Manual rebound-side fix: official/BBR boxscore credits one more offensive rebound and one fewer defensive rebound
+0029600040,1610612760,96,UnknownDistance2ptDefRebounds,-1,Manual rebound-side fix: official/BBR boxscore credits one more offensive rebound and one fewer defensive rebound
+0029600048,1610612743,911,UnknownDistance2ptOffRebounds,1,Manual rebound-side fix: official/BBR boxscore credits one more offensive rebound and one fewer defensive rebound
+0029600048,1610612743,911,UnknownDistance2ptDefRebounds,-1,Manual rebound-side fix: official/BBR boxscore credits one more offensive rebound and one fewer defensive rebound
+0029600067,1610612742,376,UnknownDistance2ptOffRebounds,1,Manual rebound-side fix: official/BBR boxscore credits one more offensive rebound and one fewer defensive rebound
+0029600067,1610612742,376,UnknownDistance2ptDefRebounds,-1,Manual rebound-side fix: official/BBR boxscore credits one more offensive rebound and one fewer defensive rebound
+0029600121,1610612742,423,UnknownDistance2ptOffRebounds,-1,Manual rebound-side fix: official/BBR boxscore credits one fewer offensive rebound and one more defensive rebound
+0029600121,1610612742,423,UnknownDistance2ptDefRebounds,1,Manual rebound-side fix: official/BBR boxscore credits one fewer offensive rebound and one more defensive rebound
+0029600259,1610612749,951,UnknownDistance2ptOffRebounds,1,Manual rebound-side fix: official/BBR boxscore credits one more offensive rebound and one fewer defensive rebound
+0029600259,1610612749,951,UnknownDistance2ptDefRebounds,-1,Manual rebound-side fix: official/BBR boxscore credits one more offensive rebound and one fewer defensive rebound
+0029600270,1610612747,965,UnknownDistance2ptOffRebounds,1,Manual rebound-side fix: official/BBR boxscore credits one more offensive rebound and one fewer defensive rebound
+0029600270,1610612747,965,UnknownDistance2ptDefRebounds,-1,Manual rebound-side fix: official/BBR boxscore credits one more offensive rebound and one fewer defensive rebound
+0029600322,1610612749,457,UnknownDistance2ptOffRebounds,1,Manual rebound-side fix: official/BBR boxscore credits one more offensive rebound and one fewer defensive rebound
+0029600322,1610612749,457,UnknownDistance2ptDefRebounds,-1,Manual rebound-side fix: official/BBR boxscore credits one more offensive rebound and one fewer defensive rebound
+0029600401,1610612737,363,UnknownDistance2ptOffRebounds,1,Manual rebound-side fix: official/BBR boxscore credits one additional offensive rebound
+0029600565,1610612752,164,UnknownDistance2ptDefRebounds,1,Manual rebound-side fix: official/BBR boxscore credits one additional defensive rebound
+0029600816,1610612752,891,UnknownDistance2ptOffRebounds,1,Manual rebound-side fix: official/BBR boxscore credits one more offensive rebound and one fewer defensive rebound
+0029600816,1610612752,891,UnknownDistance2ptDefRebounds,-1,Manual rebound-side fix: official/BBR boxscore credits one more offensive rebound and one fewer defensive rebound
+0029600893,1610612752,891,UnknownDistance2ptOffRebounds,1,Manual rebound-side fix: official/BBR boxscore credits one more offensive rebound and one fewer defensive rebound
+0029600893,1610612752,891,UnknownDistance2ptDefRebounds,-1,Manual rebound-side fix: official/BBR boxscore credits one more offensive rebound and one fewer defensive rebound
+0029600933,1610612750,339,UnknownDistance2ptOffRebounds,1,Manual rebound-side fix: official/BBR boxscore credits one more offensive rebound and one fewer defensive rebound
+0029600933,1610612750,339,UnknownDistance2ptDefRebounds,-1,Manual rebound-side fix: official/BBR boxscore credits one more offensive rebound and one fewer defensive rebound
+0029600948,1610612741,23,UnknownDistance2ptOffRebounds,-1,Manual rebound-side fix: official/BBR boxscore credits one fewer offensive rebound and one more defensive rebound
+0029600948,1610612741,23,UnknownDistance2ptDefRebounds,1,Manual rebound-side fix: official/BBR boxscore credits one fewer offensive rebound and one more defensive rebound
+0029601064,1610612755,711,UnknownDistance2ptOffRebounds,-1,Manual rebound-side fix: official/BBR boxscore credits one fewer offensive rebound and one more defensive rebound
+0029601064,1610612755,711,UnknownDistance2ptDefRebounds,1,Manual rebound-side fix: official/BBR boxscore credits one fewer offensive rebound and one more defensive rebound
+0029601119,1610612749,428,UnknownDistance2ptOffRebounds,1,Manual rebound-side fix: official/BBR boxscore credits one additional offensive rebound
+0029900545,1610612737,1898,UnknownDistance2ptOffRebounds,-1,Manual rebound-side fix: Bowdler rebound row is being attached to the prior missed free throw instead of the later opponent miss
+0029900545,1610612737,1898,UnknownDistance2ptDefRebounds,1,Manual rebound-side fix: Bowdler rebound row is being attached to the prior missed free throw instead of the later opponent miss
+0029900377,1610612763,949,UnknownDistance2ptOffRebounds,1,Manual source fix: restore the official extra Shareef offensive rebound after dropping the impossible post-free-throw row from the event stream
+0020000350,1610612763,2031,UnknownDistance2ptOffRebounds,1,Manual source fix: restore Swift's official extra offensive rebound after dropping the unresolved late-game rebound row
+0020000383,1610612758,124,UnknownDistance2ptOffRebounds,1,Manual source fix: restore Divac's official extra offensive rebound after dropping the unresolved early-third-quarter rebound row
+0020000139,1610612745,1749,UnknownDistance2ptOffRebounds,1,Manual rebound-side fix: raw rebound counters and BBR boxscore credit Mobley with one additional offensive rebound
+0020000176,1610612749,2038,UnknownDistance2ptOffRebounds,1,Manual rebound-side fix: raw rebound counters and BBR boxscore credit Przybilla with one more offensive rebound and one fewer defensive rebound
+0020000176,1610612749,2038,UnknownDistance2ptDefRebounds,-1,Manual rebound-side fix: raw rebound counters and BBR boxscore credit Przybilla with one more offensive rebound and one fewer defensive rebound
+0020000184,1610612753,42,UnknownDistance2ptOffRebounds,1,Manual rebound-side fix: raw rebound counters and BBR boxscore credit Monty Williams with one more offensive rebound and one fewer defensive rebound
+0020000184,1610612753,42,UnknownDistance2ptDefRebounds,-1,Manual rebound-side fix: raw rebound counters and BBR boxscore credit Monty Williams with one more offensive rebound and one fewer defensive rebound
+0020000261,1610612751,271,UnknownDistance2ptOffRebounds,1,Manual rebound-side fix: official and BBR boxscore credit Newman with one more offensive rebound and one fewer defensive rebound
+0020000261,1610612751,271,UnknownDistance2ptDefRebounds,-1,Manual rebound-side fix: official and BBR boxscore credit Newman with one more offensive rebound and one fewer defensive rebound
+0020000261,1610612749,281,UnknownDistance2ptOffRebounds,1,Manual rebound-side fix: official and BBR boxscore credit Scott Williams with one more offensive rebound and one fewer defensive rebound
+0020000261,1610612749,281,UnknownDistance2ptDefRebounds,-1,Manual rebound-side fix: official and BBR boxscore credit Scott Williams with one more offensive rebound and one fewer defensive rebound
+0020000261,1610612749,1501,UnknownDistance2ptOffRebounds,1,Manual rebound-side fix: official and BBR boxscore credit Tim Thomas with one more offensive rebound and one fewer defensive rebound
+0020000261,1610612749,1501,UnknownDistance2ptDefRebounds,-1,Manual rebound-side fix: official and BBR boxscore credit Tim Thomas with one more offensive rebound and one fewer defensive rebound
+0020000261,1610612751,1536,UnknownDistance2ptOffRebounds,1,Manual rebound-side fix: official and BBR boxscore credit Stephen Jackson with one more offensive rebound and one fewer defensive rebound
+0020000261,1610612751,1536,UnknownDistance2ptDefRebounds,-1,Manual rebound-side fix: official and BBR boxscore credit Stephen Jackson with one more offensive rebound and one fewer defensive rebound
+0020000373,1610612745,165,UnknownDistance2ptOffRebounds,1,Manual rebound-side fix: raw rebound counters and BBR boxscore credit Olajuwon with one more offensive rebound and one fewer defensive rebound
+0020000373,1610612745,165,UnknownDistance2ptDefRebounds,-1,Manual rebound-side fix: raw rebound counters and BBR boxscore credit Olajuwon with one more offensive rebound and one fewer defensive rebound
+0020000459,1610612763,1722,UnknownDistance2ptOffRebounds,1,Manual rebound-side fix: official and BBR boxscore credit Dickerson with one additional offensive rebound
+0020000463,1610612760,1739,UnknownDistance2ptOffRebounds,1,Manual rebound-side fix: official and BBR boxscore credit Patterson with one additional offensive rebound
+0020000566,1610612749,951,UnknownDistance2ptOffRebounds,1,Manual rebound-side fix: official and BBR boxscore credit Ray Allen with one additional offensive rebound
+0020000623,1610612765,1630,UnknownDistance2ptOffRebounds,1,Manual rebound-side fix: official and BBR boxscore credit Mikki Moore with one more offensive rebound and one fewer defensive rebound
+0020000623,1610612765,1630,UnknownDistance2ptDefRebounds,-1,Manual rebound-side fix: official and BBR boxscore credit Mikki Moore with one more offensive rebound and one fewer defensive rebound
+0020000826,1610612741,2033,UnknownDistance2ptOffRebounds,1,Manual rebound-side fix: official and BBR boxscore credit Marcus Fizer with one more offensive rebound and one fewer defensive rebound
+0020000826,1610612741,2033,UnknownDistance2ptDefRebounds,-1,Manual rebound-side fix: official and BBR boxscore credit Marcus Fizer with one more offensive rebound and one fewer defensive rebound
+0020000941,1610612758,185,UnknownDistance2ptOffRebounds,1,Manual rebound-side fix: raw rebound counters and BBR boxscore credit Chris Webber with one more offensive rebound and one fewer defensive rebound
+0020000941,1610612758,185,UnknownDistance2ptDefRebounds,-1,Manual rebound-side fix: raw rebound counters and BBR boxscore credit Chris Webber with one more offensive rebound and one fewer defensive rebound
+0020100412,1610612750,718,UnknownDistance2ptOffRebounds,1,Manual rebound-side fix: raw rebound counters and BBR boxscore credit Gary Trent with one additional offensive rebound
+0020100509,1610612750,708,UnknownDistance2ptOffRebounds,1,Manual rebound-side fix: raw rebound counters and BBR boxscore credit Kevin Garnett with one more offensive rebound and one fewer defensive rebound
+0020100509,1610612750,708,UnknownDistance2ptDefRebounds,-1,Manual rebound-side fix: raw rebound counters and BBR boxscore credit Kevin Garnett with one more offensive rebound and one fewer defensive rebound
+0020100543,1610612744,2211,UnknownDistance2ptOffRebounds,1,Manual rebound-side fix: raw rebound counters and BBR boxscore credit Troy Murphy with one additional offensive rebound
+0020100597,1610612764,1751,UnknownDistance2ptOffRebounds,-1,Manual rebound-side fix: raw rebound counters and BBR boxscore credit Jahidi White with one fewer offensive rebound and one more defensive rebound
+0020100597,1610612764,1751,UnknownDistance2ptDefRebounds,1,Manual rebound-side fix: raw rebound counters and BBR boxscore credit Jahidi White with one fewer offensive rebound and one more defensive rebound
+0020100687,1610612745,2351,UnknownDistance2ptOffRebounds,1,Manual rebound-side fix: raw rebound counters and BBR boxscore credit Oscar Torres with one more offensive rebound and one fewer defensive rebound
+0020100687,1610612745,2351,UnknownDistance2ptDefRebounds,-1,Manual rebound-side fix: raw rebound counters and BBR boxscore credit Oscar Torres with one more offensive rebound and one fewer defensive rebound
+0020100794,1610612739,238,UnknownDistance2ptOffRebounds,1,Manual rebound-side fix: raw rebound counters and BBR boxscore credit Tyrone Hill with one more offensive rebound and one fewer defensive rebound
+0020100794,1610612739,238,UnknownDistance2ptDefRebounds,-1,Manual rebound-side fix: raw rebound counters and BBR boxscore credit Tyrone Hill with one more offensive rebound and one fewer defensive rebound
+0020100996,1610612753,1727,UnknownDistance2ptOffRebounds,1,Manual rebound-side fix: raw rebound counters and BBR boxscore credit Pat Garrity with one additional offensive rebound
+0020101134,1610612763,2200,UnknownDistance2ptOffRebounds,1,Manual rebound-side fix: raw rebound counters and BBR boxscore credit Pau Gasol with one additional offensive rebound
+20201156,1610612743,2454,UnknownDistance2ptOffRebounds,1,Manual rebound-side fix: BBR boxscore 200304120DEN credits Junior Harrington with one more offensive rebound and one fewer defensive rebound
+20201156,1610612743,2454,UnknownDistance2ptDefRebounds,-1,Manual rebound-side fix: BBR boxscore 200304120DEN credits Junior Harrington with one more offensive rebound and one fewer defensive rebound
+20200234,1610612762,384,UnknownDistance2ptOffRebounds,1,Manual rebound-side fix: BBR boxscore 200211300SAS credits Calbert Cheaney with one additional offensive rebound
+0020500265,1610612750,708,UnknownDistance2ptOffRebounds,1,Manual rebound-side fix: raw rebound counters and BBR boxscore credit Kevin Garnett with one more offensive rebound and one fewer defensive rebound
+0020500265,1610612750,708,UnknownDistance2ptDefRebounds,-1,Manual rebound-side fix: raw rebound counters and BBR boxscore credit Kevin Garnett with one more offensive rebound and one fewer defensive rebound
+0020500707,1610612739,980,UnknownDistance2ptOffRebounds,1,Manual rebound-side fix: raw rebound counters and BBR boxscore credit Zydrunas Ilgauskas with one more offensive rebound and one fewer defensive rebound
+0020500707,1610612739,980,UnknownDistance2ptDefRebounds,-1,Manual rebound-side fix: raw rebound counters and BBR boxscore credit Zydrunas Ilgauskas with one more offensive rebound and one fewer defensive rebound
+0020500717,1610612749,2048,UnknownDistance2ptDefRebounds,1,Manual source fix: restore Magloire's official extra defensive rebound after dropping the unresolved late-overtime orphan rebound row
+0020500795,1610612759,1495,UnknownDistance2ptOffRebounds,1,Manual rebound-side fix: raw rebound counters and BBR boxscore credit Tim Duncan with one more offensive rebound and one fewer defensive rebound
+0020500795,1610612759,1495,UnknownDistance2ptDefRebounds,-1,Manual rebound-side fix: raw rebound counters and BBR boxscore credit Tim Duncan with one more offensive rebound and one fewer defensive rebound
+0020600133,1610612752,101126,DeadBallTurnovers,1,Manual source fix: BBR boxscore 200611180NYK credits Nate Robinson with a second turnover on the OFF.Foul plus No Turnover sequence
+0020600205,1610612751,101120,UnknownDistance2ptOffRebounds,-1,Manual rebound-side fix: raw rebound counters and BBR boxscore credit Antoine Wright with one fewer offensive rebound and one more defensive rebound
+0020600205,1610612751,101120,UnknownDistance2ptDefRebounds,1,Manual rebound-side fix: raw rebound counters and BBR boxscore credit Antoine Wright with one fewer offensive rebound and one more defensive rebound
+0020600912,1610612765,101131,UnknownDistance2ptOffRebounds,1,Manual rebound-side fix: raw rebound counters and BBR boxscore credit Jason Maxiell with one additional offensive rebound
+0020601146,1610612748,1715,UnknownDistance2ptOffRebounds,1,Manual rebound-side fix: raw rebound counters and BBR boxscore credit Jason Williams with one additional offensive rebound
+0020701169,1610612752,990,UnknownDistance2ptOffRebounds,1,Manual rebound-side fix: raw rebound counters and BBR boxscore credit Malik Rose with one more offensive rebound and one fewer defensive rebound
+0020701169,1610612752,990,UnknownDistance2ptDefRebounds,-1,Manual rebound-side fix: raw rebound counters and BBR boxscore credit Malik Rose with one more offensive rebound and one fewer defensive rebound
+0020701110,1610612759,1521,UnknownDistance2ptDefRebounds,1,Manual source fix: restore Vaughn's official defensive rebound after dropping the unresolved same-clock Spurs rebound cluster
+0020800136,1610612750,201567,DeadBallTurnovers,1,Manual source fix: official and BBR boxscore credit Kevin Love with a turnover on the OFF.Foul plus No Turnover sequence
+0020800138,1610612745,101236,FtsMade,-1,Manual source fix: BBR boxscore treats the ambiguous Chuck Hayes FT1 as missed in the malformed FT1/team-rebound/FT2 block
+0020800138,1610612745,101236,FtsMissed,1,Manual source fix: BBR boxscore treats the ambiguous Chuck Hayes FT1 as missed in the malformed FT1/team-rebound/FT2 block
+0020800017,1610612745,101236,FtsMade,-1,Manual source fix: BBR boxscore treats the ambiguous Chuck Hayes FT1 as missed in the malformed FT1/team-rebound/FT2 block
+0020800017,1610612745,101236,FtsMissed,1,Manual source fix: BBR boxscore treats the ambiguous Chuck Hayes FT1 as missed in the malformed FT1/team-rebound/FT2 block
+0020800242,1610612745,101236,FtsMade,-1,Manual source fix: BBR boxscore treats the ambiguous Chuck Hayes FT1 as missed in the malformed FT1/team-rebound/FT2 block
+0020800242,1610612745,101236,FtsMissed,1,Manual source fix: BBR boxscore treats the ambiguous Chuck Hayes FT1 as missed in the malformed FT1/team-rebound/FT2 block
+0020800452,1610612751,2250,UnknownDistance2ptOffRebounds,1,Manual rebound-side fix: BBR boxscore credits Bobby Simmons with one more offensive rebound and one fewer defensive rebound
+0020800452,1610612751,2250,UnknownDistance2ptDefRebounds,-1,Manual rebound-side fix: BBR boxscore credits Bobby Simmons with one more offensive rebound and one fewer defensive rebound
+0020900887,1610612739,201581,FtsMade,-1,Manual source fix: official boxscore treats the ambiguous JJ Hickson FT1 as missed in the malformed FT1/team-rebound/FT2 block
+0020900887,1610612739,201581,FtsMissed,1,Manual source fix: official boxscore treats the ambiguous JJ Hickson FT1 as missed in the malformed FT1/team-rebound/FT2 block
+0020900900,1610612753,2730,UnknownDistance2ptDefRebounds,1,Manual source fix: raw rebound counters and official boxscore still credit Dwight Howard with one additional defensive rebound after dropping the stray third-quarter rebound row
+0020900925,1610612766,201945,UnknownDistance2ptOffRebounds,1,Manual source fix: preserve Henderson's official extra offensive rebound from the malformed same-clock Bobcats rebound cluster after keeping Diaw's earlier board
+0020901039,1610612758,2137,UnknownDistance2ptOffRebounds,-1,Manual rebound-side fix: official boxscore credits Ime Udoka with one fewer offensive rebound and one more defensive rebound
+0020901039,1610612758,2137,UnknownDistance2ptDefRebounds,1,Manual rebound-side fix: official boxscore credits Ime Udoka with one fewer offensive rebound and one more defensive rebound
+0020900313,1610612750,201961,UnknownDistance2ptOffRebounds,1,Manual rebound-side fix: official boxscore credits Wayne Ellington with one more offensive rebound and one fewer defensive rebound
+0020900313,1610612750,201961,UnknownDistance2ptDefRebounds,-1,Manual rebound-side fix: official boxscore credits Wayne Ellington with one more offensive rebound and one fewer defensive rebound
+0040900166,1610612757,201967,UnknownDistance2ptOffRebounds,1,Manual rebound-side fix: official boxscore credits Dante Cunningham with one more offensive rebound and one fewer defensive rebound
+0040900166,1610612757,201967,UnknownDistance2ptDefRebounds,-1,Manual rebound-side fix: official boxscore credits Dante Cunningham with one more offensive rebound and one fewer defensive rebound
+20200286,1610612754,979,FtsMade,-1,Manual source fix: malformed FT1/team-rebound/FT2 block overcounts one Jermaine O'Neal made free throw
+20200286,1610612754,979,FtsMissed,1,Manual source fix: malformed FT1/team-rebound/FT2 block is missing Jermaine O'Neal's first missed free-throw attempt
+20200320,1610612739,2430,UnknownDistance2ptOffRebounds,1,Manual rebound-side fix: BBR boxscore 200212130BOS credits Carlos Boozer with one more offensive rebound and one fewer defensive rebound
+20200320,1610612739,2430,UnknownDistance2ptDefRebounds,-1,Manual rebound-side fix: BBR boxscore 200212130BOS credits Carlos Boozer with one more offensive rebound and one fewer defensive rebound
+20200359,1610612739,2032,UnknownDistance2ptOffRebounds,1,Manual rebound-side fix: BBR boxscore 200212180CLE credits Darius Miles with one more offensive rebound and one fewer defensive rebound
+20200359,1610612739,2032,UnknownDistance2ptDefRebounds,-1,Manual rebound-side fix: BBR boxscore 200212180CLE credits Darius Miles with one more offensive rebound and one fewer defensive rebound
+20200430,1610612740,248,UnknownDistance2ptOffRebounds,1,Manual rebound-side fix: BBR boxscore 200212290HOU credits George Lynch with one more offensive rebound and one fewer defensive rebound
+20200430,1610612740,248,UnknownDistance2ptDefRebounds,-1,Manual rebound-side fix: BBR boxscore 200212290HOU credits George Lynch with one more offensive rebound and one fewer defensive rebound
+20200498,1610612743,1548,UnknownDistance2ptOffRebounds,1,Manual rebound-side fix: BBR boxscore 200301080DEN credits Mark Blount with one additional offensive rebound
+20200796,1610612759,70,UnknownDistance2ptOffRebounds,1,Manual rebound-side fix: BBR boxscore 200302220SAS credits Steve Kerr with one additional offensive rebound
+20200814,1610612739,2430,UnknownDistance2ptOffRebounds,1,Manual rebound-side fix: BBR boxscore 200302250CLE credits Carlos Boozer with one more offensive rebound and one fewer defensive rebound
+20200814,1610612739,2430,UnknownDistance2ptDefRebounds,-1,Manual rebound-side fix: BBR boxscore 200302250CLE credits Carlos Boozer with one more offensive rebound and one fewer defensive rebound
+20200989,1610612740,2040,UnknownDistance2ptOffRebounds,1,Manual rebound-side fix: official boxscore credits Jerome Moiso with one more offensive rebound and one fewer defensive rebound; local BBR DB is missing his row
+20200989,1610612740,2040,UnknownDistance2ptDefRebounds,-1,Manual rebound-side fix: official boxscore credits Jerome Moiso with one more offensive rebound and one fewer defensive rebound; local BBR DB is missing his row
+40200234,1610612742,1952,UnknownDistance2ptOffRebounds,1,Manual rebound-side fix: BBR boxscore 200305110SAC credits Raja Bell with one additional offensive rebound
+20300103,1610612741,923,UnknownDistance2ptOffRebounds,1,Manual rebound-side fix: BBR boxscore 200311120BOS credits Donyell Marshall with one more offensive rebound and one fewer defensive rebound
+20300103,1610612741,923,UnknownDistance2ptDefRebounds,-1,Manual rebound-side fix: BBR boxscore 200311120BOS credits Donyell Marshall with one more offensive rebound and one fewer defensive rebound
+20300231,1610612743,468,UnknownDistance2ptOffRebounds,1,Manual rebound-side fix: BBR boxscore 200311290LAC credits Jon Barry with one additional offensive rebound
+20300257,1610612741,213,UnknownDistance2ptOffRebounds,-1,Manual rebound-side fix: BBR boxscore 200312040PHI credits Antonio Davis with one fewer offensive rebound and one more defensive rebound
+20300257,1610612741,213,UnknownDistance2ptDefRebounds,1,Manual rebound-side fix: BBR boxscore 200312040PHI credits Antonio Davis with one fewer offensive rebound and one more defensive rebound
+20300460,1610612742,1712,UnknownDistance2ptOffRebounds,1,Manual rebound-side fix: BBR boxscore 200401020MIL credits Antawn Jamison with one more offensive rebound and one fewer defensive rebound
+20300460,1610612742,1712,UnknownDistance2ptDefRebounds,-1,Manual rebound-side fix: BBR boxscore 200401020MIL credits Antawn Jamison with one more offensive rebound and one fewer defensive rebound
+20300726,1610612749,1501,UnknownDistance2ptOffRebounds,1,Manual rebound-side fix: BBR boxscore 200402070MIL credits Tim Thomas with one more offensive rebound and one fewer defensive rebound
+20300726,1610612749,1501,UnknownDistance2ptDefRebounds,-1,Manual rebound-side fix: BBR boxscore 200402070MIL credits Tim Thomas with one more offensive rebound and one fewer defensive rebound
+20300934,1610612744,2399,UnknownDistance2ptOffRebounds,1,Manual rebound-side fix: BBR boxscore 200403100UTA credits Mike Dunleavy with one more offensive rebound and one fewer defensive rebound
+20300934,1610612744,2399,UnknownDistance2ptDefRebounds,-1,Manual rebound-side fix: BBR boxscore 200403100UTA credits Mike Dunleavy with one more offensive rebound and one fewer defensive rebound
+20300948,1610612757,2032,UnknownDistance2ptOffRebounds,1,Manual rebound-side fix: BBR boxscore 200403120POR credits Darius Miles with one additional offensive rebound
+20301023,1610612764,2217,UnknownDistance2ptOffRebounds,1,Manual rebound-side fix: BBR boxscore 200403230UTA credits Brendan Haywood with one additional offensive rebound
+40300227,1610612758,185,UnknownDistance2ptOffRebounds,1,Manual rebound-side fix: BBR boxscore 200405190MIN credits Chris Webber with one more offensive rebound and one fewer defensive rebound
+40300227,1610612758,185,UnknownDistance2ptDefRebounds,-1,Manual rebound-side fix: BBR boxscore 200405190MIN credits Chris Webber with one more offensive rebound and one fewer defensive rebound
+20400197,1610612754,2109,UnknownDistance2ptOffRebounds,1,Manual rebound-side fix: BBR boxscore 200411280SEA credits Eddie Gill with one additional offensive rebound
+20400222,1610612742,1717,UnknownDistance2ptOffRebounds,1,Manual rebound-side fix: BBR boxscore 200412020DAL credits Dirk Nowitzki with one additional offensive rebound
+20400402,1610612745,436,DeadBallTurnovers,1,Manual source fix: BBR boxscore 200412280MIL credits Juwan Howard with a second turnover while raw PBP logs a No Turnover violation row
+20400468,1610612761,923,UnknownDistance2ptOffRebounds,1,Manual rebound-side fix: BBR boxscore 200501070TOR credits Donyell Marshall with one more offensive rebound and one fewer defensive rebound
+20400468,1610612761,923,UnknownDistance2ptDefRebounds,-1,Manual rebound-side fix: BBR boxscore 200501070TOR credits Donyell Marshall with one more offensive rebound and one fewer defensive rebound
+20400677,1610612739,2400,UnknownDistance2ptOffRebounds,1,Manual rebound-side fix: BBR boxscore 200502030MIA credits Drew Gooden with one more offensive rebound and one fewer defensive rebound
+20400677,1610612739,2400,UnknownDistance2ptDefRebounds,-1,Manual rebound-side fix: BBR boxscore 200502030MIA credits Drew Gooden with one more offensive rebound and one fewer defensive rebound
+20401181,1610612756,2405,UnknownDistance2ptOffRebounds,1,Manual rebound-side fix: BBR boxscore 200504150PHO credits Amar'e Stoudemire with one more offensive rebound and one fewer defensive rebound
+20401181,1610612756,2405,UnknownDistance2ptDefRebounds,-1,Manual rebound-side fix: BBR boxscore 200504150PHO credits Amar'e Stoudemire with one more offensive rebound and one fewer defensive rebound
+0021001029,1610612746,2590,UnknownDistance2ptOffRebounds,-1,Manual rebound-side fix: raw rebound counters and BBR boxscore both credit Mo Williams with one fewer offensive rebound and one more defensive rebound
+0021001029,1610612746,2590,UnknownDistance2ptDefRebounds,1,Manual rebound-side fix: raw rebound counters and BBR boxscore both credit Mo Williams with one fewer offensive rebound and one more defensive rebound
+0021100369,1610612748,2617,UnknownDistance2ptOffRebounds,1,Manual rebound-side fix: raw rebound counters and BBR boxscore credit Udonis Haslem with one more offensive rebound and one fewer defensive rebound
+0021100369,1610612748,2617,UnknownDistance2ptDefRebounds,-1,Manual rebound-side fix: raw rebound counters and BBR boxscore credit Udonis Haslem with one more offensive rebound and one fewer defensive rebound
+0021100004,1610612760,201586,UnknownDistance2ptOffRebounds,1,Manual source fix: raw rebound counters and BBR boxscore keep Serge Ibaka's extra offensive rebound from the delayed same-clock miss/rebound pair
+0021100586,1610612738,1610612738,BadPassSteals,-1,Manual source fix: remove the ghost Celtics steal row that duplicates the late-third-quarter Kurt Thomas steal
+0021100644,1610612753,2202,DeadBallTurnovers,1,Manual source fix: official and BBR boxscore count Jason Richardson's late No Turnover row as a real turnover
+0021100825,1610612745,202335,UnknownDistance2ptOffRebounds,1,Manual source fix: BBR boxscore credits Patrick Patterson with one additional offensive rebound
+0041100167,1610612747,101115,UnknownDistance2ptOffRebounds,1,Manual rebound-side fix: BBR boxscore credits Andrew Bynum with one more offensive rebound and one fewer defensive rebound
+0041100167,1610612747,101115,UnknownDistance2ptDefRebounds,-1,Manual rebound-side fix: BBR boxscore credits Andrew Bynum with one more offensive rebound and one fewer defensive rebound
+0041100303,1610612738,200765,UnknownDistance2ptOffRebounds,1,Manual source fix: BBR boxscore credits Rajon Rondo with one additional offensive rebound
+0021201040,1610612749,101145,UnknownDistance2ptOffRebounds,1,Manual rebound-side fix: raw rebound counters and BBR boxscore credit Monta Ellis with one more offensive rebound and one fewer defensive rebound
+0021201040,1610612749,101145,UnknownDistance2ptDefRebounds,-1,Manual rebound-side fix: raw rebound counters and BBR boxscore credit Monta Ellis with one more offensive rebound and one fewer defensive rebound
+0021200126,1610612750,1905,UnknownDistance2ptOffRebounds,1,Manual rebound-side fix: BBR boxscore credits Andrei Kirilenko with one more offensive rebound and one fewer defensive rebound
+0021200126,1610612750,1905,UnknownDistance2ptDefRebounds,-1,Manual rebound-side fix: BBR boxscore credits Andrei Kirilenko with one more offensive rebound and one fewer defensive rebound
+0021200142,1610612758,201574,UnknownDistance2ptOffRebounds,-1,Manual rebound-side fix: BBR boxscore credits Jason Thompson with one fewer offensive rebound and one more defensive rebound
+0021200142,1610612758,201574,UnknownDistance2ptDefRebounds,1,Manual rebound-side fix: BBR boxscore credits Jason Thompson with one fewer offensive rebound and one more defensive rebound
+0021200037,1610612752,2747,UnknownDistance2ptOffRebounds,1,Manual source fix: BBR boxscore credits J.R. Smith with one additional offensive rebound
+0021200793,1610612741,2430,UnknownDistance2ptOffRebounds,1,Manual rebound-side fix: BBR boxscore credits Carlos Boozer with one more offensive rebound and one fewer defensive rebound
+0021200793,1610612741,2430,UnknownDistance2ptDefRebounds,-1,Manual rebound-side fix: BBR boxscore credits Carlos Boozer with one more offensive rebound and one fewer defensive rebound
+0021200083,1610612742,201958,UnknownDistance2ptDefRebounds,1,Manual source fix: BBR boxscore credits Rodrigue Beaubois with one additional defensive rebound
+0021200872,1610612759,1938,UnknownDistance2ptOffRebounds,1,Manual source fix: official boxscore credits Manu Ginobili with one additional offensive rebound
+0021200096,1610612749,202336,UnknownDistance2ptOffRebounds,-1,Manual rebound-side fix: BBR boxscore credits Larry Sanders with one fewer offensive rebound and one more defensive rebound
+0021200096,1610612749,202336,UnknownDistance2ptDefRebounds,1,Manual rebound-side fix: BBR boxscore credits Larry Sanders with one fewer offensive rebound and one more defensive rebound
+0021200982,1610612739,202087,UnknownDistance2ptOffRebounds,-1,Manual rebound-side fix: BBR boxscore credits Alonzo Gee with one fewer offensive rebound and one more defensive rebound
+0021200982,1610612739,202087,UnknownDistance2ptDefRebounds,1,Manual rebound-side fix: BBR boxscore credits Alonzo Gee with one fewer offensive rebound and one more defensive rebound
+0021300225,1610612744,979,FtsMade,-1,Manual source fix: official and BBR boxscores keep Jermaine O'Neal at two made free throws; the malformed FT1/TEAM-REBOUND/FT2 sequence overstates his makes by one
+0021300225,1610612744,979,FtsMissed,1,Manual source fix: official and BBR boxscores keep Jermaine O'Neal at three free-throw attempts; the malformed FT1/TEAM-REBOUND/FT2 sequence drops one missed attempt
+0021300228,1610612766,201945,UnknownDistance2ptOffRebounds,1,Manual rebound-side fix: official and BBR boxscores credit Gerald Henderson with one more offensive rebound and one fewer defensive rebound
+0021300228,1610612766,201945,UnknownDistance2ptDefRebounds,-1,Manual rebound-side fix: official and BBR boxscores credit Gerald Henderson with one more offensive rebound and one fewer defensive rebound
+0021300274,1610612762,202324,UnknownDistance2ptOffRebounds,1,Manual rebound-side fix: official and BBR boxscores credit Derrick Favors with one more offensive rebound and one fewer defensive rebound
+0021300274,1610612762,202324,UnknownDistance2ptDefRebounds,-1,Manual rebound-side fix: official and BBR boxscores credit Derrick Favors with one more offensive rebound and one fewer defensive rebound
+0021300357,1610612737,201143,UnknownDistance2ptOffRebounds,1,Manual source fix: official and BBR boxscores credit Al Horford with one additional offensive rebound missing from the historical play-by-play
+0021300716,1610612763,201585,UnknownDistance2ptOffRebounds,1,Manual rebound-side fix: official and BBR boxscores credit Kosta Koufos with one more offensive rebound and one fewer defensive rebound
+0021300716,1610612763,201585,UnknownDistance2ptDefRebounds,-1,Manual rebound-side fix: official and BBR boxscores credit Kosta Koufos with one more offensive rebound and one fewer defensive rebound
+0021300775,1610612760,2570,BadPassTurnovers,-1,Manual source fix: official and BBR boxscores charge one fewer bad-pass turnover to Kendrick Perkins in Thunder at Trail Blazers
+0021300775,1610612757,201577,BadPassSteals,-1,Manual source fix: official and BBR boxscores do not credit Robin Lopez with the stray steal in Thunder at Trail Blazers
+0021300775,1610612760,201586,BadPassTurnovers,1,Manual source fix: official and BBR boxscores charge one additional bad-pass turnover to Serge Ibaka in Thunder at Trail Blazers
+0021301023,1610612752,2199,UnknownDistance2ptOffRebounds,1,Manual rebound-side fix: official and BBR boxscores credit Tyson Chandler with one more offensive rebound and one fewer defensive rebound
+0021301023,1610612752,2199,UnknownDistance2ptDefRebounds,-1,Manual rebound-side fix: official and BBR boxscores credit Tyson Chandler with one more offensive rebound and one fewer defensive rebound
+0021301222,1610612738,201145,UnknownDistance2ptOffRebounds,1,Manual rebound-side fix: official and BBR boxscores credit Jeff Green with one more offensive rebound and one fewer defensive rebound
+0021301222,1610612738,201145,UnknownDistance2ptDefRebounds,-1,Manual rebound-side fix: official and BBR boxscores credit Jeff Green with one more offensive rebound and one fewer defensive rebound
+0021400043,1610612755,203909,UnknownDistance2ptOffRebounds,1,Manual rebound-side fix: official and BBR boxscores credit K.J. McDaniels with one more offensive rebound and one fewer defensive rebound
+0021400043,1610612755,203909,UnknownDistance2ptDefRebounds,-1,Manual rebound-side fix: official and BBR boxscores credit K.J. McDaniels with one more offensive rebound and one fewer defensive rebound
+0021400775,1610612755,203457,UnknownDistance2ptOffRebounds,1,Manual rebound-side fix: official and BBR boxscores credit Nerlens Noel with one more offensive rebound and one fewer defensive rebound
+0021400775,1610612755,203457,UnknownDistance2ptDefRebounds,-1,Manual rebound-side fix: official and BBR boxscores credit Nerlens Noel with one more offensive rebound and one fewer defensive rebound
+0021400816,1610612766,2744,UnknownDistance2ptOffRebounds,1,Manual source fix: official and BBR boxscores credit Al Jefferson with one additional offensive rebound missing from the historical play-by-play
+0021400875,1610612759,1495,UnknownDistance2ptOffRebounds,1,Manual rebound-side fix: official and BBR boxscores credit Tim Duncan with one more offensive rebound and one fewer defensive rebound
+0021400875,1610612759,1495,UnknownDistance2ptDefRebounds,-1,Manual rebound-side fix: official and BBR boxscores credit Tim Duncan with one more offensive rebound and one fewer defensive rebound
+0021400964,1610612759,1495,UnknownDistance2ptOffRebounds,1,Manual rebound-side fix: official and BBR boxscores credit Tim Duncan with one more offensive rebound and one fewer defensive rebound
+0021400964,1610612759,1495,UnknownDistance2ptDefRebounds,-1,Manual rebound-side fix: official and BBR boxscores credit Tim Duncan with one more offensive rebound and one fewer defensive rebound
+0021401057,1610612759,1495,UnknownDistance2ptOffRebounds,1,Manual rebound-side fix: official and BBR boxscores credit Tim Duncan with one more offensive rebound and one fewer defensive rebound
+0021401057,1610612759,1495,UnknownDistance2ptDefRebounds,-1,Manual rebound-side fix: official and BBR boxscores credit Tim Duncan with one more offensive rebound and one fewer defensive rebound
+0041400236,1610612746,201933,UnknownDistance2ptOffRebounds,1,Manual rebound-side fix: official and BBR boxscores credit Blake Griffin with one more offensive rebound and one fewer defensive rebound
+0041400236,1610612746,201933,UnknownDistance2ptDefRebounds,-1,Manual rebound-side fix: official and BBR boxscores credit Blake Griffin with one more offensive rebound and one fewer defensive rebound
+0021500104,1610612765,2581,DeadBallTurnovers,1,Manual source fix: official and BBR boxscores charge Steve Blake with one additional dead-ball turnover from the lingering No Turnover row in Pistons at Warriors
+0021500104,1610612744,202691,DeadBallTurnovers,1,Manual source fix: official and BBR boxscores charge Klay Thompson with one additional dead-ball turnover from the lingering No Turnover row in Pistons at Warriors
+0021500104,1610612744,203084,DeadBallTurnovers,1,Manual source fix: official and BBR boxscores charge Harrison Barnes with one additional dead-ball turnover from the lingering No Turnover row in Pistons at Warriors
+0021500105,1610612746,2037,DeadBallTurnovers,1,Manual source fix: official and BBR boxscores charge Jamal Crawford with one additional dead-ball turnover from the lingering No Turnover row in Grizzlies at Clippers
+0021500105,1610612763,2757,DeadBallTurnovers,1,Manual source fix: official and BBR boxscores charge Beno Udrih with one additional dead-ball turnover from the lingering No Turnover row in Grizzlies at Clippers
+0021500105,1610612763,201188,DeadBallTurnovers,1,Manual source fix: official and BBR boxscores charge Marc Gasol with one additional dead-ball turnover from the lingering No Turnover row in Grizzlies at Clippers
+0021500271,1610612755,203917,DeadBallTurnovers,1,Manual source fix: official and BBR boxscores charge Nik Stauskas with one additional dead-ball turnover from the lingering No Turnover row in 76ers at Knicks
+0021500061,1610612759,200746,UnknownDistance2ptOffRebounds,1,Manual rebound-side fix: official and BBR boxscores credit LaMarcus Aldridge with one more offensive rebound and one fewer defensive rebound
+0021500061,1610612759,200746,UnknownDistance2ptDefRebounds,-1,Manual rebound-side fix: official and BBR boxscores credit LaMarcus Aldridge with one more offensive rebound and one fewer defensive rebound
+0021500061,1610612759,202695,UnknownDistance2ptDefRebounds,1,Manual source fix: official and BBR boxscores keep Kawhi Leonard with one additional defensive rebound from the manually dropped 8:13 row in Spurs at Wizards
+0021500045,1610612742,2585,UnknownDistance2ptOffRebounds,1,Manual rebound-side fix: official and BBR boxscores credit Zaza Pachulia with one more offensive rebound and one fewer defensive rebound
+0021500045,1610612742,2585,UnknownDistance2ptDefRebounds,-1,Manual rebound-side fix: official and BBR boxscores credit Zaza Pachulia with one more offensive rebound and one fewer defensive rebound
+0021500276,1610612746,2746,UnknownDistance2ptOffRebounds,1,Manual rebound-side fix: official and BBR boxscores credit Josh Smith with one more offensive rebound and one fewer defensive rebound
+0021500276,1610612746,2746,UnknownDistance2ptDefRebounds,-1,Manual rebound-side fix: official and BBR boxscores credit Josh Smith with one more offensive rebound and one fewer defensive rebound
+0021500385,1610612747,201579,UnknownDistance2ptOffRebounds,1,Manual rebound-side fix: official and BBR boxscores credit Roy Hibbert with one more offensive rebound and one fewer defensive rebound
+0021500385,1610612747,201579,UnknownDistance2ptDefRebounds,-1,Manual rebound-side fix: official and BBR boxscores credit Roy Hibbert with one more offensive rebound and one fewer defensive rebound
+0021500528,1610612765,202694,UnknownDistance2ptOffRebounds,1,Manual rebound-side fix: official and BBR boxscores credit Marcus Morris with one more offensive rebound and one fewer defensive rebound
+0021500528,1610612765,202694,UnknownDistance2ptDefRebounds,-1,Manual rebound-side fix: official and BBR boxscores credit Marcus Morris with one more offensive rebound and one fewer defensive rebound
+0021500565,1610612762,203481,UnknownDistance2ptOffRebounds,1,Manual rebound-side fix: official and BBR boxscores credit Jeff Withey with one more offensive rebound and one fewer defensive rebound
+0021500565,1610612762,203481,UnknownDistance2ptDefRebounds,-1,Manual rebound-side fix: official and BBR boxscores credit Jeff Withey with one more offensive rebound and one fewer defensive rebound
+0021500653,1610612759,201980,UnknownDistance2ptOffRebounds,1,Manual rebound-side fix: official and BBR boxscores credit Danny Green with one more offensive rebound and one fewer defensive rebound
+0021500653,1610612759,201980,UnknownDistance2ptDefRebounds,-1,Manual rebound-side fix: official and BBR boxscores credit Danny Green with one more offensive rebound and one fewer defensive rebound
+0021500657,1610612749,202328,UnknownDistance2ptOffRebounds,1,Manual rebound-side fix: official and BBR boxscores credit Greg Monroe with one more offensive rebound and one fewer defensive rebound
+0021500657,1610612749,202328,UnknownDistance2ptDefRebounds,-1,Manual rebound-side fix: official and BBR boxscores credit Greg Monroe with one more offensive rebound and one fewer defensive rebound
+0021500689,1610612745,2746,UnknownDistance2ptOffRebounds,1,Manual rebound-side fix: official and BBR boxscores credit Josh Smith with one more offensive rebound and one fewer defensive rebound
+0021500689,1610612745,2746,UnknownDistance2ptDefRebounds,-1,Manual rebound-side fix: official and BBR boxscores credit Josh Smith with one more offensive rebound and one fewer defensive rebound
+0021500701,1610612760,203500,UnknownDistance2ptOffRebounds,1,Manual rebound-side fix: official and BBR boxscores credit Steven Adams with one more offensive rebound and one fewer defensive rebound
+0021500701,1610612760,203500,UnknownDistance2ptDefRebounds,-1,Manual rebound-side fix: official and BBR boxscores credit Steven Adams with one more offensive rebound and one fewer defensive rebound
+0021500774,1610612766,203469,UnknownDistance2ptOffRebounds,1,Manual source fix: official and BBR boxscores credit Cody Zeller with one additional offensive rebound missing from the historical play-by-play
+0021500994,1610612762,202324,UnknownDistance2ptOffRebounds,1,Manual source fix: official and BBR boxscores credit Derrick Favors with one additional offensive rebound missing from the historical play-by-play
+0021501137,1610612764,202693,UnknownDistance2ptOffRebounds,1,Manual rebound-side fix: official and BBR boxscores credit Markieff Morris with one more offensive rebound and one fewer defensive rebound
+0021501137,1610612764,202693,UnknownDistance2ptDefRebounds,-1,Manual rebound-side fix: official and BBR boxscores credit Markieff Morris with one more offensive rebound and one fewer defensive rebound
+0021501180,1610612752,201577,FtsMade,-1,Manual source fix: official and BBR boxscores keep Robin Lopez at six made free throws; the malformed FT1 / team-rebound / missing-FT2 block overstates his makes by one
+0021501180,1610612752,201577,FtsMissed,1,Manual source fix: official and BBR boxscores keep Robin Lopez at twelve free-throw attempts; the malformed FT1 / team-rebound / missing-FT2 block drops one missed attempt
+0041500171,1610612746,101108,UnknownDistance2ptOffRebounds,1,Manual rebound-side fix: official and BBR boxscores credit Chris Paul with one more offensive rebound and one fewer defensive rebound
+0041500171,1610612746,101108,UnknownDistance2ptDefRebounds,-1,Manual rebound-side fix: official and BBR boxscores credit Chris Paul with one more offensive rebound and one fewer defensive rebound
+0021600096,1610612741,202710,UnknownDistance2ptOffRebounds,1,Manual rebound-side fix: official and BBR boxscores credit Jimmy Butler with one more offensive rebound and one fewer defensive rebound
+0021600096,1610612741,202710,UnknownDistance2ptDefRebounds,-1,Manual rebound-side fix: official and BBR boxscores credit Jimmy Butler with one more offensive rebound and one fewer defensive rebound
+0021600129,1610612740,204038,UnknownDistance2ptOffRebounds,1,Manual rebound-side fix: official and BBR boxscores credit Langston Galloway with one more offensive rebound and one fewer defensive rebound
+0021600129,1610612740,204038,UnknownDistance2ptDefRebounds,-1,Manual rebound-side fix: official and BBR boxscores credit Langston Galloway with one more offensive rebound and one fewer defensive rebound
+0021600152,1610612751,1626191,UnknownDistance2ptOffRebounds,1,Manual rebound-side fix: official and BBR boxscores credit Chris McCullough with one more offensive rebound and one fewer defensive rebound
+0021600152,1610612751,1626191,UnknownDistance2ptDefRebounds,-1,Manual rebound-side fix: official and BBR boxscores credit Chris McCullough with one more offensive rebound and one fewer defensive rebound
+0021600198,1610612741,202710,UnknownDistance2ptOffRebounds,1,Manual rebound-side fix: official and BBR boxscores credit Jimmy Butler with one more offensive rebound and one fewer defensive rebound
+0021600198,1610612741,202710,UnknownDistance2ptDefRebounds,-1,Manual rebound-side fix: official and BBR boxscores credit Jimmy Butler with one more offensive rebound and one fewer defensive rebound
+0021600330,1610612744,2585,UnknownDistance2ptOffRebounds,1,Manual rebound-side fix: official and BBR boxscores credit Zaza Pachulia with one more offensive rebound and one fewer defensive rebound
+0021600330,1610612744,2585,UnknownDistance2ptDefRebounds,-1,Manual rebound-side fix: official and BBR boxscores credit Zaza Pachulia with one more offensive rebound and one fewer defensive rebound
+0021600330,1610612744,2738,UnknownDistance2ptOffRebounds,1,Manual rebound-side fix: official and BBR boxscores credit Andre Iguodala with one more offensive rebound and one fewer defensive rebound
+0021600330,1610612744,2738,UnknownDistance2ptDefRebounds,-1,Manual rebound-side fix: official and BBR boxscores credit Andre Iguodala with one more offensive rebound and one fewer defensive rebound
+0021600358,1610612744,2738,UnknownDistance2ptOffRebounds,1,Manual rebound-side fix: official and BBR boxscores credit Andre Iguodala with one more offensive rebound and one fewer defensive rebound
+0021600358,1610612744,2738,UnknownDistance2ptDefRebounds,-1,Manual rebound-side fix: official and BBR boxscores credit Andre Iguodala with one more offensive rebound and one fewer defensive rebound
+0021600512,1610612761,1627751,UnknownDistance2ptOffRebounds,1,Manual rebound-side fix: official and BBR boxscores credit Jakob Poeltl with one more offensive rebound and one fewer defensive rebound
+0021600512,1610612761,1627751,UnknownDistance2ptDefRebounds,-1,Manual rebound-side fix: official and BBR boxscores credit Jakob Poeltl with one more offensive rebound and one fewer defensive rebound
+0021600549,1610612747,204028,UnknownDistance2ptOffRebounds,1,Manual rebound-side fix: official and BBR boxscores credit Tarik Black with one more offensive rebound and one fewer defensive rebound
+0021600549,1610612747,204028,UnknownDistance2ptDefRebounds,-1,Manual rebound-side fix: official and BBR boxscores credit Tarik Black with one more offensive rebound and one fewer defensive rebound
+0021600612,1610612765,202694,UnknownDistance2ptOffRebounds,1,Manual rebound-side fix: official and BBR boxscores credit Marcus Morris with one more offensive rebound and one fewer defensive rebound
+0021600612,1610612765,202694,UnknownDistance2ptDefRebounds,-1,Manual rebound-side fix: official and BBR boxscores credit Marcus Morris with one more offensive rebound and one fewer defensive rebound
+0021600626,1610612743,201163,UnknownDistance2ptOffRebounds,1,Manual rebound-side fix: official and BBR boxscores credit Wilson Chandler with one more offensive rebound and one fewer defensive rebound
+0021600626,1610612743,201163,UnknownDistance2ptDefRebounds,-1,Manual rebound-side fix: official and BBR boxscores credit Wilson Chandler with one more offensive rebound and one fewer defensive rebound
+0021600626,1610612747,1627826,UnknownDistance2ptOffRebounds,1,Manual rebound-side fix: official and BBR boxscores credit Ivica Zubac with one more offensive rebound and one fewer defensive rebound
+0021600626,1610612747,1627826,UnknownDistance2ptDefRebounds,-1,Manual rebound-side fix: official and BBR boxscores credit Ivica Zubac with one more offensive rebound and one fewer defensive rebound
+0021600749,1610612741,201577,UnknownDistance2ptOffRebounds,1,Manual rebound-side fix: official and BBR boxscores credit Robin Lopez with one more offensive rebound and one fewer defensive rebound
+0021600749,1610612741,201577,UnknownDistance2ptDefRebounds,-1,Manual rebound-side fix: official and BBR boxscores credit Robin Lopez with one more offensive rebound and one fewer defensive rebound
+0021600874,1610612759,202722,UnknownDistance2ptDefRebounds,1,Manual source fix: official and BBR boxscores credit Davis Bertans with one additional defensive rebound missing from the historical play-by-play
+0021600874,1610612759,203473,UnknownDistance2ptOffRebounds,1,Manual rebound-side fix: official and BBR boxscores credit Dewayne Dedmon with one more offensive rebound and one fewer defensive rebound
+0021600874,1610612759,203473,UnknownDistance2ptDefRebounds,-1,Manual rebound-side fix: official and BBR boxscores credit Dewayne Dedmon with one more offensive rebound and one fewer defensive rebound
+0021601011,1610612757,203994,UnknownDistance2ptOffRebounds,-1,Manual rebound-side fix: official and BBR boxscores credit Jusuf Nurkic with one fewer offensive rebound and one more defensive rebound
+0021601011,1610612757,203994,UnknownDistance2ptDefRebounds,1,Manual rebound-side fix: official and BBR boxscores credit Jusuf Nurkic with one fewer offensive rebound and one more defensive rebound
+0021601125,1610612745,201935,DeadBallTurnovers,1,Manual source fix: official and BBR boxscores charge James Harden with one additional dead-ball turnover from the lingering No Turnover row in Rockets at Trail Blazers
+0021601125,1610612757,203468,DeadBallTurnovers,1,Manual source fix: official and BBR boxscores charge C.J. McCollum with one additional dead-ball turnover from the lingering No Turnover row in Rockets at Trail Blazers
+0021601125,1610612757,203994,DeadBallTurnovers,1,Manual source fix: official and BBR boxscores charge Jusuf Nurkic with one additional dead-ball turnover from the lingering No Turnover row in Rockets at Trail Blazers
+0021601141,1610612757,203081,DeadBallTurnovers,1,Manual source fix: official and BBR boxscores charge Damian Lillard with one additional dead-ball turnover from the lingering No Turnover row in Trail Blazers at Suns
+0021601191,1610612755,203967,DeadBallTurnovers,2,Manual source fix: official and BBR boxscores charge Dario Saric with two additional dead-ball turnovers from the lingering No Turnover rows in Bucks at 76ers
+0041600102,1610612741,202710,DeadBallTurnovers,1,Manual source fix: official and BBR boxscores charge Jimmy Butler with one additional dead-ball turnover from the lingering No Turnover row in Bulls at Celtics
+0041600102,1610612738,202738,DeadBallTurnovers,1,Manual source fix: official and BBR boxscores charge Isaiah Thomas with one additional dead-ball turnover from the lingering No Turnover row in Bulls at Celtics
+0041600122,1610612761,200768,DeadBallTurnovers,1,Manual source fix: official and BBR boxscores charge Kyle Lowry with one additional dead-ball turnover from the lingering No Turnover row in Bucks at Raptors
+0041600122,1610612761,202335,DeadBallTurnovers,1,Manual source fix: official and BBR boxscores charge Patrick Patterson with one additional dead-ball turnover from the lingering No Turnover row in Bucks at Raptors
+0041600122,1610612761,202709,DeadBallTurnovers,2,Manual source fix: official and BBR boxscores charge Cory Joseph with two additional dead-ball turnovers from the lingering No Turnover rows in Bucks at Raptors
+0041600125,1610612749,203089,DeadBallTurnovers,1,Manual source fix: official and BBR boxscores charge John Henson with one additional dead-ball turnover from the lingering No Turnover row in Raptors at Bucks
+0041600125,1610612761,1626181,DeadBallTurnovers,1,Manual source fix: official and BBR boxscores charge Norman Powell with one additional dead-ball turnover from the lingering No Turnover row in Raptors at Bucks
+0041600132,1610612737,200794,DeadBallTurnovers,1,Manual source fix: official and BBR boxscores charge Paul Millsap with one additional dead-ball turnover from the lingering No Turnover row in Wizards at Hawks
+0041600132,1610612737,203471,DeadBallTurnovers,1,Manual source fix: official and BBR boxscores charge Dennis Schroder with one additional dead-ball turnover from the lingering No Turnover row in Wizards at Hawks
+0041600142,1610612744,201580,DeadBallTurnovers,1,Manual source fix: official and BBR boxscores charge JaVale McGee with one additional dead-ball turnover from the lingering No Turnover row in Warriors at Trail Blazers
+0041600142,1610612757,202323,DeadBallTurnovers,3,Manual source fix: official and BBR boxscores charge Evan Turner with three additional dead-ball turnovers from the lingering No Turnover rows in Warriors at Trail Blazers
+0041600142,1610612757,203081,DeadBallTurnovers,1,Manual source fix: official and BBR boxscores charge Damian Lillard with one additional dead-ball turnover from the lingering No Turnover row in Warriors at Trail Blazers
+0041600142,1610612744,203110,DeadBallTurnovers,1,Manual source fix: official and BBR boxscores charge Draymond Green with one additional dead-ball turnover from the lingering No Turnover row in Warriors at Trail Blazers
+0041600142,1610612757,203468,DeadBallTurnovers,2,Manual source fix: official and BBR boxscores charge C.J. McCollum with two additional dead-ball turnovers from the lingering No Turnover rows in Warriors at Trail Blazers
+0041600144,1610612757,202323,DeadBallTurnovers,1,Manual source fix: official and BBR boxscores charge Evan Turner with one additional dead-ball turnover from the lingering No Turnover row in Warriors at Trail Blazers Game 4
+0041600144,1610612757,203081,DeadBallTurnovers,1,Manual source fix: official and BBR boxscores charge Damian Lillard with one additional dead-ball turnover from the lingering No Turnover row in Warriors at Trail Blazers Game 4
+0041600144,1610612757,203086,DeadBallTurnovers,1,Manual source fix: official and BBR boxscores charge Meyers Leonard with one additional dead-ball turnover from the lingering No Turnover row in Warriors at Trail Blazers Game 4
+0041600144,1610612744,203110,DeadBallTurnovers,1,Manual source fix: official and BBR boxscores charge Draymond Green with one additional dead-ball turnover from the lingering No Turnover row in Warriors at Trail Blazers Game 4
+0041600201,1610612738,1626179,UnknownDistance2ptOffRebounds,1,Manual rebound-side fix: official and BBR boxscores credit Terry Rozier with one more offensive rebound and one fewer defensive rebound
+0041600201,1610612738,1626179,UnknownDistance2ptDefRebounds,-1,Manual rebound-side fix: official and BBR boxscores credit Terry Rozier with one more offensive rebound and one fewer defensive rebound
+0041600223,1610612744,201142,UnknownDistance2ptOffRebounds,1,Manual rebound-side fix: official and BBR boxscores credit Kevin Durant with one more offensive rebound and one fewer defensive rebound
+0041600223,1610612744,201142,UnknownDistance2ptDefRebounds,-1,Manual rebound-side fix: official and BBR boxscores credit Kevin Durant with one more offensive rebound and one fewer defensive rebound
+0041600404,1610612744,201580,UnknownDistance2ptOffRebounds,1,Manual rebound-side fix: official and BBR boxscores credit JaVale McGee with one more offensive rebound and one fewer defensive rebound
+0041600404,1610612744,201580,UnknownDistance2ptDefRebounds,-1,Manual rebound-side fix: official and BBR boxscores credit JaVale McGee with one more offensive rebound and one fewer defensive rebound
+0021600037,1610612748,202355,BadPassSteals,1,Manual source fix: pbpv3 and the official/BBR boxscores credit Hassan Whiteside with the Parker bad-pass steal that playbyplayv2 assigns to Justise Winslow
+0021600037,1610612748,1626159,BadPassSteals,-1,Manual source fix: pbpv3 and the official/BBR boxscores credit Hassan Whiteside with the Parker bad-pass steal that playbyplayv2 assigns to Justise Winslow
+0021600417,1610612743,203999,UnknownDistance2ptOffRebounds,-1,Manual rebound fix: official and BBR boxscores give Nikola Jokic one fewer offensive rebound and two more defensive rebounds than the corrupted raw sequence
+0021600417,1610612743,203999,UnknownDistance2ptDefRebounds,2,Manual rebound fix: official and BBR boxscores give Nikola Jokic one fewer offensive rebound and two more defensive rebounds than the corrupted raw sequence
+0021600421,1610612754,202331,MissedArc3,1,Manual source fix: official and BBR boxscores credit Paul George with one additional missed three and not Myles Turner in Pacers at Knicks
+0021600421,1610612754,1626167,MissedArc3,-1,Manual source fix: official and BBR boxscores credit Paul George with one additional missed three and not Myles Turner in Pacers at Knicks
+0021600421,1610612754,202331,LostBallTurnovers,1,Manual source fix: official and BBR boxscores credit Paul George with the extra live-ball turnover instead of Thaddeus Young in Pacers at Knicks
+0021600421,1610612754,201152,LostBallTurnovers,-1,Manual source fix: official and BBR boxscores credit Paul George with the extra live-ball turnover instead of Thaddeus Young in Pacers at Knicks
+0021600056,1610612766,201587,MissedLongMidRange,1,Manual source fix: the local official shots cache assigns the q1 5:36 missed 10-footer to Nicolas Batum not Kemba Walker
+0021600056,1610612766,202689,MissedLongMidRange,-1,Manual source fix: the local official shots cache assigns the q1 5:36 missed 10-footer to Nicolas Batum not Kemba Walker
+0021600056,1610612766,201587,Darko_10to17Ft_Att,1,Keep Darko zone splits aligned with the official shots cache for the reassigned Batum miss
+0021600056,1610612766,202689,Darko_10to17Ft_Att,-1,Keep Darko zone splits aligned with the official shots cache for the reassigned Batum miss
+0021600056,1610612766,201587,Total2ptShotDistance,10,Add Batum's reassigned 10-foot miss from the local official shots cache
+0021600056,1610612766,202689,Total2ptShotDistance,-10,Remove Walker's reassigned 10-foot miss per the local official shots cache
+0021600056,1610612766,201587,Total2ptShotsWithDistance,1,Add Batum's reassigned distance-tagged miss from the local official shots cache
+0021600056,1610612766,202689,Total2ptShotsWithDistance,-1,Remove Walker's reassigned distance-tagged miss per the local official shots cache
+0021700012,1610612757,202329,UnknownDistance2ptDefRebounds,1,Manual rebound cleanup: restore Aminu's missing defensive rebound from the delayed 2:04 Suns miss
+0021700150,1610612754,203506,UnknownDistance2ptDefRebounds,1,Manual rebound cleanup: restore Oladipo's missing defensive rebound from the delayed 5:28 Pelicans miss
+0021700285,1610612749,203089,UnknownDistance2ptOffRebounds,1,Manual rebound cleanup: restore Henson's missing offensive rebound from the delayed third-quarter Bucks cluster
+0021700317,1610612762,202324,UnknownDistance2ptOffRebounds,1,Manual rebound cleanup: restore Favors' missing offensive rebound from the delayed missed-free-throw cluster
+0021700359,1610612765,203083,UnknownDistance2ptOffRebounds,1,Manual rebound cleanup: restore Drummond's missing offensive rebound from the delayed third-quarter cluster
+0021700431,1610612760,202331,UnknownDistance2ptOffRebounds,1,Manual rebound cleanup: restore Paul George's missing offensive rebound from the late fourth-quarter Thunder cluster
+0021700056,1610612765,203083,UnknownDistance2ptOffRebounds,1,Manual rebound cleanup: restore Drummond's missing offensive rebound from the delayed and-one cluster
+0021700695,1610612750,1626157,UnknownDistance2ptDefRebounds,1,Manual rebound cleanup: restore Towns' missing defensive rebound from the delayed third-quarter Clippers miss
+0021800287,1610612765,1626169,UnknownDistance2ptOffRebounds,1,Manual rebound cleanup: restore Stanley Johnson's missing offensive rebound from the delayed 5:23 Pistons tip-miss cluster
+0021900175,1610612751,201599,UnknownDistance2ptOffRebounds,1,Manual rebound cleanup: restore DeAndre Jordan's missing offensive rebound from the stranded 10:23 fourth-quarter cluster
+0021900261,1610612749,101141,UnknownDistance2ptOffRebounds,1,Manual rebound cleanup: restore Ersan Ilyasova's missing offensive rebound from the stranded 0:41 second-quarter cluster
+0021900830,1610612738,1628464,UnknownDistance2ptOffRebounds,1,Manual rebound cleanup: restore Daniel Theis's missing offensive rebound from the stranded 7:51 fourth-quarter cluster
+0021901243,1610612747,203076,UnknownDistance2ptOffRebounds,1,Manual rebound cleanup: restore Anthony Davis's missing offensive rebound from the stranded 2:27 second-quarter cluster

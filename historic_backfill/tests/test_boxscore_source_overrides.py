@@ -3,6 +3,7 @@ import pandas as pd
 from historic_backfill.catalogs.boxscore_source_overrides import (
     BOXSCORE_SOURCE_COLUMNS,
     apply_boxscore_response_overrides,
+    load_boxscore_source_overrides,
 )
 
 
@@ -151,6 +152,62 @@ def test_apply_boxscore_response_overrides_replaces_existing_player_row():
     assert sarunas["REB"] == 4
 
 
+def test_set_boxscore_source_overrides_controls_default_lookup():
+    import historic_backfill.catalogs.boxscore_source_overrides as mod
+
+    base = {
+        "resultSets": [
+            {
+                "headers": BOXSCORE_SOURCE_COLUMNS,
+                "rowSet": [
+                    [
+                        "0029600070",
+                        1610612743,
+                        "DEN",
+                        "Denver",
+                        36,
+                        "Bad Name",
+                        "Bad",
+                        "",
+                        "",
+                        "00:00",
+                        0,
+                        0,
+                        0.0,
+                        0,
+                        0,
+                        0.0,
+                        0,
+                        0,
+                        0.0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                    ]
+                ],
+            }
+        ]
+    }
+    snapshot_df = pd.DataFrame([_override_row(PTS=42)])
+
+    try:
+        mod.set_boxscore_source_overrides(snapshot_df)
+        adjusted = mod.apply_boxscore_response_overrides("0029600070", base)
+    finally:
+        mod._BOXSCORE_SOURCE_OVERRIDES = None
+        mod._BOXSCORE_SOURCE_OVERRIDE_PATH = None
+
+    row = dict(zip(BOXSCORE_SOURCE_COLUMNS, adjusted["resultSets"][0]["rowSet"][0]))
+    assert row["PTS"] == 42
+
+
 def test_apply_boxscore_response_overrides_can_fix_existing_row_without_changing_roster():
     base = {
         "resultSets": [
@@ -268,3 +325,22 @@ def test_apply_boxscore_response_overrides_can_fix_existing_row_without_changing
     assert rows.loc[rows["PLAYER_ID"] == 971, "PTS"].item() == 8
     assert rows.loc[rows["PLAYER_ID"] == 710, "PTS"].item() == 4
     assert rows.loc[rows["TEAM_ID"] == 1610612751, "PTS"].sum() == 12
+
+
+def test_load_boxscore_source_overrides_preserves_padded_game_id(tmp_path):
+    path = tmp_path / "boxscore_source_overrides.csv"
+    pd.DataFrame([_override_row(GAME_ID="0029600070")]).to_csv(path, index=False)
+    overrides = load_boxscore_source_overrides(path)
+    base = {
+        "resultSets": [
+            {
+                "headers": BOXSCORE_SOURCE_COLUMNS,
+                "rowSet": [],
+            }
+        ]
+    }
+
+    adjusted = apply_boxscore_response_overrides("0029600070", base, overrides=overrides)
+    inserted = dict(zip(BOXSCORE_SOURCE_COLUMNS, adjusted["resultSets"][0]["rowSet"][0]))
+
+    assert inserted["GAME_ID"] == "0029600070"
