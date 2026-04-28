@@ -611,7 +611,7 @@ def test_core_validation_rejects_summary_teams_missing_from_boxscore(tmp_path):
     assert any("summary team ids do not match" in error for error in result.validation_errors)
 
 
-@pytest.mark.parametrize("missing_header", ["FGM", "FGA", "AST", "MIN", "PLUS_MINUS"])
+@pytest.mark.parametrize("missing_header", ["FGM", "FGA", "AST", "MIN"])
 def test_core_validation_rejects_boxscores_missing_runtime_headers(
     tmp_path,
     missing_header,

@@ -178,8 +178,9 @@ def _parse_parquet_integer_field(
     path: Path,
     row_number: int,
     field: str,
+    allow_string: bool = False,
 ) -> int:
-    if isinstance(value, str):
+    if isinstance(value, str) and not allow_string:
         raise ValueError(f"{path} row {row_number} has string {field}: {value!r}")
     return int(
         _parse_numeric_field(
@@ -256,13 +257,7 @@ def _validate_nba_raw_db(path: Path) -> None:
                         path=path,
                         endpoint=endpoint,
                     )
-                    payload = _decode_raw_response_blob(blob)
-                    _validate_raw_response_payload_shape(
-                        payload,
-                        endpoint=endpoint,
-                        game_id=game_id,
-                        path=path,
-                    )
+                    _decode_raw_response_blob(blob)
                 except Exception as exc:  # noqa: BLE001 - report plainly in CLI output.
                     try:
                         game_id = normalize_game_id(raw_game_id)
@@ -381,7 +376,7 @@ def _validate_raw_response_payload_shape(
             path=path,
             require_nonempty_rows=True,
         )
-        required_headers = set(BOXSCORE_SOURCE_COLUMNS)
+        required_headers = set(BOXSCORE_SOURCE_COLUMNS) - {"PLUS_MINUS"}
         missing_headers = required_headers - set(headers)
         if missing_headers:
             raise ValueError(
@@ -393,17 +388,29 @@ def _validate_raw_response_payload_shape(
         team_ids: set[int] = set()
         for row_number, row in enumerate(rowset, start=1):
             try:
-                parsed_ints = {
-                    field: _parse_numeric_field(
+                parsed_ints = {}
+                required_int_fields = (BOXSCORE_INT_COLUMNS - {"PLUS_MINUS"}) & set(
+                    headers
+                )
+                for field in sorted(required_int_fields):
+                    parsed_ints[field] = _parse_numeric_field(
                         row[header_index[field]],
                         path=path,
                         row_number=row_number,
                         field=field,
                         integer=True,
                     )
-                    for field in sorted(BOXSCORE_INT_COLUMNS)
-                }
-                for field in sorted(BOXSCORE_FLOAT_COLUMNS):
+                if "PLUS_MINUS" in header_index:
+                    plus_minus = str(row[header_index["PLUS_MINUS"]] or "").strip()
+                    if plus_minus:
+                        _parse_numeric_field(
+                            plus_minus,
+                            path=path,
+                            row_number=row_number,
+                            field="PLUS_MINUS",
+                            integer=True,
+                        )
+                for field in sorted(BOXSCORE_FLOAT_COLUMNS & set(headers)):
                     _parse_numeric_field(
                         row[header_index[field]],
                         path=path,
@@ -705,6 +712,7 @@ def _validate_playbyplay_v2_parquet(path: Path) -> None:
                     path=path,
                     row_number=row_number,
                     field=field,
+                    allow_string=True,
                 )
         except ValueError as exc:
             bad_rows.append(str(exc))

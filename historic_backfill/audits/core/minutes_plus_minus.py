@@ -85,6 +85,16 @@ def _empty_official_boxscore_df() -> pd.DataFrame:
     )
 
 
+def _boxscore_series(
+    official: pd.DataFrame,
+    column: str,
+    default: Any,
+) -> pd.Series:
+    if column in official.columns:
+        return official[column]
+    return pd.Series([default] * len(official), index=official.index)
+
+
 def _build_official_boxscore_df(
     game_id: str,
     raw: Dict[str, Any] | None,
@@ -125,10 +135,17 @@ def _build_official_boxscore_df(
     official["game_id"] = _normalize_game_id(game_id)
     official["player_id"] = official["PLAYER_ID"]
     official["team_id"] = official["TEAM_ID"]
-    official["player_name"] = official.get("PLAYER_NAME", "").fillna("").astype(str)
-    official["Minutes_official"] = official.get("MIN", "").apply(parse_official_minutes)
+    official["player_name"] = (
+        _boxscore_series(official, "PLAYER_NAME", "").fillna("").astype(str)
+    )
+    official["Minutes_official"] = _boxscore_series(
+        official, "MIN", ""
+    ).apply(parse_official_minutes)
     official["Plus_Minus_official"] = (
-        pd.to_numeric(official.get("PLUS_MINUS", 0), errors="coerce")
+        pd.to_numeric(
+            _boxscore_series(official, "PLUS_MINUS", 0),
+            errors="coerce",
+        )
         .fillna(0.0)
         .astype(float)
     )
