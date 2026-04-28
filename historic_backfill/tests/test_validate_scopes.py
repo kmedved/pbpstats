@@ -1,6 +1,7 @@
 from pathlib import Path
 import sqlite3
 
+import pandas as pd
 import pytest
 
 from historic_backfill.runners.validate import validate_scope
@@ -35,8 +36,18 @@ def _write_valid_nba_db(
 
 def _write_core_inputs(root: Path) -> None:
     _write_valid_nba_db(root)
+    parquet_path = root / "data" / "playbyplayv2.parq"
+    parquet_path.parent.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame(
+        {
+            "GAME_ID": ["0029700001"],
+            "EVENTNUM": [1],
+            "EVENTMSGTYPE": [12],
+            "PERIOD": [1],
+            "SEASON": [1997],
+        }
+    ).to_parquet(parquet_path)
     for rel_path in (
-        "data/playbyplayv2.parq",
         "data/period_starters_v6.parquet",
         "data/period_starters_v5.parquet",
     ):
@@ -59,6 +70,12 @@ def _write_core_catalogs(root: Path) -> None:
     )
     (catalogs / "validation_overrides.csv").write_text(
         "game_id,action,tolerance,notes\n",
+        encoding="utf-8",
+    )
+    (catalogs / "boxscore_source_overrides.csv").write_text(
+        "game_id,GAME_ID,TEAM_ID,TEAM_ABBREVIATION,TEAM_CITY,PLAYER_ID,PLAYER_NAME,"
+        "NICKNAME,START_POSITION,COMMENT,MIN,FGM,FGA,FG_PCT,FG3M,FG3A,FG3_PCT,"
+        "FTM,FTA,FT_PCT,OREB,DREB,REB,AST,STL,BLK,TO,PF,PTS,PLUS_MINUS,notes\n",
         encoding="utf-8",
     )
     (catalogs / "overrides" / "correction_manifest.json").write_text(
@@ -134,6 +151,38 @@ def test_core_validation_reports_invalid_nba_raw_db_contents(tmp_path):
     assert any("pbpv3" in error for error in result.validation_errors)
 
 
+def test_core_validation_reports_invalid_playbyplay_v2_parquet(tmp_path):
+    _write_core_inputs(tmp_path)
+    _write_core_catalogs(tmp_path)
+    (tmp_path / "data" / "playbyplayv2.parq").write_text(
+        "not parquet\n",
+        encoding="utf-8",
+    )
+
+    result = validate_scope("core", root=tmp_path)
+
+    assert result.ok is False
+    assert any("playbyplayv2.parq" in error for error in result.validation_errors)
+
+
+def test_core_validation_reports_missing_playbyplay_v2_columns(tmp_path):
+    _write_core_inputs(tmp_path)
+    _write_core_catalogs(tmp_path)
+    pd.DataFrame(
+        {
+            "game_id": ["0029700001"],
+            "eventnum": [1],
+            "eventmsgtype": [12],
+            "period": [1],
+        }
+    ).to_parquet(tmp_path / "data" / "playbyplayv2.parq")
+
+    result = validate_scope("core", root=tmp_path)
+
+    assert result.ok is False
+    assert any("SEASON" in error for error in result.validation_errors)
+
+
 @pytest.mark.parametrize(
     ("rel_path", "bad_contents"),
     [
@@ -152,6 +201,7 @@ def test_core_validation_reports_invalid_nba_raw_db_contents(tmp_path):
             "catalogs/validation_overrides.csv",
             "game_id,action,tolerance,notes\n" "29600370,allow,-1,bad tolerance\n",
         ),
+        ("catalogs/boxscore_source_overrides.csv", "game_id\n"),
         ("catalogs/overrides/correction_manifest.json", "{not json\n"),
         (
             "catalogs/overrides/correction_manifest.json",
@@ -210,6 +260,42 @@ def test_core_validation_reports_invalid_correction_manifest_semantics(tmp_path)
     assert any(
         "does not resolve to 5 players" in error for error in result.validation_errors
     )
+
+
+def test_core_validation_reports_invalid_delta_correction_schema(tmp_path):
+    _write_core_inputs(tmp_path)
+    _write_core_catalogs(tmp_path)
+    (tmp_path / "catalogs" / "overrides" / "correction_manifest.json").write_text(
+        """
+{
+  "manifest_version": "test",
+  "corrections": [
+    {
+      "correction_id": "bad_delta",
+      "status": "active",
+      "domain": "lineup",
+      "scope_type": "period_start",
+      "authoring_mode": "delta",
+      "game_id": "0029700001",
+      "period": 1,
+      "team_id": 1610612740,
+      "swap_out_player_id": "abc",
+      "reason_code": "test",
+      "evidence_summary": "test",
+      "source_primary": "manual_trace",
+      "preferred_source": "manual_trace"
+    }
+  ],
+  "residual_annotations": []
+}
+""",
+        encoding="utf-8",
+    )
+
+    result = validate_scope("core", root=tmp_path)
+
+    assert result.ok is False
+    assert any("swap_out_player_id" in error for error in result.validation_errors)
 
 
 def test_core_validation_reports_stale_compiled_runtime_views(tmp_path):

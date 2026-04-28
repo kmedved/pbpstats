@@ -70,10 +70,13 @@ python -m historic_backfill.runners.validate --scope=cross-source
 python -m historic_backfill.runners.validate --scope=provenance
 ```
 
-`core` checks required NBA runtime inputs and never checks BBR/tpdev paths.
-It is an input/catalog preflight, not a full corpus rerun. `cross-source`
-reports missing optional BBR/tpdev inputs as skipped diagnostics. `provenance`
-is stricter and fails when evidence files needed for re-review are missing.
+`core` checks required NBA runtime inputs and committed runtime catalogs; when
+the local NBA files exist, it opens `nba_raw.db`, checks required
+`raw_responses` endpoints, and verifies the `playbyplayv2.parq` schema. It never
+checks BBR/tpdev paths. It is an input/catalog preflight, not a full corpus
+rerun. `cross-source` reports missing optional BBR/tpdev inputs as skipped
+diagnostics. `provenance` is stricter and fails when evidence files needed for
+re-review are missing.
 
 See `RERUN.md` for operational commands.
 

@@ -270,6 +270,67 @@ def test_prepare_local_runtime_file_directory_defaults_to_committed_catalog_over
     assert (runtime_dir / "overrides" / "lineup_window_overrides.json").exists()
 
 
+def test_prepare_local_runtime_file_directory_can_use_file_directory_overrides(
+    tmp_path: Path,
+) -> None:
+    live_dir = tmp_path / "live"
+    overrides_dir = live_dir / "overrides"
+    overrides_dir.mkdir(parents=True)
+    (overrides_dir / "lineup_window_overrides.json").write_text(
+        '{"local": true}\n',
+        encoding="utf-8",
+    )
+
+    info = runner.prepare_local_runtime_file_directory(
+        tmp_path / "runtime_file_directory",
+        live_file_directory=live_dir,
+        catalog_overrides_dir=None,
+    )
+    runtime_dir = Path(info["runtime_file_directory"]["path"])
+
+    assert info["overrides_snapshot"]["source_kind"] == "file_directory"
+    assert (runtime_dir / "overrides" / "lineup_window_overrides.json").read_text(
+        encoding="utf-8"
+    ) == '{"local": true}\n'
+
+
+def test_parse_args_exposes_boxscore_and_override_directory_controls(
+    tmp_path: Path,
+) -> None:
+    args = runner.parse_args(
+        [
+            "--seasons",
+            "1997",
+            "--output-dir",
+            str(tmp_path / "out"),
+            "--boxscore-source-overrides-path",
+            str(tmp_path / "boxscore_source_overrides.csv"),
+            "--catalog-overrides-dir",
+            str(tmp_path / "catalog_overrides"),
+        ]
+    )
+
+    assert args.boxscore_source_overrides_path == (
+        tmp_path / "boxscore_source_overrides.csv"
+    )
+    assert args.catalog_overrides_dir == tmp_path / "catalog_overrides"
+    assert args.use_file_directory_overrides is False
+
+
+def test_parse_args_can_prefer_file_directory_overrides(tmp_path: Path) -> None:
+    args = runner.parse_args(
+        [
+            "--seasons",
+            "1997",
+            "--output-dir",
+            str(tmp_path / "out"),
+            "--use-file-directory-overrides",
+        ]
+    )
+
+    assert args.use_file_directory_overrides is True
+
+
 def test_prepare_local_runtime_inputs_reuse_validated_cache_reuses_matching_files(
     tmp_path: Path,
     monkeypatch,

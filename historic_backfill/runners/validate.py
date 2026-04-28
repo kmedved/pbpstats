@@ -10,6 +10,11 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Iterable
 
+import pyarrow.parquet as pq
+
+from historic_backfill.catalogs.boxscore_source_overrides import (
+    BOXSCORE_SOURCE_OVERRIDE_COLUMNS,
+)
 from historic_backfill.catalogs.lineup_correction_manifest import (
     validate_compiled_runtime_views,
     validate_manifest_schema,
@@ -36,11 +41,19 @@ CORE_CATALOG_INPUTS = (
     "catalogs/pbp_row_overrides.csv",
     "catalogs/pbp_stat_overrides.csv",
     "catalogs/validation_overrides.csv",
+    "catalogs/boxscore_source_overrides.csv",
     "catalogs/overrides/correction_manifest.json",
     "catalogs/overrides/period_starters_overrides.json",
     "catalogs/overrides/lineup_window_overrides.json",
 )
 REQUIRED_RAW_RESPONSE_ENDPOINTS = {"boxscore", "summary", "pbpv3"}
+PLAYBYPLAY_V2_REQUIRED_COLUMNS = {
+    "GAME_ID",
+    "EVENTNUM",
+    "EVENTMSGTYPE",
+    "PERIOD",
+    "SEASON",
+}
 PBP_STAT_OVERRIDE_REQUIRED_COLUMNS = {
     "game_id",
     "team_id",
@@ -243,12 +256,32 @@ def _validate_nba_raw_db(path: Path) -> None:
         conn.close()
 
 
+def _validate_playbyplay_v2_parquet(path: Path) -> None:
+    if not path.exists():
+        return
+    try:
+        schema = pq.read_schema(path)
+    except Exception as exc:  # noqa: BLE001 - report plainly in CLI output.
+        raise ValueError(f"{path} is not a readable parquet file: {exc}") from exc
+    observed_columns = {str(column).upper() for column in schema.names}
+    missing_columns = PLAYBYPLAY_V2_REQUIRED_COLUMNS - observed_columns
+    if missing_columns:
+        raise ValueError(
+            f"{path} missing required playbyplayv2 columns: {sorted(missing_columns)}"
+        )
+
+
 def _validate_core_nba_inputs(root: Path) -> list[str]:
     errors: list[str] = []
-    db_path = root / "data" / "nba_raw.db"
-    if db_path.exists():
+    validators = [
+        (root / "data" / "nba_raw.db", _validate_nba_raw_db),
+        (root / "data" / "playbyplayv2.parq", _validate_playbyplay_v2_parquet),
+    ]
+    for path, validator in validators:
+        if not path.exists():
+            continue
         try:
-            _validate_nba_raw_db(db_path)
+            validator(path)
         except Exception as exc:  # noqa: BLE001 - report plainly in CLI output.
             errors.append(str(exc))
     return errors
@@ -267,6 +300,12 @@ def _validate_core_catalogs(root: Path) -> list[str]:
         (
             root / "catalogs" / "validation_overrides.csv",
             _validate_validation_overrides,
+        ),
+        (
+            root / "catalogs" / "boxscore_source_overrides.csv",
+            lambda path: _validate_csv_columns(
+                path, set(BOXSCORE_SOURCE_OVERRIDE_COLUMNS)
+            ),
         ),
         (
             root / "catalogs" / "overrides" / "correction_manifest.json",

@@ -663,6 +663,7 @@ def _validate_correction_record(correction: dict[str, Any], seen_ids: set[str]) 
         "game_id",
         "period",
         "team_id",
+        "authoring_mode",
         "reason_code",
         "evidence_summary",
         "source_primary",
@@ -672,6 +673,19 @@ def _validate_correction_record(correction: dict[str, Any], seen_ids: set[str]) 
             raise ManifestValidationError(
                 f"Correction {correction_id} is missing required field {field}"
             )
+    authoring_mode = str(correction.get("authoring_mode") or "")
+    if authoring_mode not in AUTHORING_MODE_VALUES:
+        raise ManifestValidationError(
+            f"Correction {correction_id} has invalid authoring_mode {authoring_mode}"
+        )
+    if authoring_mode == "delta":
+        for player_field in ("swap_out_player_id", "swap_in_player_id"):
+            try:
+                int(correction[player_field])
+            except (KeyError, TypeError, ValueError) as exc:
+                raise ManifestValidationError(
+                    f"Delta correction {correction_id} is missing or has invalid {player_field}"
+                ) from exc
     for source_field in ["source_primary", "source_secondary", "preferred_source"]:
         source_value = correction.get(source_field)
         if source_value in (None, ""):

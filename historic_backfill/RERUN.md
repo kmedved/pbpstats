@@ -50,7 +50,9 @@ See `data/README.md` for the canonical local data layout.
 
 Core validation is an input/catalog preflight. It should fail clearly when
 required NBA data is missing, and it should validate committed catalogs such as
-the PBP row override synthetic-sub canary. It should not require or inspect
+the PBP row override synthetic-sub canary. When NBA data files are present, it
+opens `nba_raw.db`, verifies the `raw_responses` endpoints needed by the runner,
+and checks the `playbyplayv2.parq` schema. It should not require or inspect
 BBR/tpdev paths. A successful preflight is not a full corpus rerun.
 
 ```bash
@@ -79,6 +81,14 @@ entrypoint. Its defaults resolve under `historic_backfill/data/` and
 `playbyplayv2.parq` plus the v6/v5 period starter parquet files into each run
 cache; v3 actions are fetched from the `pbpv3` endpoint stored inside
 `nba_raw.db`.
+
+By default, runtime lineup override JSONs are snapshotted from the committed
+`historic_backfill/catalogs/overrides/` directory. For local experiments that
+intentionally use `--file-directory/overrides`, pass
+`--use-file-directory-overrides`. To test another committed-catalog candidate,
+pass `--catalog-overrides-dir PATH`. The runner prints the selected
+`overrides_snapshot` source at startup and records it in
+`runtime_input_provenance.json`.
 
 Check its current CLI before a full run:
 

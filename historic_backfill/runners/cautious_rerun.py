@@ -1099,7 +1099,31 @@ def parse_args(argv: Iterable[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--db-path", type=Path, default=DEFAULT_DB)
     parser.add_argument("--parquet-path", type=Path, default=DEFAULT_PARQUET)
     parser.add_argument("--overrides-path", type=Path, default=DEFAULT_OVERRIDES)
+    parser.add_argument(
+        "--boxscore-source-overrides-path",
+        type=Path,
+        default=DEFAULT_BOXSCORE_SOURCE_OVERRIDES,
+    )
     parser.add_argument("--file-directory", type=Path, default=DEFAULT_FILE_DIRECTORY)
+    override_group = parser.add_mutually_exclusive_group()
+    override_group.add_argument(
+        "--catalog-overrides-dir",
+        type=Path,
+        default=DEFAULT_RUNTIME_CATALOG_OVERRIDES_DIR,
+        help=(
+            "Directory of committed runtime override JSONs to snapshot into the run "
+            "file directory."
+        ),
+    )
+    override_group.add_argument(
+        "--use-file-directory-overrides",
+        action="store_true",
+        default=False,
+        help=(
+            "Snapshot overrides from --file-directory/overrides instead of the "
+            "committed catalog override directory."
+        ),
+    )
     parser.add_argument("--strict-mode", action="store_true", default=False)
     parser.add_argument("--tolerance", type=int, default=2)
     parser.add_argument("--max-workers", type=int, default=4)
@@ -1151,6 +1175,11 @@ def main(argv: Iterable[str] | None = None) -> int:
     args = parse_args(argv)
     output_dir = args.output_dir.resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
+    catalog_overrides_dir = (
+        None
+        if args.use_file_directory_overrides
+        else args.catalog_overrides_dir.resolve()
+    )
     overall_start = time.perf_counter()
     runtime_input_start = time.perf_counter()
     runtime_inputs = prepare_local_runtime_inputs(
@@ -1158,8 +1187,10 @@ def main(argv: Iterable[str] | None = None) -> int:
         db_path=args.db_path.resolve(),
         parquet_path=args.parquet_path.resolve(),
         overrides_path=args.overrides_path.resolve(),
+        boxscore_source_overrides_path=args.boxscore_source_overrides_path.resolve(),
         allow_unreadable_csv_fallback=args.allow_unreadable_csv_fallback,
         file_directory=args.file_directory.resolve(),
+        catalog_overrides_dir=catalog_overrides_dir,
         runtime_input_cache_mode=args.runtime_input_cache_mode,
     )
     (output_dir / "runtime_input_provenance.json").write_text(
@@ -1195,6 +1226,11 @@ def main(argv: Iterable[str] | None = None) -> int:
     print(f"[RUNNER] runtime_input_cache_mode: {args.runtime_input_cache_mode}")
     print(f"[RUNNER] live_file_directory: {args.file_directory.resolve()}")
     print(f"[RUNNER] runtime_file_directory: {runtime_inputs['file_directory']}")
+    print(
+        "[RUNNER] overrides_snapshot: "
+        f"{runtime_inputs['runtime_input_provenance']['file_directory']['overrides_snapshot']['source_kind']} "
+        f"from {runtime_inputs['runtime_input_provenance']['file_directory']['overrides_snapshot']['source']['path']}"
+    )
     print(
         "[RUNNER] period_starters_sources: "
         + ", ".join(
