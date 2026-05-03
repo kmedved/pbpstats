@@ -3,6 +3,10 @@ import sys
 
 sys.path.insert(0, os.path.abspath("."))
 
+import pbpstats
+from pbpstats.data_loader.live.enhanced_pbp.loader import LiveEnhancedPbpLoader
+from pbpstats.data_loader.nba_enhanced_pbp_loader import NbaEnhancedPbpLoader
+from pbpstats.resources.enhanced_pbp.live.turnover import LiveTurnover
 from pbpstats.resources.enhanced_pbp.shot_clock import annotate_shot_clock
 from pbpstats.resources.enhanced_pbp import (
     FieldGoal,
@@ -17,7 +21,17 @@ from pbpstats.resources.enhanced_pbp import (
 
 
 class DummyEvent:
-    def __init__(self, *, period=1, seconds_remaining=0.0, description="", team_id=None, offense_team_id=None):
+    def __init__(
+        self,
+        *,
+        period=1,
+        seconds_remaining=0.0,
+        description="",
+        team_id=None,
+        offense_team_id=None,
+        game_id=None,
+    ):
+        self.game_id = game_id
         self.period = period
         self.seconds_remaining = seconds_remaining
         self.description = description
@@ -80,12 +94,43 @@ class DummyReb(Rebound, DummyEvent):
         return self._missed_shot
 
 
+class DummyBrokenDreb(Rebound, DummyEvent):
+    @property
+    def is_real_rebound(self):
+        raise RuntimeError("missing linked shot")
+
+    @property
+    def oreb(self):
+        return False
+
+    @property
+    def missed_shot(self):
+        raise RuntimeError("missing linked shot")
+
+
+class DummyMalformedDreb(DummyBrokenDreb):
+    @property
+    def oreb(self):
+        raise AttributeError("missing subtype")
+
+
+class DummyNoOffenseEvent(DummyEvent):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        del self.offense_team_id
+
+
 class DummyTO(Turnover, DummyEvent):
     def __init__(self, *, is_no_turnover=False, is_kicked_ball=False, is_shot_clock_violation=False, **kwargs):
         DummyEvent.__init__(self, **kwargs)
         self.is_no_turnover = is_no_turnover
         self.is_kicked_ball = is_kicked_ball
         self.is_shot_clock_violation = is_shot_clock_violation
+
+
+class DummyStatsKickedBallTO(DummyTO):
+    def get_offense_team_id(self):
+        return self.team_id
 
 
 class DummyFoul(Foul, DummyEvent):
@@ -95,18 +140,28 @@ class DummyFoul(Foul, DummyEvent):
         is_technical=False,
         is_double_technical=False,
         is_double_foul=False,
+        is_clear_path_foul=False,
+        is_flagrant1=False,
+        is_flagrant2=False,
         is_shooting_foul=False,
         is_shooting_block_foul=False,
         is_loose_ball_foul=False,
+        is_defensive_3_seconds=False,
+        is_delay_of_game=False,
         **kwargs,
     ):
         DummyEvent.__init__(self, **kwargs)
         self._is_technical = is_technical
         self._is_double_technical = is_double_technical
         self._is_double_foul = is_double_foul
+        self._is_clear_path_foul = is_clear_path_foul
+        self._is_flagrant1 = is_flagrant1
+        self._is_flagrant2 = is_flagrant2
         self._is_shooting_foul = is_shooting_foul
         self._is_shooting_block_foul = is_shooting_block_foul
         self._is_loose_ball_foul = is_loose_ball_foul
+        self._is_defensive_3_seconds = is_defensive_3_seconds
+        self._is_delay_of_game = is_delay_of_game
 
     @property
     def is_technical(self):
@@ -121,6 +176,18 @@ class DummyFoul(Foul, DummyEvent):
         return self._is_double_foul
 
     @property
+    def is_clear_path_foul(self):
+        return self._is_clear_path_foul
+
+    @property
+    def is_flagrant1(self):
+        return self._is_flagrant1
+
+    @property
+    def is_flagrant2(self):
+        return self._is_flagrant2
+
+    @property
     def is_shooting_foul(self):
         return self._is_shooting_foul
 
@@ -131,6 +198,14 @@ class DummyFoul(Foul, DummyEvent):
     @property
     def is_loose_ball_foul(self):
         return self._is_loose_ball_foul
+
+    @property
+    def is_defensive_3_seconds(self):
+        return self._is_defensive_3_seconds
+
+    @property
+    def is_delay_of_game(self):
+        return self._is_delay_of_game
 
 
 class DummyViol(Violation, DummyEvent):
@@ -144,9 +219,54 @@ class DummyJB(JumpBall, DummyEvent):
 
 
 class DummyFT(FreeThrow, DummyEvent):
-    def __init__(self, *, is_end_ft=False, **kwargs):
+    def __init__(self, *, is_end_ft=False, is_made=False, **kwargs):
         DummyEvent.__init__(self, **kwargs)
-        self.is_end_ft = is_end_ft
+        self._is_end_ft = is_end_ft
+        self._is_made = is_made
+
+    @property
+    def is_made(self):
+        return self._is_made
+
+    @property
+    def is_ft_1_of_1(self):
+        return self._is_end_ft
+
+    @property
+    def is_ft_1_of_2(self):
+        return False
+
+    @property
+    def is_ft_2_of_2(self):
+        return False
+
+    @property
+    def is_ft_1_of_3(self):
+        return False
+
+    @property
+    def is_ft_2_of_3(self):
+        return False
+
+    @property
+    def is_ft_3_of_3(self):
+        return False
+
+    @property
+    def is_technical_ft(self):
+        return False
+
+    @property
+    def is_ft_1pt(self):
+        return False
+
+    @property
+    def is_ft_2pt(self):
+        return False
+
+    @property
+    def is_ft_3pt(self):
+        return False
 
 
 def _link_events(events):
@@ -237,6 +357,230 @@ def test_normal_miss_offensive_rebound_short_reset():
     assert tip_in.shot_clock == 14.0
 
 
+def test_nba_short_reset_starts_in_2018():
+    sop = DummyStart(period=1, seconds_remaining=120)
+    miss = DummyFG(
+        is_made=False,
+        description="miss",
+        team_id=1,
+        offense_team_id=1,
+        seconds_remaining=100,
+    )
+    oreb = DummyReb(
+        oreb=True,
+        missed_shot=miss,
+        team_id=1,
+        offense_team_id=1,
+        seconds_remaining=100,
+    )
+    next_ev = DummyFG(
+        is_made=False, team_id=1, offense_team_id=1, seconds_remaining=99
+    )
+    events = [sop, miss, oreb, next_ev]
+    _link_events(events)
+
+    annotate_shot_clock(events, season_year=2017, league=pbpstats.NBA_STRING)
+    assert next_ev.shot_clock == 23.0
+
+    annotate_shot_clock(events, season_year=2018, league=pbpstats.NBA_STRING)
+    assert next_ev.shot_clock == 13.0
+
+
+def test_nba_loader_infers_season_from_game_id_for_short_reset():
+    sop = DummyStart(period=1, seconds_remaining=120)
+    miss = DummyFG(
+        is_made=False,
+        description="miss",
+        team_id=1,
+        offense_team_id=1,
+        seconds_remaining=100,
+    )
+    oreb = DummyReb(
+        oreb=True,
+        missed_shot=miss,
+        team_id=1,
+        offense_team_id=1,
+        seconds_remaining=100,
+    )
+    tip_in = DummyFG(
+        is_made=True, team_id=1, offense_team_id=1, seconds_remaining=100
+    )
+    events = [sop, miss, oreb, tip_in]
+    _link_events(events)
+
+    loader = object.__new__(NbaEnhancedPbpLoader)
+    loader.game_id = "0022300001"
+    loader.league = pbpstats.NBA_STRING
+    loader.items = events
+
+    loader._annotate_shot_clock()
+
+    assert tip_in.shot_clock == 14.0
+
+
+def test_nba_loader_infers_league_and_season_from_numeric_game_id():
+    sop = DummyStart(period=1, seconds_remaining=120)
+    miss = DummyFG(
+        is_made=False,
+        description="miss",
+        team_id=1,
+        offense_team_id=1,
+        seconds_remaining=100,
+    )
+    oreb = DummyReb(
+        oreb=True,
+        missed_shot=miss,
+        team_id=1,
+        offense_team_id=1,
+        seconds_remaining=100,
+    )
+    tip_in = DummyFG(
+        is_made=True, team_id=1, offense_team_id=1, seconds_remaining=100
+    )
+    events = [sop, miss, oreb, tip_in]
+    _link_events(events)
+
+    loader = object.__new__(NbaEnhancedPbpLoader)
+    loader.game_id = 22300001
+    loader.items = events
+
+    loader._annotate_shot_clock()
+
+    assert tip_in.shot_clock == 14.0
+
+
+def test_annotate_shot_clock_infers_league_and_season_from_event_game_id():
+    sop = DummyStart(
+        period=1,
+        seconds_remaining=120,
+        game_id="1021500001",
+    )
+    miss = DummyFG(
+        is_made=False,
+        description="miss",
+        team_id=1,
+        offense_team_id=1,
+        seconds_remaining=100,
+        game_id="1021500001",
+    )
+    oreb = DummyReb(
+        oreb=True,
+        missed_shot=miss,
+        team_id=1,
+        offense_team_id=1,
+        seconds_remaining=100,
+        game_id="1021500001",
+    )
+    next_ev = DummyFG(
+        is_made=False,
+        team_id=1,
+        offense_team_id=1,
+        seconds_remaining=99,
+        game_id="1021500001",
+    )
+    events = [sop, miss, oreb, next_ev]
+    _link_events(events)
+
+    annotate_shot_clock(events)
+
+    assert next_ev.shot_clock == 23.0
+
+
+def test_annotate_shot_clock_infers_nba_from_numeric_event_game_id():
+    sop = DummyStart(
+        period=1,
+        seconds_remaining=120,
+        game_id=22300001,
+    )
+    miss = DummyFG(
+        is_made=False,
+        description="miss",
+        team_id=1,
+        offense_team_id=1,
+        seconds_remaining=100,
+        game_id=22300001,
+    )
+    oreb = DummyReb(
+        oreb=True,
+        missed_shot=miss,
+        team_id=1,
+        offense_team_id=1,
+        seconds_remaining=100,
+        game_id=22300001,
+    )
+    next_ev = DummyFG(
+        is_made=False,
+        team_id=1,
+        offense_team_id=1,
+        seconds_remaining=99,
+        game_id=22300001,
+    )
+    events = [sop, miss, oreb, next_ev]
+    _link_events(events)
+
+    annotate_shot_clock(events)
+
+    assert next_ev.shot_clock == 13.0
+
+
+def test_wnba_short_reset_starts_in_2016():
+    sop = DummyStart(period=1, seconds_remaining=120)
+    miss = DummyFG(
+        is_made=False,
+        description="miss",
+        team_id=1,
+        offense_team_id=1,
+        seconds_remaining=100,
+    )
+    oreb = DummyReb(
+        oreb=True,
+        missed_shot=miss,
+        team_id=1,
+        offense_team_id=1,
+        seconds_remaining=100,
+    )
+    next_ev = DummyFG(
+        is_made=False, team_id=1, offense_team_id=1, seconds_remaining=99
+    )
+    events = [sop, miss, oreb, next_ev]
+    _link_events(events)
+
+    annotate_shot_clock(events, season_year=2015, league=pbpstats.WNBA_STRING)
+    assert next_ev.shot_clock == 23.0
+
+    annotate_shot_clock(events, season_year=2016, league=pbpstats.WNBA_STRING)
+    assert next_ev.shot_clock == 13.0
+
+
+def test_g_league_short_reset_starts_in_2016():
+    sop = DummyStart(period=1, seconds_remaining=120)
+    miss = DummyFG(
+        is_made=False,
+        description="miss",
+        team_id=1,
+        offense_team_id=1,
+        seconds_remaining=100,
+    )
+    oreb = DummyReb(
+        oreb=True,
+        missed_shot=miss,
+        team_id=1,
+        offense_team_id=1,
+        seconds_remaining=100,
+    )
+    next_ev = DummyFG(
+        is_made=False, team_id=1, offense_team_id=1, seconds_remaining=99
+    )
+    events = [sop, miss, oreb, next_ev]
+    _link_events(events)
+
+    annotate_shot_clock(events, season_year=2015, league=pbpstats.G_LEAGUE_STRING)
+    assert next_ev.shot_clock == 23.0
+
+    annotate_shot_clock(events, season_year=2016, league=pbpstats.G_LEAGUE_STRING)
+    assert next_ev.shot_clock == 13.0
+
+
 def test_shot_clock_violation_display_zero():
     sop = DummyStart(period=1, seconds_remaining=50)
     tov = DummyTO(team_id=2, offense_team_id=1, seconds_remaining=40, is_shot_clock_violation=True)
@@ -261,6 +605,24 @@ def test_defensive_kicked_ball_retained_bumps_to_fourteen():
     _link_events(events)
 
     annotate_shot_clock(events, season_year=2018, league="nba")
+
+    assert next_ev.shot_clock == 9.0
+
+
+def test_stats_style_kicked_ball_retained_bumps_to_fourteen():
+    sop = DummyStart(period=1, seconds_remaining=50)
+    kicked = DummyStatsKickedBallTO(
+        team_id=2,
+        offense_team_id=1,
+        seconds_remaining=35,
+        is_kicked_ball=True,
+    )
+    kicked.non_possession_changing_override = True
+    next_ev = DummyFG(is_made=False, team_id=1, offense_team_id=1, seconds_remaining=30)
+    events = [sop, kicked, next_ev]
+    _link_events(events)
+
+    annotate_shot_clock(events, season_year=2018, league=pbpstats.NBA_STRING)
 
     assert next_ev.shot_clock == 9.0
 
@@ -305,6 +667,289 @@ def test_loose_ball_foul_with_rim_context_resets_to_short():
     annotate_shot_clock(events, season_year=2018, league="nba")
 
     assert next_ev.shot_clock == 13.0
+
+
+def test_defensive_technical_retained_bumps_to_fourteen():
+    sop = DummyStart(period=1, seconds_remaining=50)
+    technical = DummyFoul(
+        team_id=2,
+        offense_team_id=1,
+        seconds_remaining=34,
+        is_technical=True,
+    )
+    next_ev = DummyFG(is_made=False, team_id=1, offense_team_id=1, seconds_remaining=33)
+    events = [sop, technical, next_ev]
+    _link_events(events)
+
+    annotate_shot_clock(events, season_year=2023, league=pbpstats.NBA_STRING)
+
+    assert next_ev.shot_clock == 13.0
+
+
+def test_double_technical_retained_bumps_to_fourteen():
+    sop = DummyStart(period=1, seconds_remaining=50)
+    technical = DummyFoul(
+        team_id=2,
+        offense_team_id=1,
+        seconds_remaining=34,
+        is_double_technical=True,
+    )
+    next_ev = DummyFG(is_made=False, team_id=1, offense_team_id=1, seconds_remaining=33)
+    events = [sop, technical, next_ev]
+    _link_events(events)
+
+    annotate_shot_clock(events, season_year=2023, league=pbpstats.NBA_STRING)
+
+    assert next_ev.shot_clock == 13.0
+
+
+def test_double_foul_retained_bumps_to_fourteen():
+    sop = DummyStart(period=1, seconds_remaining=50)
+    foul = DummyFoul(
+        team_id=2,
+        offense_team_id=1,
+        seconds_remaining=34,
+        is_double_foul=True,
+    )
+    next_ev = DummyFG(is_made=False, team_id=1, offense_team_id=1, seconds_remaining=33)
+    events = [sop, foul, next_ev]
+    _link_events(events)
+
+    annotate_shot_clock(events, season_year=2023, league=pbpstats.NBA_STRING)
+
+    assert next_ev.shot_clock == 13.0
+
+
+def test_defensive_delay_of_game_retained_bumps_to_fourteen():
+    sop = DummyStart(period=1, seconds_remaining=50)
+    delay = DummyFoul(
+        team_id=2,
+        offense_team_id=1,
+        seconds_remaining=34,
+        is_delay_of_game=True,
+    )
+    next_ev = DummyFG(is_made=False, team_id=1, offense_team_id=1, seconds_remaining=33)
+    events = [sop, delay, next_ev]
+    _link_events(events)
+
+    annotate_shot_clock(events, season_year=2023, league=pbpstats.NBA_STRING)
+
+    assert next_ev.shot_clock == 13.0
+
+
+def test_offensive_technical_retained_does_not_bump():
+    sop = DummyStart(period=1, seconds_remaining=50)
+    technical = DummyFoul(
+        team_id=1,
+        offense_team_id=1,
+        seconds_remaining=34,
+        is_technical=True,
+    )
+    next_ev = DummyFG(is_made=False, team_id=1, offense_team_id=1, seconds_remaining=33)
+    events = [sop, technical, next_ev]
+    _link_events(events)
+
+    annotate_shot_clock(events, season_year=2023, league=pbpstats.NBA_STRING)
+
+    assert next_ev.shot_clock == 7.0
+
+
+def test_defensive_flagrant_foul_resets_full():
+    sop = DummyStart(period=1, seconds_remaining=50)
+    foul = DummyFoul(
+        team_id=2,
+        offense_team_id=1,
+        seconds_remaining=34,
+        is_flagrant1=True,
+    )
+    next_ev = DummyFG(is_made=False, team_id=1, offense_team_id=1, seconds_remaining=33)
+    events = [sop, foul, next_ev]
+    _link_events(events)
+
+    annotate_shot_clock(events, season_year=2023, league=pbpstats.NBA_STRING)
+
+    assert next_ev.shot_clock == 23.0
+
+
+def test_defensive_violation_after_rim_context_resets_to_short():
+    sop = DummyStart(period=1, seconds_remaining=120)
+    miss = DummyFG(
+        is_made=False,
+        description="missed jumper",
+        team_id=1,
+        offense_team_id=1,
+        seconds_remaining=118,
+    )
+    violation = DummyViol(team_id=2, offense_team_id=1, seconds_remaining=118)
+    next_ev = DummyFG(is_made=False, team_id=1, offense_team_id=1, seconds_remaining=117)
+    events = [sop, miss, violation, next_ev]
+    _link_events(events)
+
+    annotate_shot_clock(events, season_year=2023, league=pbpstats.NBA_STRING)
+
+    assert next_ev.shot_clock == 13.0
+
+
+def test_retained_deadball_rebound_after_rim_resets_to_short():
+    sop = DummyStart(period=1, seconds_remaining=120)
+    miss = DummyFG(
+        is_made=False,
+        description="missed jumper",
+        team_id=1,
+        offense_team_id=1,
+        seconds_remaining=118,
+    )
+    team_rebound = DummyReb(
+        is_real_rebound=False,
+        oreb=False,
+        missed_shot=miss,
+        team_id=1,
+        offense_team_id=1,
+        seconds_remaining=118,
+    )
+    next_ev = DummyFG(is_made=False, team_id=1, offense_team_id=1, seconds_remaining=117)
+    events = [sop, miss, team_rebound, next_ev]
+    _link_events(events)
+
+    annotate_shot_clock(events, season_year=2023, league=pbpstats.NBA_STRING)
+
+    assert next_ev.shot_clock == 13.0
+
+
+def test_retained_deadball_rebound_after_airball_does_not_reset():
+    sop = DummyStart(period=1, seconds_remaining=120)
+    miss = DummyFG(
+        is_made=False,
+        description="missed airball",
+        team_id=1,
+        offense_team_id=1,
+        seconds_remaining=118,
+    )
+    team_rebound = DummyReb(
+        is_real_rebound=False,
+        oreb=False,
+        missed_shot=miss,
+        team_id=1,
+        offense_team_id=1,
+        seconds_remaining=118,
+    )
+    next_ev = DummyFG(is_made=False, team_id=1, offense_team_id=1, seconds_remaining=117)
+    events = [sop, miss, team_rebound, next_ev]
+    _link_events(events)
+
+    annotate_shot_clock(events, season_year=2023, league=pbpstats.NBA_STRING)
+
+    assert next_ev.shot_clock == 21.0
+
+
+def test_non_final_free_throw_deadball_rebound_does_not_reset():
+    sop = DummyStart(period=1, seconds_remaining=120)
+    miss = DummyFT(
+        is_end_ft=False,
+        description="missed free throw 1 of 2",
+        team_id=1,
+        offense_team_id=1,
+        seconds_remaining=118,
+    )
+    team_rebound = DummyReb(
+        is_real_rebound=False,
+        oreb=False,
+        missed_shot=miss,
+        team_id=1,
+        offense_team_id=1,
+        seconds_remaining=118,
+    )
+    next_ev = DummyFG(is_made=False, team_id=1, offense_team_id=1, seconds_remaining=117)
+    events = [sop, miss, team_rebound, next_ev]
+    _link_events(events)
+
+    annotate_shot_clock(events, season_year=2023, league=pbpstats.NBA_STRING)
+
+    assert next_ev.shot_clock == 21.0
+
+
+def test_live_dreb_normalization_uses_linked_missed_shot():
+    miss = DummyFG(
+        is_made=False,
+        description="miss",
+        team_id=1,
+        offense_team_id=1,
+        seconds_remaining=100,
+    )
+    admin = DummyEvent(team_id=2, offense_team_id=2, seconds_remaining=100)
+    dreb = DummyReb(
+        oreb=False,
+        missed_shot=miss,
+        team_id=2,
+        offense_team_id=2,
+        seconds_remaining=99,
+    )
+    events = [miss, admin, dreb]
+    _link_events(events)
+    loader = object.__new__(LiveEnhancedPbpLoader)
+    loader.items = events
+
+    loader._change_team_id_on_drebs()
+
+    assert dreb.offense_team_id == 1
+
+
+def test_live_dreb_normalization_falls_back_when_linked_shot_unavailable():
+    previous_event = DummyEvent(team_id=2, offense_team_id=1, seconds_remaining=100)
+    dreb = DummyBrokenDreb(team_id=2, offense_team_id=2, seconds_remaining=99)
+    events = [previous_event, dreb]
+    _link_events(events)
+    loader = object.__new__(LiveEnhancedPbpLoader)
+    loader.items = events
+
+    loader._change_team_id_on_drebs()
+
+    assert dreb.offense_team_id == 1
+
+
+def test_live_dreb_normalization_falls_back_when_oreb_flag_unavailable():
+    previous_event = DummyEvent(team_id=2, offense_team_id=1, seconds_remaining=100)
+    dreb = DummyMalformedDreb(team_id=2, offense_team_id=2, seconds_remaining=99)
+    events = [previous_event, dreb]
+    _link_events(events)
+    loader = object.__new__(LiveEnhancedPbpLoader)
+    loader.items = events
+
+    loader._change_team_id_on_drebs()
+
+    assert dreb.offense_team_id == 1
+
+
+def test_live_dreb_normalization_does_not_crash_without_offense_fields():
+    previous_event = DummyNoOffenseEvent(team_id=2, seconds_remaining=100)
+    dreb = DummyMalformedDreb(team_id=2, offense_team_id=2, seconds_remaining=99)
+    del dreb.offense_team_id
+    events = [previous_event, dreb]
+    _link_events(events)
+    loader = object.__new__(LiveEnhancedPbpLoader)
+    loader.items = events
+
+    loader._change_team_id_on_drebs()
+
+    assert dreb.offense_team_id is None
+
+
+def test_live_lane_violation_turnover_normalizes_sub_type_case():
+    event = {
+        "period": 1,
+        "actionNumber": 1,
+        "clock": "PT10M00.00S",
+        "actionType": "turnover",
+        "subType": "lane violation",
+        "teamId": 1,
+        "personId": 1,
+        "possession": 1,
+        "orderNumber": 1,
+    }
+
+    turnover = LiveTurnover(event, "0022300001")
+
+    assert turnover.is_lane_violation is True
 
 
 def test_loose_ball_foul_does_not_use_later_miss_same_timestamp_as_rim_context():

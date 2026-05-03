@@ -18,14 +18,20 @@ from pbpstats.resources.enhanced_pbp import (
 @dataclass(frozen=True)
 class ShotClockConfig:
     full_reset: float = 24.0
-    short_reset: float = 14.0
+    rim_retention_reset: float = 14.0
+    retained_stop_minimum: float = 14.0
     bump_to_short_on_retained_stop: bool = True
     hard_reset_to_short_on_rim_hit_stop: bool = True
     treat_kicked_ball_as_retained_stop: bool = True
 
 
 def _infer_rim_hit_from_missed_shot(missed) -> Optional[bool]:
-    """Best-effort rim contact inference from the missed shot object."""
+    """
+    Best-effort rim contact inference from the missed shot object.
+
+    Provider data does not expose rim contact directly. Blocked shots are treated
+    as no-rim misses unless the provider gives a stronger signal.
+    """
     if missed is None:
         return None
 
@@ -65,11 +71,9 @@ def _infer_rim_hit_from_rebound(reb) -> Optional[bool]:
             if rim2 is not None:
                 return rim2
 
-    # Fallback 2: bounded backward scan within the same period/time
+    # Fallback 2: backward scan within the same period/time
     prev = getattr(reb, "previous_event", None)
-    for _ in range(6):
-        if prev is None:
-            break
+    while prev is not None:
         if getattr(prev, "period", None) != getattr(reb, "period", None):
             break
         if getattr(prev, "seconds_remaining", None) != getattr(
@@ -119,6 +123,13 @@ def _safe_offense_team_id(event, *, backfill_previous: bool = True) -> Optional[
     return tid
 
 
+def _safe_bool_attr(event, attr: str) -> bool:
+    try:
+        return bool(getattr(event, attr, False))
+    except Exception:
+        return False
+
+
 def _possession_change_override(event) -> Optional[bool]:
     if getattr(event, "possession_changing_override", False):
         return True
@@ -147,32 +158,195 @@ def _infer_possession_changed(event) -> bool:
     return False
 
 
-def _get_short_reset_value(league: Optional[str], season_year: Optional[int]) -> float:
+def _normalize_game_id_for_inference(game_id) -> str:
+    game_id = str(game_id or "").strip()
+    if game_id.isdigit() and len(game_id) < 10:
+        return game_id.zfill(10)
+    return game_id
+
+
+def _infer_league_from_game_id(game_id) -> Optional[str]:
+    game_id = _normalize_game_id_for_inference(game_id)
+    if game_id.startswith(pbpstats.NBA_GAME_ID_PREFIX):
+        return pbpstats.NBA_STRING
+    if game_id.startswith(pbpstats.WNBA_GAME_ID_PREFIX):
+        return pbpstats.WNBA_STRING
+    if game_id.startswith(pbpstats.G_LEAGUE_GAME_ID_PREFIX):
+        return pbpstats.G_LEAGUE_STRING
+    return None
+
+
+def _infer_season_year_from_game_id(game_id) -> Optional[int]:
+    game_id = _normalize_game_id_for_inference(game_id)
+    if len(game_id) < 5:
+        return None
+    try:
+        suffix = int(game_id[3:5])
+    except ValueError:
+        return None
+    return 2000 + suffix if suffix < 90 else 1900 + suffix
+
+
+def _infer_league_from_events(events: List[object]) -> Optional[str]:
+    for event in events:
+        league = _infer_league_from_game_id(getattr(event, "game_id", None))
+        if league is not None:
+            return league
+    return None
+
+
+def _infer_season_year_from_events(events: List[object]) -> Optional[int]:
+    for event in events:
+        season_year = _infer_season_year_from_game_id(
+            getattr(event, "game_id", None)
+        )
+        if season_year is not None:
+            return season_year
+    return None
+
+
+def _short_reset_league_thresholds():
+    thresholds = {
+        pbpstats.NBA_STRING: 2018,
+        pbpstats.WNBA_STRING: 2016,
+        pbpstats.G_LEAGUE_STRING: 2016,
+    }
+    if hasattr(pbpstats, "D_LEAGUE_STRING"):
+        thresholds[pbpstats.D_LEAGUE_STRING] = 2016
+    return thresholds
+
+
+def _league_supports_retained_stop_minimum(league: Optional[str]) -> bool:
+    return league in _short_reset_league_thresholds()
+
+
+def _get_rim_retention_reset_value(
+    league: Optional[str], season_year: Optional[int]
+) -> float:
     """
-    Returns the shot clock value to use for short resets (offensive rebounds,
-    retained-ball defensive fouls/violations).
+    Returns the shot clock value to use for rim-contact retention resets
+    (offensive rebounds, retained loose balls, and retained dead-ball rebounds).
 
     - NBA: 14s starting with 2018-19 (season_year >= 2018).
-    - WNBA / G-League: approximate as 14s for the same set of retained-ball
-      situations.
-    - Older NBA seasons and other leagues: no short reset; use 24s everywhere.
+    - WNBA: 14s starting with 2016.
+    - G-League / D-League: 14s starting with 2016-17.
+    - Older seasons and other leagues: no rim-retention short reset; use 24s.
+    - Unknown WNBA/G-League seasons use current rules because those loaders do
+      not always carry a reliable season field.
     """
     full = 24.0
+    thresholds = _short_reset_league_thresholds()
+    threshold = thresholds.get(league)
+    if threshold is None:
+        return full
 
-    # NBA 14-second reset from 2018-19 onward.
-    if league == pbpstats.NBA_STRING and season_year is not None and season_year >= 2018:
-        return 14.0
+    if season_year is None:
+        if league in {pbpstats.WNBA_STRING, pbpstats.G_LEAGUE_STRING} or (
+            hasattr(pbpstats, "D_LEAGUE_STRING")
+            and league == pbpstats.D_LEAGUE_STRING
+        ):
+            return 14.0
+        return full
 
-    # Leagues that always use a short reset (approximation).
-    short_reset_leagues = {pbpstats.WNBA_STRING, pbpstats.G_LEAGUE_STRING}
-    # Live G League sometimes uses a different constant.
-    if hasattr(pbpstats, "D_LEAGUE_STRING"):
-        short_reset_leagues.add(pbpstats.D_LEAGUE_STRING)
-
-    if league in short_reset_leagues:
+    if season_year >= threshold:
         return 14.0
 
     return full
+
+
+def _build_shot_clock_config(
+    league: Optional[str], season_year: Optional[int]
+) -> ShotClockConfig:
+    retained_stop_minimum = 24.0
+    if _league_supports_retained_stop_minimum(league):
+        retained_stop_minimum = 14.0
+    return ShotClockConfig(
+        rim_retention_reset=_get_rim_retention_reset_value(league, season_year),
+        retained_stop_minimum=retained_stop_minimum,
+    )
+
+
+def _get_short_reset_value(league: Optional[str], season_year: Optional[int]) -> float:
+    """
+    Backward-compatible private helper for the rim-retention reset value.
+    """
+    return _get_rim_retention_reset_value(league, season_year)
+
+
+def _is_retained_missed_shot_deadball(event) -> bool:
+    if not isinstance(event, Rebound):
+        return False
+    if _safe_is_real_rebound(event):
+        return False
+    if _safe_bool_attr(event, "is_buzzer_beater_placeholder"):
+        return False
+    if _safe_bool_attr(event, "is_buzzer_beater_rebound_at_shot_time"):
+        return False
+
+    try:
+        missed = event.missed_shot
+    except Exception:
+        return False
+
+    if isinstance(missed, FreeThrow) and not getattr(missed, "is_end_ft", False):
+        return False
+
+    shot_team_id = getattr(missed, "team_id", None)
+    if shot_team_id is None:
+        return False
+
+    next_event = getattr(event, "next_event", None)
+    next_offense = _safe_offense_team_id(next_event, backfill_previous=False)
+    if next_offense == shot_team_id:
+        return True
+
+    if getattr(event, "team_id", None) == shot_team_id and not _infer_possession_changed(
+        event
+    ):
+        return True
+
+    return False
+
+
+def _rim_retention_new_state(cfg: ShotClockConfig) -> float:
+    if cfg.rim_retention_reset < cfg.full_reset:
+        return cfg.rim_retention_reset
+    return cfg.full_reset
+
+
+def _retained_stop_new_state(
+    state: float, cfg: ShotClockConfig, *, rim_hit_context: bool
+) -> float:
+    if cfg.retained_stop_minimum >= cfg.full_reset:
+        return cfg.full_reset
+
+    if cfg.hard_reset_to_short_on_rim_hit_stop and rim_hit_context:
+        return _rim_retention_new_state(cfg)
+
+    if cfg.bump_to_short_on_retained_stop:
+        return max(cfg.retained_stop_minimum, state)
+
+    return cfg.full_reset
+
+
+def _retained_technical_or_delay(event) -> bool:
+    return (
+        getattr(event, "is_technical", False)
+        or getattr(event, "is_delay_of_game", False)
+        or getattr(event, "is_defensive_3_seconds", False)
+    )
+
+
+def _full_reset_defensive_foul(event) -> bool:
+    return _safe_bool_attr(event, "is_flagrant") or _safe_bool_attr(
+        event, "is_clear_path_foul"
+    )
+
+
+def _shooting_foul_without_retained_reset(event) -> bool:
+    return getattr(event, "is_shooting_foul", False) or getattr(
+        event, "is_shooting_block_foul", False
+    )
 
 
 def _events_at_same_time(event) -> List[object]:
@@ -206,19 +380,6 @@ def _rim_hit_context_at_time(event) -> bool:
     return False
 
 
-def _retained_stop_new_state(state: float, cfg: ShotClockConfig, *, rim_hit_context: bool) -> float:
-    if cfg.short_reset >= cfg.full_reset:
-        return cfg.full_reset
-
-    if cfg.hard_reset_to_short_on_rim_hit_stop and rim_hit_context:
-        return cfg.short_reset
-
-    if cfg.bump_to_short_on_retained_stop:
-        return max(cfg.short_reset, state)
-
-    return cfg.full_reset
-
-
 def annotate_shot_clock(
     events: List[object],
     season_year: Optional[int] = None,
@@ -236,12 +397,23 @@ def annotate_shot_clock(
     It assumes events are already linked via previous_event / next_event so that
     possession changes across events can be inferred.
     Events should also be in chronological order within each period.
+
+    This approximation does not know inbound location. Retained defensive
+    fouls/violations are treated as frontcourt retained stops unless the
+    provider has already changed possession. Blocked field goal misses are
+    treated as no-rim misses because provider feeds do not expose rim contact.
+    End-of-period situations clamp the displayed value to the game clock instead
+    of exposing an explicit "shot clock off" state.
     """
     if not events:
         return
 
-    short_reset = _get_short_reset_value(league, season_year)
-    cfg = ShotClockConfig(short_reset=short_reset)
+    if league is None:
+        league = _infer_league_from_events(events)
+    if season_year is None:
+        season_year = _infer_season_year_from_events(events)
+
+    cfg = _build_shot_clock_config(league, season_year)
 
     # Group by period to keep logic clean; events are already in chronological
     # order within a game (descending clock).
@@ -282,7 +454,7 @@ def _annotate_period_shot_clock(
     for ev in period_events:
         # 1. Decay from previous event -> shot clock at *start* of this event.
         if previous_event is None or isinstance(ev, StartOfPeriod):
-            # New period or explicit StartOfPeriod → fresh 24
+            # New period or explicit StartOfPeriod -> fresh 24
             shot_clock_state = cfg.full_reset
         else:
             # Prefer clock diff over provider-specific deltas.
@@ -313,7 +485,7 @@ def _annotate_period_shot_clock(
         if isinstance(ev, Turnover) and getattr(ev, "is_shot_clock_violation", False):
             ev.shot_clock = 0.0
 
-        # 3. Apply resets/updates caused BY this event → state for next event.
+        # 3. Apply resets/updates caused BY this event -> state for next event.
         shot_clock_state = _update_shot_clock_after_event(
             ev,
             shot_clock_state,
@@ -348,13 +520,20 @@ def _update_shot_clock_after_event(
         return cfg.full_reset
 
     # 1) Rebounds
-    if isinstance(event, Rebound) and _safe_is_real_rebound(event):
-        if getattr(event, "oreb", False):
+    if isinstance(event, Rebound):
+        if _safe_is_real_rebound(event):
+            if getattr(event, "oreb", False):
+                rim_hit = _infer_rim_hit_from_rebound(event)
+                if rim_hit is False:
+                    return shot_clock_state
+                return _rim_retention_new_state(cfg)
+            return cfg.full_reset
+
+        if _is_retained_missed_shot_deadball(event):
             rim_hit = _infer_rim_hit_from_rebound(event)
             if rim_hit is False:
                 return shot_clock_state
-            return cfg.short_reset if cfg.short_reset < cfg.full_reset else cfg.full_reset
-        return cfg.full_reset
+            return _rim_retention_new_state(cfg)
 
     # 2) Made field goals
     if isinstance(event, FieldGoal) and getattr(event, "is_made", False):
@@ -367,7 +546,7 @@ def _update_shot_clock_after_event(
         if cfg.treat_kicked_ball_as_retained_stop and getattr(
             event, "is_kicked_ball", False
         ):
-            if is_defense_event and not possession_changed:
+            if not possession_changed:
                 return _retained_stop_new_state(
                     shot_clock_state, cfg, rim_hit_context=False
                 )
@@ -383,21 +562,21 @@ def _update_shot_clock_after_event(
     if isinstance(event, JumpBall):
         if possession_changed:
             return cfg.full_reset
-        # Held-ball jump balls do not reset the shot clock when offense retains.
+        # Approximation: retained jump balls are treated as defensive held balls.
         return shot_clock_state
 
     # 6) Defensive non-shooting fouls where offense keeps the ball
     if isinstance(event, Foul):
         if is_defense_event and not possession_changed:
-            if (
-                getattr(event, "is_technical", False)
-                or getattr(event, "is_double_technical", False)
-                or getattr(event, "is_double_foul", False)
-            ):
-                return shot_clock_state
-            if getattr(event, "is_shooting_foul", False) or getattr(
-                event, "is_shooting_block_foul", False
-            ):
+            if _full_reset_defensive_foul(event):
+                return cfg.full_reset
+
+            if _retained_technical_or_delay(event):
+                return _retained_stop_new_state(
+                    shot_clock_state, cfg, rim_hit_context=False
+                )
+
+            if _shooting_foul_without_retained_reset(event):
                 return shot_clock_state
 
             rim_hit_ctx = False
@@ -411,8 +590,9 @@ def _update_shot_clock_after_event(
     # 7) Defensive violations where offense keeps the ball
     if isinstance(event, Violation):
         if is_defense_event and not possession_changed:
+            rim_hit_ctx = _rim_hit_context_at_time(event)
             return _retained_stop_new_state(
-                shot_clock_state, cfg, rim_hit_context=False
+                shot_clock_state, cfg, rim_hit_context=rim_hit_ctx
             )
 
     # 8) Fallback: possession changed

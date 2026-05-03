@@ -2,7 +2,14 @@ import json
 import os
 from collections import defaultdict
 
-from pbpstats import NBA_STRING
+from pbpstats import (
+    G_LEAGUE_GAME_ID_PREFIX,
+    G_LEAGUE_STRING,
+    NBA_GAME_ID_PREFIX,
+    NBA_STRING,
+    WNBA_GAME_ID_PREFIX,
+    WNBA_STRING,
+)
 from pbpstats.overrides import IntDecoder
 from pbpstats.resources.enhanced_pbp import FieldGoal, Foul, FreeThrow, StartOfPeriod
 from pbpstats.resources.enhanced_pbp.intraperiod_lineup_repair import (
@@ -179,20 +186,54 @@ class NbaEnhancedPbpLoader(object):
         This wraps resources.enhanced_pbp.shot_clock.annotate_shot_clock so that the
         logic is shared by stats_nba / data_nba / live data providers.
         """
-        # Season is stored as e.g. "2019" or "2019-20"; we want the start year.
-        season_val = getattr(self, "season", None)
-        season_year = None
-        if isinstance(season_val, int):
-            season_year = season_val
-        elif isinstance(season_val, str):
-            try:
-                season_year = int(season_val.strip().split("-")[0])
-            except (ValueError, TypeError):
-                season_year = None
-
-        league = getattr(self, "league", NBA_STRING)
+        season_year = self._infer_season_year()
+        league = (
+            getattr(self, "league", None)
+            or self._infer_league_from_game_id()
+            or NBA_STRING
+        )
 
         annotate_shot_clock(self.items, season_year=season_year, league=league)
+
+    def _infer_season_year(self):
+        # Season is stored as e.g. "2019" or "2019-20"; we want the start year.
+        season_val = getattr(self, "season", None)
+        if isinstance(season_val, int):
+            return season_val
+        elif isinstance(season_val, str):
+            try:
+                return int(season_val.strip().split("-")[0])
+            except (ValueError, TypeError):
+                pass
+
+        return self._infer_season_year_from_game_id()
+
+    def _infer_season_year_from_game_id(self):
+        raw_game_id = self._normalize_game_id_for_inference()
+        try:
+            suffix = int(raw_game_id[3:5])
+        except (TypeError, ValueError):
+            return None
+
+        # Game ids encode the season start year as YY after the three-character
+        # game type prefix, e.g. 0022300001 -> 2023.
+        return 2000 + suffix if suffix < 90 else 1900 + suffix
+
+    def _infer_league_from_game_id(self):
+        raw_game_id = self._normalize_game_id_for_inference()
+        if raw_game_id.startswith(NBA_GAME_ID_PREFIX):
+            return NBA_STRING
+        if raw_game_id.startswith(WNBA_GAME_ID_PREFIX):
+            return WNBA_STRING
+        if raw_game_id.startswith(G_LEAGUE_GAME_ID_PREFIX):
+            return G_LEAGUE_STRING
+        return None
+
+    def _normalize_game_id_for_inference(self):
+        raw_game_id = str(getattr(self, "game_id", "") or "").strip()
+        if raw_game_id.isdigit() and len(raw_game_id) < 10:
+            return raw_game_id.zfill(10)
+        return raw_game_id
 
     def _load_possession_changing_event_overrides(self):
         """

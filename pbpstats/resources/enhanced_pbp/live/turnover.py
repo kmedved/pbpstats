@@ -53,7 +53,7 @@ class LiveTurnover(Turnover, LiveEnhancedPbpItem):
 
     @property
     def is_lane_violation(self):
-        return hasattr(self, "sub_type") and self.stripped_sub_type == "LaneViolation"
+        return hasattr(self, "sub_type") and self.stripped_sub_type == "laneviolation"
 
     @property
     def is_kicked_ball(self):

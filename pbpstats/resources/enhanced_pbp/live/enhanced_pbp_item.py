@@ -110,8 +110,8 @@ class LiveEnhancedPbpItem(EnhancedPbpItem):
 
     @property
     def stripped_sub_type(self):
-        return self.sub_type.replace("-", "").replace(" ", "")
+        return str(self.sub_type).replace("-", "").replace(" ", "").lower()
 
     @property
     def stripped_descriptor(self):
-        return self.descriptor.replace("-", "").replace(" ", "")
+        return str(self.descriptor).replace("-", "").replace(" ", "").lower()

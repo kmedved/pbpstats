@@ -56,16 +56,39 @@ class LiveEnhancedPbpLoader(LivePbpLoader, NbaEnhancedPbpLoader):
         ]
         self._add_extra_attrs_to_all_events()
         self._change_team_id_on_drebs()
-        # Recompute shot clock using corrected offense_team_id values on DREBs.
-        # This is a second pass over the events, but it keeps live shot clocks
-        # aligned with the post-adjustment possession data.
+        # Compute shot clock using corrected offense_team_id values on DREBs.
         self._annotate_shot_clock()
 
     def _change_team_id_on_drebs(self):
         """
-        live pbp changes possession on dreb, swap team to be consistent with other sources
+        live pbp changes possession on dreb; normalize DREB offense_team_id
+        to the team that attempted the rebounded shot, matching stats/data semantics.
         """
         for event in self.items:
-            if isinstance(event, Rebound):
-                if event.is_real_rebound and not event.oreb:
-                    event.offense_team_id = event.previous_event.offense_team_id
+            if not isinstance(event, Rebound):
+                continue
+            try:
+                is_real_rebound = event.is_real_rebound
+            except Exception:
+                is_real_rebound = True
+            try:
+                is_oreb = event.oreb
+            except Exception:
+                is_oreb = False
+            if not is_real_rebound or is_oreb:
+                continue
+
+            try:
+                missed_shot = event.missed_shot
+                event.offense_team_id = missed_shot.get_offense_team_id()
+            except Exception:
+                previous_event = getattr(event, "previous_event", None)
+                if previous_event is not None:
+                    try:
+                        event.offense_team_id = previous_event.get_offense_team_id()
+                    except Exception:
+                        event.offense_team_id = getattr(
+                            previous_event,
+                            "offense_team_id",
+                            getattr(event, "offense_team_id", None),
+                        )

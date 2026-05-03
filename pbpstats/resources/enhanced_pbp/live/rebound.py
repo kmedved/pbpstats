@@ -1,4 +1,5 @@
 from pbpstats.resources.enhanced_pbp import Rebound
+from pbpstats.resources.enhanced_pbp.rebound import EventOrderError
 from pbpstats.resources.enhanced_pbp.live.enhanced_pbp_item import LiveEnhancedPbpItem
 
 
@@ -28,8 +29,10 @@ class LiveRebound(Rebound, LiveEnhancedPbpItem):
                 return prev_event
             prev_event = prev_event.previous_event
 
-        raise Rebound.EventOrderError(
-            f"previous event: {self.previous_event} is not a missed free throw or field goal"
+        raise EventOrderError(
+            f"previous event: {self.previous_event} is not a missed free throw or field goal",
+            rebound_event=self,
+            previous_event=self.previous_event,
         )
 
     @property
