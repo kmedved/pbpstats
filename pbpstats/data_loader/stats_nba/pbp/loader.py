@@ -33,7 +33,13 @@ class StatsNbaPbpLoader(StatsNbaLoaderBase):
 
     def __init__(self, game_id, source_loader):
         self.game_id = game_id
+        self.source_loader = source_loader
         self.source_data = source_loader.load_data(self.game_id)
+        self.loaded_endpoint_strategy = getattr(
+            source_loader,
+            "loaded_endpoint_strategy",
+            getattr(source_loader, "endpoint_strategy", None),
+        )
         self.file_directory = getattr(source_loader, "file_directory", None)
         self._make_pbp_items()
 

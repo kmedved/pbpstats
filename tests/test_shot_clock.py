@@ -6,6 +6,7 @@ sys.path.insert(0, os.path.abspath("."))
 import pbpstats
 from pbpstats.data_loader.live.enhanced_pbp.loader import LiveEnhancedPbpLoader
 from pbpstats.data_loader.nba_enhanced_pbp_loader import NbaEnhancedPbpLoader
+from pbpstats.resources.enhanced_pbp.live.rebound import LiveRebound
 from pbpstats.resources.enhanced_pbp.live.turnover import LiveTurnover
 from pbpstats.resources.enhanced_pbp.shot_clock import annotate_shot_clock
 from pbpstats.resources.enhanced_pbp import (
@@ -625,6 +626,41 @@ def test_stats_style_kicked_ball_retained_bumps_to_fourteen():
     annotate_shot_clock(events, season_year=2018, league=pbpstats.NBA_STRING)
 
     assert next_ev.shot_clock == 9.0
+
+
+def test_stats_style_kicked_ball_retained_without_override_bumps_to_fourteen():
+    sop = DummyStart(period=1, seconds_remaining=50, offense_team_id=1)
+    kicked = DummyStatsKickedBallTO(
+        team_id=2,
+        offense_team_id=1,
+        seconds_remaining=35,
+        is_kicked_ball=True,
+    )
+    next_ev = DummyFG(is_made=False, team_id=1, offense_team_id=1, seconds_remaining=30)
+    events = [sop, kicked, next_ev]
+    _link_events(events)
+
+    annotate_shot_clock(events, season_year=2018, league=pbpstats.NBA_STRING)
+
+    assert next_ev.shot_clock == 9.0
+
+
+def test_live_rebound_oreb_normalizes_sub_type_case_and_spacing():
+    rebound = LiveRebound(
+        {
+            "period": 1,
+            "actionNumber": 7,
+            "clock": "PT1M00.00S",
+            "actionType": "rebound",
+            "subType": "Offen-sive",
+            "teamId": 1,
+            "personId": 1,
+            "possession": 1,
+        },
+        "0022400001",
+    )
+
+    assert rebound.oreb
 
 
 def test_defensive_goaltend_resets_full():

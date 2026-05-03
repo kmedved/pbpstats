@@ -1,12 +1,16 @@
 import pytest
 
 from pbpstats.data_loader.stats_nba.pbp.v3_synthetic import (
+    ENDPOINT_STRATEGY_V3_SYNTHETIC,
     V2_HEADERS,
     StatsNbaV2PbpResponseError,
     StatsNbaV3SyntheticMappingError,
     StatsNbaV3SyntheticRoleError,
     UnsupportedV3SyntheticSchemaError,
     build_synthetic_v2_pbp_response,
+)
+from pbpstats.data_loader.stats_nba.enhanced_pbp.loader import (
+    StatsNbaEnhancedPbpLoader,
 )
 from pbpstats.data_loader.stats_nba.pbp.web import StatsNbaPbpWebLoader
 from pbpstats.resources.enhanced_pbp.stats_nba.enhanced_pbp_factory import (
@@ -259,6 +263,28 @@ def _response_rows(response):
     return [dict(zip(headers, row)) for row in response["resultSets"][0]["rowSet"]]
 
 
+def _single_action_row(action_type, sub_type, description=None):
+    source_data = {
+        "game": {
+            "actions": [
+                _action(
+                    1,
+                    1,
+                    action_type,
+                    sub_type,
+                    team_id=HOME_ID,
+                    location="h",
+                    team_tricode="WAS",
+                    person_id=204456,
+                    player_name="Tyus Jones",
+                    description=description or sub_type,
+                )
+            ]
+        }
+    }
+    return _response_rows(build_synthetic_v2_pbp_response(GAME_ID, source_data))[0]
+
+
 def _enhanced_events(response):
     factory = StatsNbaEnhancedPbpFactory()
     events = [
@@ -327,6 +353,51 @@ def test_synthetic_v3_role_confidence_downstream_events():
     assert turnover.player3_id == 1628386
     assert foul.player3_id == 1628386
     assert free_throw.is_made
+
+
+@pytest.mark.parametrize(
+    "action_type,sub_type,expected_event_type,expected_action_type",
+    [
+        ("turnover", "Shot Clock Violation", 5, 11),
+        ("turnover", "Kicked Ball Violation", 5, 19),
+        ("turnover", "Bad Pass Out-of-Bounds", 5, 45),
+        ("turnover", "Lost Ball Out-of-Bounds", 5, 40),
+        ("turnover", "5 Second Violation", 5, 9),
+        ("turnover", "8 Second Violation", 5, 10),
+        ("turnover", "Backcourt Violation", 5, 13),
+        ("violation", "Kicked Ball Violation", 7, 5),
+        ("violation", "Lane Violation", 7, 3),
+        ("violation", "Defensive Goaltending Violation", 7, 2),
+        ("foul", "Clear Path Foul", 6, 9),
+        ("foul", "Flagrant Type 1 Foul", 6, 14),
+        ("foul", "Flagrant Type 2 Foul", 6, 15),
+        ("foul", "Non-Unsportsmanlike Technical", 6, 12),
+        ("foul", "Defensive 3 Seconds Technical", 6, 17),
+        ("foul", "Delay Of Game Technical", 6, 18),
+        ("free throw", "Free Throw Clear-Path 1 of 2", 3, 11),
+        ("free throw", "Flagrant Free Throw 2 of 2", 3, 12),
+    ],
+)
+def test_synthetic_v3_maps_actual_subtype_aliases(
+    action_type, sub_type, expected_event_type, expected_action_type
+):
+    row = _single_action_row(action_type, sub_type)
+
+    assert row["EVENTMSGTYPE"] == expected_event_type
+    assert row["EVENTMSGACTIONTYPE"] == expected_action_type
+
+
+def test_enhanced_repair_does_not_write_synthetic_v3_to_canonical_pbp(tmp_path):
+    (tmp_path / "pbp").mkdir()
+    loader = StatsNbaEnhancedPbpLoader.__new__(StatsNbaEnhancedPbpLoader)
+    loader.file_directory = str(tmp_path)
+    loader.game_id = GAME_ID
+    loader.source_data = {"resultSets": [{"rowSet": [["synthetic"]]}]}
+    loader.loaded_endpoint_strategy = ENDPOINT_STRATEGY_V3_SYNTHETIC
+
+    loader._save_data_to_file()
+
+    assert not (tmp_path / "pbp" / f"stats_{GAME_ID}.json").exists()
 
 
 def test_synthetic_v3_possession_start_uses_stats_start_period_inference():
@@ -505,9 +576,14 @@ def test_synthetic_v3_missing_required_role_raises_structured_error():
         build_synthetic_v2_pbp_response(GAME_ID, source_data)
 
 
-def test_synthetic_v3_is_nba_only_until_validated():
+def test_synthetic_v3_rejects_wnba_until_role_parity_is_validated():
     with pytest.raises(UnsupportedV3SyntheticSchemaError):
         build_synthetic_v2_pbp_response("1022400001", _sample_v3_source_data())
+
+
+def test_synthetic_v3_rejects_g_league_until_role_parity_is_validated():
+    with pytest.raises(UnsupportedV3SyntheticSchemaError):
+        build_synthetic_v2_pbp_response("2022400001", _sample_v3_source_data())
 
 
 def test_auto_strategy_does_not_fallback_when_valid_v2_cache_write_fails():

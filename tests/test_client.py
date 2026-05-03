@@ -69,6 +69,19 @@ def test_client_does_not_thread_endpoint_strategy_to_unsupported_resource():
     assert client.Game.BoxscoreDataSourceOptions == {}
 
 
+def test_client_does_not_thread_endpoint_strategy_to_non_stats_nba_provider():
+    settings = {
+        "dir": "tmp",
+        "Pbp": {
+            "source": "file",
+            "data_provider": "data_nba",
+            "endpoint_strategy": "v3_synthetic",
+        },
+    }
+    client = Client(settings)
+    assert client.Game.PbpDataSourceOptions == {}
+
+
 def test_client_instances_do_not_share_bound_resource_classes():
     pbp_client = Client(
         {

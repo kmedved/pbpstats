@@ -29,12 +29,15 @@ class StatsNbaPbpFileLoader(StatsNbaFileLoader):
     @check_file_directory
     def load_data(self, game_id):
         self.game_id = game_id
+        self.loaded_endpoint_strategy = None
         if self.endpoint_strategy == ENDPOINT_STRATEGY_V3_SYNTHETIC:
+            self.loaded_endpoint_strategy = ENDPOINT_STRATEGY_V3_SYNTHETIC
             return self._load_synthetic_v3_cache()
         if self.endpoint_strategy == ENDPOINT_STRATEGY_AUTO:
             return self._load_auto_cache()
         source_data = self._load_v2_cache()
         validate_v2_pbp_response(source_data)
+        self.loaded_endpoint_strategy = ENDPOINT_STRATEGY_V2
         return source_data
 
     def _load_v2_cache(self):
@@ -51,6 +54,8 @@ class StatsNbaPbpFileLoader(StatsNbaFileLoader):
         try:
             source_data = self._load_v2_cache()
             validate_v2_pbp_response(source_data)
+            self.loaded_endpoint_strategy = ENDPOINT_STRATEGY_V2
             return source_data
         except Exception:
+            self.loaded_endpoint_strategy = ENDPOINT_STRATEGY_V3_SYNTHETIC
             return self._load_synthetic_v3_cache()

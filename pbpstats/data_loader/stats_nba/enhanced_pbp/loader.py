@@ -24,6 +24,9 @@ from pbpstats.data_loader.data_nba.pbp.loader import DataNbaPbpLoader
 from pbpstats.data_loader.data_nba.pbp.web import DataNbaPbpWebLoader
 from pbpstats.data_loader.nba_enhanced_pbp_loader import NbaEnhancedPbpLoader
 from pbpstats.data_loader.stats_nba.pbp.loader import StatsNbaPbpLoader
+from pbpstats.data_loader.stats_nba.pbp.v3_synthetic import (
+    ENDPOINT_STRATEGY_V3_SYNTHETIC,
+)
 from pbpstats.data_loader.stats_nba.pbp.web import StatsNbaPbpV3WebLoader
 from pbpstats.data_loader.stats_nba.shots.loader import StatsNbaShotsLoader
 from pbpstats.resources.enhanced_pbp import FieldGoal
@@ -555,6 +558,11 @@ class StatsNbaEnhancedPbpLoader(StatsNbaPbpLoader, NbaEnhancedPbpLoader):
         self._save_data_to_file()
 
     def _save_data_to_file(self):
+        if (
+            getattr(self, "loaded_endpoint_strategy", None)
+            == ENDPOINT_STRATEGY_V3_SYNTHETIC
+        ):
+            return
         if self.file_directory is not None and os.path.isdir(self.file_directory):
             file_path = f"{self.file_directory}/pbp/stats_{self.game_id}.json"
             with open(file_path, "w") as outfile:

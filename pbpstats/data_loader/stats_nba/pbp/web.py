@@ -34,6 +34,7 @@ class StatsNbaPbpWebLoader(StatsNbaWebLoader):
 
     def load_data(self, game_id):
         self.game_id = game_id
+        self.loaded_endpoint_strategy = None
         if self.endpoint_strategy == ENDPOINT_STRATEGY_V3_SYNTHETIC:
             return self._load_v3_synthetic_data()
 
@@ -45,6 +46,7 @@ class StatsNbaPbpWebLoader(StatsNbaWebLoader):
                 raise
             return self._load_v3_synthetic_data()
         self.source_data = source_data
+        self.loaded_endpoint_strategy = ENDPOINT_STRATEGY_V2
         self._save_data_to_file()
         return self.source_data
 
@@ -75,6 +77,7 @@ class StatsNbaPbpWebLoader(StatsNbaWebLoader):
         self.source_data = build_synthetic_v2_pbp_response(
             self.game_id, v3_source_data
         )
+        self.loaded_endpoint_strategy = ENDPOINT_STRATEGY_V3_SYNTHETIC
         self._save_synthetic_v3_data_to_file()
         return self.source_data
 

@@ -715,7 +715,7 @@ class _SyntheticEventBuilder:
 
 
 def _map_from_table(mapping, sub_type, builder):
-    key = _clean_text(sub_type).lower()
+    key = _normalize_subtype_key(sub_type)
     if key in mapping:
         return mapping[key]
     raise StatsNbaV3SyntheticMappingError(
@@ -772,6 +772,12 @@ def _clean_text(value):
     if _is_missing(value):
         return ""
     return str(value).strip()
+
+
+def _normalize_subtype_key(value):
+    key = _clean_text(value).lower()
+    key = re.sub(r"[^a-z0-9]+", " ", key)
+    return re.sub(r"\s+", " ", key).strip()
 
 
 def _format_v3_clock(clock):
@@ -860,59 +866,119 @@ _FREE_THROW_ACTION_TYPES = {
     "free throw 2 of 3": 14,
     "free throw 3 of 3": 15,
     "free throw technical": 16,
+    "technical free throw": 16,
+    "free throw flagrant 1 of 1": 20,
+    "flagrant free throw 1 of 1": 20,
     "free throw flagrant 1 of 2": 11,
     "free throw flagrant 2 of 2": 12,
+    "flagrant free throw 1 of 2": 11,
+    "flagrant free throw 2 of 2": 12,
+    "free throw flagrant 1 of 3": 27,
+    "flagrant free throw 1 of 3": 27,
+    "free throw flagrant 2 of 3": 14,
+    "free throw flagrant 3 of 3": 15,
+    "free throw clear path 1 of 2": 11,
+    "free throw clear path 2 of 2": 12,
+    "clear path free throw 1 of 2": 11,
+    "clear path free throw 2 of 2": 12,
 }
 
 _FOUL_ACTION_TYPES = {
     "personal": 1,
+    "personal foul": 1,
     "shooting": 2,
+    "shooting foul": 2,
     "loose ball": 3,
+    "loose ball foul": 3,
     "offensive": 4,
+    "offensive foul": 4,
     "inbound": 5,
+    "inbound foul": 5,
     "away from play": 6,
+    "away from play foul": 6,
     "clear path": 9,
+    "clear path foul": 9,
     "double personal": 10,
+    "double personal foul": 10,
     "technical": 11,
-    "non-unsportsmanlike technical": 12,
+    "technical foul": 11,
+    "non unsportsmanlike technical": 12,
     "hanging technical": 13,
     "flagrant type 1": 14,
+    "flagrant type 1 foul": 14,
     "flagrant type 2": 15,
+    "flagrant type 2 foul": 15,
     "double technical": 16,
+    "double technical foul": 16,
     "defensive 3 seconds": 17,
+    "defensive 3 seconds technical": 17,
+    "defensive three seconds": 17,
+    "defensive three seconds technical": 17,
     "delay technical": 18,
+    "delay technical foul": 18,
+    "delay of game": 18,
+    "delay of game technical": 18,
     "taunting technical": 19,
     "offensive charge": 26,
     "personal block": 27,
     "take": 28,
+    "take foul": 28,
+    "personal take": 28,
     "shooting block": 29,
+    "shooting block foul": 29,
     "transition take": 31,
+    "transition take foul": 31,
 }
 
 _TURNOVER_ACTION_TYPES = {
     "": 0,
     "no turnover": 0,
     "bad pass": 1,
+    "bad pass turnover": 1,
     "lost ball": 2,
+    "lost ball turnover": 2,
+    "double dribble": 6,
+    "discontinued dribble": 7,
     "traveling": 4,
+    "traveling violation": 4,
+    "traveling turnover": 4,
     "3 second violation": 8,
+    "three second violation": 8,
+    "5 second violation": 9,
+    "five second violation": 9,
+    "8 second violation": 10,
+    "eight second violation": 10,
     "shot clock": 11,
+    "shot clock violation": 11,
+    "backcourt violation": 13,
     "offensive goaltending": 15,
+    "offensive goaltending violation": 15,
     "lane violation": 17,
     "kicked ball": 19,
+    "kicked ball violation": 19,
     "palming": 21,
+    "palming violation": 21,
     "step out of bounds": 39,
+    "step out of bounds turnover": 39,
     "lost ball out of bounds": 40,
+    "lost ball out of bounds turnover": 40,
     "bad pass out of bounds": 45,
+    "bad pass out of bounds turnover": 45,
 }
 
 _VIOLATION_ACTION_TYPES = {
     "delay of game": 1,
+    "delay of game violation": 1,
     "defensive goaltending": 2,
+    "defensive goaltending violation": 2,
     "lane": 3,
+    "lane violation": 3,
     "jump ball": 4,
+    "jump ball violation": 4,
     "kicked ball": 5,
+    "kicked ball violation": 5,
     "double lane": 6,
+    "double lane violation": 6,
 }
 
 _TIMEOUT_ACTION_TYPES = {

@@ -158,6 +158,21 @@ def _infer_possession_changed(event) -> bool:
     return False
 
 
+def _is_retained_kicked_ball(event, possession_changed: bool) -> bool:
+    if not possession_changed:
+        return True
+
+    previous_event = getattr(event, "previous_event", None)
+    next_event = getattr(event, "next_event", None)
+    previous_offense = _safe_offense_team_id(previous_event, backfill_previous=True)
+    next_offense = _safe_offense_team_id(next_event, backfill_previous=False)
+    return (
+        previous_offense is not None
+        and next_offense is not None
+        and previous_offense == next_offense
+    )
+
+
 def _normalize_game_id_for_inference(game_id) -> str:
     game_id = str(game_id or "").strip()
     if game_id.isdigit() and len(game_id) < 10:
@@ -543,13 +558,14 @@ def _update_shot_clock_after_event(
 
     # 3) Turnovers
     if isinstance(event, Turnover) and not getattr(event, "is_no_turnover", False):
-        if cfg.treat_kicked_ball_as_retained_stop and getattr(
-            event, "is_kicked_ball", False
+        if (
+            cfg.treat_kicked_ball_as_retained_stop
+            and _safe_bool_attr(event, "is_kicked_ball")
+            and _is_retained_kicked_ball(event, possession_changed)
         ):
-            if not possession_changed:
-                return _retained_stop_new_state(
-                    shot_clock_state, cfg, rim_hit_context=False
-                )
+            return _retained_stop_new_state(
+                shot_clock_state, cfg, rim_hit_context=False
+            )
         return cfg.full_reset
 
     # 4) Free throws

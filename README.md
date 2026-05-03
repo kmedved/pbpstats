@@ -41,6 +41,13 @@ source loaders accept `endpoint_strategy`:
 True v2 files remain canonical under `/pbp`. Raw v3 cache files are written under
 `/pbp_v3`, and synthetic rows are written under `/pbp_synthetic_v3`.
 
+League coverage is intentionally conservative. The synthetic v3 PBP path is
+validated for NBA games only. WNBA `shotchartdetail` uses the same shot-chart
+schema and remains supported by the normal `Shots` and enhanced-coordinate path,
+but sampled WNBA `playbyplayv3` payloads omit v2 participant roles such as
+foul-drawn players and some complete jump-ball roles. G League synthetic v3 PBP
+also remains unsupported until league-specific fixtures prove parity.
+
 # Local Development
 Using [poetry](https://python-poetry.org/) for package management. Install it first if it is not already installed on your system.
 

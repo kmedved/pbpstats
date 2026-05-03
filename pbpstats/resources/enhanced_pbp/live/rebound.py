@@ -40,7 +40,7 @@ class LiveRebound(Rebound, LiveEnhancedPbpItem):
         """
         returns True if rebound is an offensive rebound, False otherwise
         """
-        return self.sub_type == "offensive"
+        return self.stripped_sub_type == "offensive"
 
     @property
     def is_placeholder(self):

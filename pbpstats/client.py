@@ -27,10 +27,10 @@ from pbpstats.data_loader.factory import DataLoaderFactory
 DATA_LOADER_SUFFIX = "DataLoaderClass"
 DATA_SOURCE_SUFFIX = "DataSource"
 DATA_SOURCE_OPTIONS_SUFFIX = "DataSourceOptions"
-SOURCE_LOADER_OPTIONS_BY_RESOURCE = {
-    "Pbp": {"endpoint_strategy"},
-    "EnhancedPbp": {"endpoint_strategy"},
-    "Possessions": {"endpoint_strategy"},
+SOURCE_LOADER_OPTIONS_BY_RESOURCE_PROVIDER = {
+    ("Pbp", "stats_nba"): {"endpoint_strategy"},
+    ("EnhancedPbp", "stats_nba"): {"endpoint_strategy"},
+    ("Possessions", "stats_nba"): {"endpoint_strategy"},
 }
 PATTERN = re.compile(r"(?<!^)(?=[A-Z])")  # for converting camel case to snake case
 
@@ -70,7 +70,9 @@ class Client(object):
                     setattr(
                         getattr(self, parent_cls_name),
                         f"{resource}{DATA_SOURCE_OPTIONS_SUFFIX}",
-                        self._get_source_loader_options(resource, value),
+                        self._get_source_loader_options(
+                            resource, value["data_provider"], value
+                        ),
                     )
                     setattr(
                         getattr(self, parent_cls_name),
@@ -97,8 +99,10 @@ class Client(object):
             setattr(getattr(self, name), "data_directory", self.data_directory)
 
     @staticmethod
-    def _get_source_loader_options(resource, config):
-        option_keys = SOURCE_LOADER_OPTIONS_BY_RESOURCE.get(resource, set())
+    def _get_source_loader_options(resource, data_provider, config):
+        option_keys = SOURCE_LOADER_OPTIONS_BY_RESOURCE_PROVIDER.get(
+            (resource, data_provider), set()
+        )
         return {
             option_key: config[option_key]
             for option_key in option_keys

@@ -61,6 +61,13 @@ Synthetic v3 files are kept separate from true v2 files. True v2 PBP remains in
 ``/pbp``, raw v3 responses are stored in ``/pbp_v3``, and synthetic rows are
 stored in ``/pbp_synthetic_v3``.
 
+The synthetic v3 PBP path is validated for NBA games only. WNBA
+``shotchartdetail`` uses the same shot-chart schema and remains supported by the
+normal ``Shots`` and enhanced-coordinate path, but sampled WNBA
+``playbyplayv3`` payloads omit v2 participant roles such as foul-drawn players
+and some complete jump-ball roles. G League synthetic v3 PBP also remains
+unsupported until league-specific fixtures prove parity.
+
 See the code examples below for some examples settings.
 
 Resource options are:
