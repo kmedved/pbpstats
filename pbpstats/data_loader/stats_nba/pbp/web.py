@@ -1,11 +1,12 @@
 import json
 import os
 
-from pbpstats import G_LEAGUE_STRING, NBA_STRING
+from pbpstats import G_LEAGUE_STRING, NBA_STRING, WNBA_GAME_ID_PREFIX
 from pbpstats.data_loader.stats_nba.pbp.v3_synthetic import (
     ENDPOINT_STRATEGY_AUTO,
     ENDPOINT_STRATEGY_V2,
     ENDPOINT_STRATEGY_V3_SYNTHETIC,
+    StatsNbaV3SyntheticRoleSupplementError,
     build_synthetic_v2_pbp_response,
     validate_endpoint_strategy,
     validate_v2_pbp_response,
@@ -74,20 +75,42 @@ class StatsNbaPbpWebLoader(StatsNbaWebLoader):
     def _load_v3_synthetic_data(self):
         v3_loader = StatsNbaPbpV3WebLoader(self.file_directory)
         v3_source_data = v3_loader.load_data(self.game_id)
+        v2_role_supplement = self._load_v2_role_supplement_for_v3_synthetic()
         self.source_data = build_synthetic_v2_pbp_response(
-            self.game_id, v3_source_data
+            self.game_id,
+            v3_source_data,
+            v2_role_supplement=v2_role_supplement,
         )
         self.loaded_endpoint_strategy = ENDPOINT_STRATEGY_V3_SYNTHETIC
         self._save_synthetic_v3_data_to_file()
         return self.source_data
 
+    def _load_v2_role_supplement_for_v3_synthetic(self):
+        if str(self.game_id)[:2] != WNBA_GAME_ID_PREFIX:
+            return None
+        try:
+            v2_source_data = self._load_v2_data()
+            validate_v2_pbp_response(v2_source_data)
+        except Exception as exc:
+            raise StatsNbaV3SyntheticRoleSupplementError(
+                "WNBA synthetic playbyplayv3 requires a valid playbyplayv2 "
+                f"role supplement: game_id={self.game_id}"
+            ) from exc
+        self._save_v2_source_data_to_file(v2_source_data)
+        return v2_source_data
+
     def _save_data_to_file(self):
         if self._defer_v2_save:
             return
+        self._save_v2_source_data_to_file(self.source_data)
+
+    def _save_v2_source_data_to_file(self, source_data):
         if self.file_directory is not None and os.path.isdir(self.file_directory):
-            file_path = f"{self.file_directory}/pbp/stats_{self.game_id}.json"
+            dir_path = os.path.join(self.file_directory, "pbp")
+            os.makedirs(dir_path, exist_ok=True)
+            file_path = os.path.join(dir_path, f"stats_{self.game_id}.json")
             with open(file_path, "w") as outfile:
-                json.dump(self.source_data, outfile)
+                json.dump(source_data, outfile)
 
     def _save_synthetic_v3_data_to_file(self):
         if self.file_directory is not None and os.path.isdir(self.file_directory):

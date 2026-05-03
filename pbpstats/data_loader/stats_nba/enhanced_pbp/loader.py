@@ -16,6 +16,7 @@ The following code will load pbp data for game id "0021900001" from a file locat
     pbp_loader = StatsNbaEnhancedPbpLoader("0021900001", source_loader)
     print(pbp_loader.items[0].data)  # prints dict with the first event of the game
 """
+
 import json
 import os
 import logging
@@ -86,10 +87,7 @@ class StatsNbaEnhancedPbpLoader(StatsNbaPbpLoader, NbaEnhancedPbpLoader):
                 if isinstance(ev, StartOfPeriod):
                     if getattr(self, "boxscore_source_loader", None) is not None:
                         ev.boxscore_source_loader = self.boxscore_source_loader
-                    if (
-                        getattr(self, "period_boxscore_source_loader", None)
-                        is not None
-                    ):
+                    if getattr(self, "period_boxscore_source_loader", None) is not None:
                         ev.period_boxscore_source_loader = (
                             self.period_boxscore_source_loader
                         )
@@ -466,10 +464,7 @@ class StatsNbaEnhancedPbpLoader(StatsNbaPbpLoader, NbaEnhancedPbpLoader):
 
         # Filter actions that have the fields we need, then sort by actionId
         try:
-            filtered = [
-                a for a in actions
-                if "actionNumber" in a and "actionId" in a
-            ]
+            filtered = [a for a in actions if "actionNumber" in a and "actionId" in a]
             filtered.sort(key=lambda a: a["actionId"])
         except Exception:
             return
@@ -562,8 +557,17 @@ class StatsNbaEnhancedPbpLoader(StatsNbaPbpLoader, NbaEnhancedPbpLoader):
             getattr(self, "loaded_endpoint_strategy", None)
             == ENDPOINT_STRATEGY_V3_SYNTHETIC
         ):
+            self._save_synthetic_v3_data_to_file()
             return
         if self.file_directory is not None and os.path.isdir(self.file_directory):
             file_path = f"{self.file_directory}/pbp/stats_{self.game_id}.json"
+            with open(file_path, "w") as outfile:
+                json.dump(self.source_data, outfile)
+
+    def _save_synthetic_v3_data_to_file(self):
+        if self.file_directory is not None and os.path.isdir(self.file_directory):
+            dir_path = os.path.join(self.file_directory, "pbp_synthetic_v3")
+            os.makedirs(dir_path, exist_ok=True)
+            file_path = os.path.join(dir_path, f"stats_{self.game_id}.json")
             with open(file_path, "w") as outfile:
                 json.dump(self.source_data, outfile)

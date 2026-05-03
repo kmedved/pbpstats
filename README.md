@@ -8,8 +8,9 @@ A package to scrape and parse NBA, WNBA and G-League play-by-play data.
 * Supports NBA, WNBA and G-League stats
 * All stats on pbpstats.com are derived from these stats
 * Fixes order of events for some common cases in which events are out of order
-* Supports an opt-in NBA stats.nba.com `playbyplayv3` synthetic fallback that
-  emits the existing playbyplayv2-shaped PBP contract
+* Supports an opt-in stats.nba.com `playbyplayv3` synthetic path that emits the
+  existing playbyplayv2-shaped PBP contract for NBA games and for WNBA games
+  when a validated true-v2 role supplement is available
 
 # Installation
 Tested on Python 3.10-3.12
@@ -30,8 +31,8 @@ Refresh local bundles with `python scripts/build_context_bundle.py`.
 Version policy: Policy B, so only shipped/runtime behavior changes require a version bump.
 
 # stats.nba.com PBP Endpoint Strategy
-For NBA `stats_nba` `Pbp`, `EnhancedPbp`, and `Possessions` resources, the
-source loaders accept `endpoint_strategy`:
+For NBA and WNBA `stats_nba` `Pbp`, `EnhancedPbp`, and `Possessions`
+resources, the source loaders accept `endpoint_strategy`:
 
 * `v2` - default compatibility mode. Uses true playbyplayv2 file/web data.
 * `v3_synthetic` - uses playbyplayv3 and emits synthetic playbyplayv2-shaped rows.
@@ -41,12 +42,14 @@ source loaders accept `endpoint_strategy`:
 True v2 files remain canonical under `/pbp`. Raw v3 cache files are written under
 `/pbp_v3`, and synthetic rows are written under `/pbp_synthetic_v3`.
 
-League coverage is intentionally conservative. The synthetic v3 PBP path is
-validated for NBA games only. WNBA `shotchartdetail` uses the same shot-chart
-schema and remains supported by the normal `Shots` and enhanced-coordinate path,
-but sampled WNBA `playbyplayv3` payloads omit v2 participant roles such as
-foul-drawn players and some complete jump-ball roles. G League synthetic v3 PBP
-also remains unsupported until league-specific fixtures prove parity.
+League coverage is intentionally conservative. NBA synthetic rows can be built
+from v3 alone. WNBA synthetic rows require a validated true-v2 role supplement
+because sampled WNBA `playbyplayv3` payloads omit v2 participant roles such as
+foul-drawn players and some complete jump-ball roles. WNBA `shotchartdetail`
+uses the same shot-chart schema and remains supported by the normal `Shots` and
+enhanced-coordinate path, but it is not used as a participant-role source. G
+League synthetic v3 PBP remains unsupported until league-specific fixtures prove
+parity.
 
 # Local Development
 Using [poetry](https://python-poetry.org/) for package management. Install it first if it is not already installed on your system.
