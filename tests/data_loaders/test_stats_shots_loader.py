@@ -124,3 +124,69 @@ class TestStatsShotsLoader:
         assert len(shots_loader.items) == 193
         assert isinstance(shots_loader.items[0], StatsNbaShot)
         assert shots_loader.items[0].data == self.expected_first_item_data
+
+    @responses.activate
+    def test_wnba_web_loader_uses_league_id_10_and_wnba_season(self):
+        game_id = "1022500234"
+        with open(
+            f"{self.data_directory}/game_details/stats_summary_{game_id}.json"
+        ) as f:
+            summary_response = json.loads(f.read())
+        with open(
+            f"{self.data_directory}/game_details/stats_home_shots_{game_id}.json"
+        ) as f:
+            home_response = json.loads(f.read())
+        with open(
+            f"{self.data_directory}/game_details/stats_away_shots_{game_id}.json"
+        ) as f:
+            away_response = json.loads(f.read())
+
+        summary_base_url = "https://stats.wnba.com/stats/boxscoresummaryv2"
+        summary_url = furl(summary_base_url).add({"GameId": game_id}).url
+        responses.add(responses.GET, summary_url, json=summary_response, status=200)
+
+        base_url = "https://stats.wnba.com/stats/shotchartdetail"
+        base_query_params = {
+            "GameID": game_id,
+            "Season": "2025",
+            "SeasonType": "Regular Season",
+            "PlayerID": 0,
+            "Outcome": "",
+            "Location": "",
+            "Month": 0,
+            "SeasonSegment": "",
+            "DateFrom": "",
+            "DateTo": "",
+            "OpponentTeamID": 0,
+            "VsConference": "",
+            "VsDivision": "",
+            "Position": "",
+            "RookieYear": "",
+            "GameSegment": "",
+            "Period": 0,
+            "LastNGames": 0,
+            "ContextMeasure": "FG_PCT",
+            "PlayerPosition": "",
+            "LeagueID": "10",
+        }
+        home_query_params = dict(base_query_params)
+        home_query_params["TeamID"] = 1611661317
+        away_query_params = dict(base_query_params)
+        away_query_params["TeamID"] = 1611661331
+        responses.add(
+            responses.GET,
+            furl(base_url).add(home_query_params).url,
+            json=home_response,
+            status=200,
+        )
+        responses.add(
+            responses.GET,
+            furl(base_url).add(away_query_params).url,
+            json=away_response,
+            status=200,
+        )
+
+        source_loader = StatsNbaShotsWebLoader(self.data_directory)
+        shots_loader = StatsNbaShotsLoader(game_id, source_loader)
+
+        assert len(shots_loader.items) == 131

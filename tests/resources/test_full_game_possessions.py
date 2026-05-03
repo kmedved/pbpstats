@@ -1,5 +1,48 @@
 import pbpstats
+import pytest
 from pbpstats.client import Client
+
+
+WNBA_SYNTHETIC_POSSESSION_GAME_IDS = [
+    "1022500234",
+    "1022500283",
+    "1022500286",
+    "1022500285",
+]
+
+
+def _wnba_possessions(game_id, endpoint_strategy="v2"):
+    client = Client(
+        {
+            "dir": "tests/data",
+            "Possessions": {
+                "source": "file",
+                "data_provider": "stats_nba",
+                "endpoint_strategy": endpoint_strategy,
+            },
+        }
+    )
+    return client.Game(game_id).possessions.items
+
+
+@pytest.mark.parametrize("game_id", WNBA_SYNTHETIC_POSSESSION_GAME_IDS)
+def test_wnba_synthetic_possessions_match_true_v2_possessions(game_id):
+    v2_possessions = _wnba_possessions(game_id)
+    synthetic_possessions = _wnba_possessions(game_id, "v3_synthetic")
+
+    assert len(synthetic_possessions) == len(v2_possessions)
+    assert [possession.offense_team_id for possession in synthetic_possessions] == [
+        possession.offense_team_id for possession in v2_possessions
+    ]
+    assert [possession.events[0].event_num for possession in synthetic_possessions] == [
+        possession.events[0].event_num for possession in v2_possessions
+    ]
+    assert [
+        possession.events[-1].event_num for possession in synthetic_possessions
+    ] == [possession.events[-1].event_num for possession in v2_possessions]
+    assert [
+        possession.possession_start_type for possession in synthetic_possessions
+    ] == [possession.possession_start_type for possession in v2_possessions]
 
 
 class TestFullGamePossessions:

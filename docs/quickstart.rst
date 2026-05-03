@@ -49,8 +49,8 @@ the settings and it will be saved in the appropriate subdirectory.
 
 Options for ``data_provider`` are 'stats_nba' and 'data_nba' and 'live'.
 
-For NBA ``stats_nba`` ``Pbp``, ``EnhancedPbp`` and ``Possessions`` resources,
-you can also set ``endpoint_strategy``. Options are:
+For NBA and WNBA ``stats_nba`` ``Pbp``, ``EnhancedPbp`` and ``Possessions``
+resources, you can also set ``endpoint_strategy``. Options are:
 
 * ``v2`` - default compatibility mode using true playbyplayv2 file/web data.
 * ``v3_synthetic`` - use playbyplayv3 and emit synthetic playbyplayv2-shaped rows.
@@ -61,11 +61,12 @@ Synthetic v3 files are kept separate from true v2 files. True v2 PBP remains in
 ``/pbp``, raw v3 responses are stored in ``/pbp_v3``, and synthetic rows are
 stored in ``/pbp_synthetic_v3``.
 
-The synthetic v3 PBP path is validated for NBA games only. WNBA
-``shotchartdetail`` uses the same shot-chart schema and remains supported by the
-normal ``Shots`` and enhanced-coordinate path, but sampled WNBA
-``playbyplayv3`` payloads omit v2 participant roles such as foul-drawn players
-and some complete jump-ball roles. G League synthetic v3 PBP also remains
+NBA synthetic rows can be built from v3 alone. WNBA synthetic rows require a
+validated true-v2 role supplement because sampled WNBA ``playbyplayv3`` payloads
+omit v2 participant roles such as foul-drawn players and some complete
+jump-ball roles. WNBA ``shotchartdetail`` uses the same shot-chart schema and
+remains supported by the normal ``Shots`` and enhanced-coordinate path, but it
+is not used as a participant-role source. G League synthetic v3 PBP remains
 unsupported until league-specific fixtures prove parity.
 
 See the code examples below for some examples settings.

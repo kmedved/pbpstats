@@ -4,7 +4,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import Optional
 
-from pbpstats import NBA_GAME_ID_PREFIX
+from pbpstats import G_LEAGUE_GAME_ID_PREFIX, NBA_GAME_ID_PREFIX, WNBA_GAME_ID_PREFIX
 
 
 ENDPOINT_STRATEGY_V2 = "v2"
@@ -116,11 +116,41 @@ class StatsNbaV3SyntheticRoleError(RuntimeError):
         )
 
 
+class StatsNbaV3SyntheticRoleSupplementError(RuntimeError):
+    """
+    Raised when a league requires a v2 role supplement and it is missing or invalid.
+    """
+
+
+class StatsNbaV3SyntheticParityError(RuntimeError):
+    """
+    Raised when v3 actions and a v2 role supplement do not align exactly.
+    """
+
+
+@dataclass(frozen=True)
+class _SyntheticLeaguePolicy:
+    league: str
+    allow_v3_only: bool
+    require_v2_role_supplement: bool
+
+
+_NBA_SYNTHETIC_POLICY = _SyntheticLeaguePolicy(
+    league="nba",
+    allow_v3_only=True,
+    require_v2_role_supplement=False,
+)
+_WNBA_SYNTHETIC_POLICY = _SyntheticLeaguePolicy(
+    league="wnba",
+    allow_v3_only=False,
+    require_v2_role_supplement=True,
+)
+
+
 def validate_endpoint_strategy(endpoint_strategy):
     if endpoint_strategy not in VALID_ENDPOINT_STRATEGIES:
         raise ValueError(
-            "endpoint_strategy must be one of "
-            f"{sorted(VALID_ENDPOINT_STRATEGIES)}"
+            "endpoint_strategy must be one of " f"{sorted(VALID_ENDPOINT_STRATEGIES)}"
         )
 
 
@@ -158,7 +188,9 @@ def is_valid_v2_pbp_response(source_data):
         return False
 
 
-def build_synthetic_v2_pbp_response(game_id, v3_source_data, shotchartdetail=None):
+def build_synthetic_v2_pbp_response(
+    game_id, v3_source_data, shotchartdetail=None, v2_role_supplement=None
+):
     """
     Build a playbyplayv2-shaped response from playbyplayv3 actions.
 
@@ -167,10 +199,7 @@ def build_synthetic_v2_pbp_response(game_id, v3_source_data, shotchartdetail=Non
     """
     del shotchartdetail
 
-    if str(game_id)[:2] != NBA_GAME_ID_PREFIX:
-        raise UnsupportedV3SyntheticSchemaError(
-            "Synthetic playbyplayv3 PBP is currently validated for NBA games only"
-        )
+    policy = _get_synthetic_league_policy(game_id)
 
     if not isinstance(v3_source_data, dict):
         raise StatsNbaV2PbpResponseError("playbyplayv3 response is not a dict")
@@ -188,11 +217,145 @@ def build_synthetic_v2_pbp_response(game_id, v3_source_data, shotchartdetail=Non
         raise StatsNbaV2PbpResponseError(
             "playbyplayv3 response has no actions with actionNumber"
         )
-    rows = [
-        _SyntheticEventBuilder(game_id, group, context, player_index).build_row()
-        for group in grouped_actions
-    ]
-    return {"resultSets": [{"name": "PlayByPlay", "headers": V2_HEADERS, "rowSet": rows}]}
+    role_supplement = None
+    if policy.require_v2_role_supplement:
+        role_supplement = _V2RoleSupplement.from_source_data(
+            game_id, v2_role_supplement, grouped_actions
+        )
+    elif v2_role_supplement is not None:
+        role_supplement = _V2RoleSupplement.from_source_data(
+            game_id, v2_role_supplement, grouped_actions
+        )
+
+    rows = []
+    for group in grouped_actions:
+        builder = _SyntheticEventBuilder(game_id, group, context, player_index)
+        if policy.require_v2_role_supplement:
+            rows.append(builder.build_row_from_v2_supplement(role_supplement))
+        else:
+            rows.append(builder.build_row())
+    return {
+        "resultSets": [{"name": "PlayByPlay", "headers": V2_HEADERS, "rowSet": rows}]
+    }
+
+
+def _get_synthetic_league_policy(game_id):
+    prefix = str(game_id)[:2]
+    if prefix == NBA_GAME_ID_PREFIX:
+        return _NBA_SYNTHETIC_POLICY
+    if prefix == WNBA_GAME_ID_PREFIX:
+        return _WNBA_SYNTHETIC_POLICY
+    if prefix == G_LEAGUE_GAME_ID_PREFIX:
+        raise UnsupportedV3SyntheticSchemaError(
+            "Synthetic playbyplayv3 PBP is not validated for G League games"
+        )
+    raise UnsupportedV3SyntheticSchemaError(
+        f"Synthetic playbyplayv3 PBP is not validated for game id {game_id!r}"
+    )
+
+
+class _V2RoleSupplement:
+    def __init__(self, game_id, headers, rows_by_event_num):
+        self.game_id = str(game_id).zfill(10)
+        self.headers = headers
+        self.rows_by_event_num = rows_by_event_num
+
+    @classmethod
+    def from_source_data(cls, game_id, source_data, grouped_actions):
+        if source_data is None:
+            raise StatsNbaV3SyntheticRoleSupplementError(
+                f"v2 role supplement is required for game_id={game_id}"
+            )
+        try:
+            validate_v2_pbp_response(source_data)
+        except StatsNbaV2PbpResponseError as exc:
+            raise StatsNbaV3SyntheticRoleSupplementError(
+                f"Invalid v2 role supplement for game_id={game_id}: {exc}"
+            ) from exc
+
+        result_set = source_data["resultSets"][0]
+        headers = result_set["headers"]
+        missing_headers = set(V2_HEADERS).difference(headers)
+        if missing_headers:
+            raise StatsNbaV3SyntheticRoleSupplementError(
+                "v2 role supplement is missing required headers: "
+                f"{sorted(missing_headers)}"
+            )
+
+        rows_by_event_num = {}
+        for raw_row in result_set["rowSet"]:
+            row = dict(zip(headers, raw_row))
+            event_num = _coerce_int(row.get("EVENTNUM"))
+            if event_num is None:
+                raise StatsNbaV3SyntheticRoleSupplementError(
+                    f"v2 role supplement has row without EVENTNUM: game_id={game_id}"
+                )
+            if event_num in rows_by_event_num:
+                raise StatsNbaV3SyntheticRoleSupplementError(
+                    "v2 role supplement has duplicate EVENTNUM: "
+                    f"game_id={game_id}, event_num={event_num}"
+                )
+            rows_by_event_num[event_num] = row
+
+        v3_event_nums = {
+            _coerce_int(group[0].get("actionNumber"))
+            for group in grouped_actions
+            if _coerce_int(group[0].get("actionNumber")) is not None
+        }
+        v2_event_nums = set(rows_by_event_num)
+        if v3_event_nums != v2_event_nums:
+            missing_in_v2 = sorted(v3_event_nums.difference(v2_event_nums))
+            missing_in_v3 = sorted(v2_event_nums.difference(v3_event_nums))
+            raise StatsNbaV3SyntheticParityError(
+                "v3 actionNumber groups and v2 EVENTNUM rows do not align: "
+                f"game_id={game_id}, missing_in_v2={missing_in_v2}, "
+                f"missing_in_v3={missing_in_v3}"
+            )
+
+        return cls(game_id, headers, rows_by_event_num)
+
+    def row_for_event_num(self, event_num):
+        row = self.rows_by_event_num.get(event_num)
+        if row is None:
+            raise StatsNbaV3SyntheticParityError(
+                f"v2 role supplement has no row for game_id={self.game_id}, "
+                f"event_num={event_num}"
+            )
+        return row
+
+    def build_validated_row(
+        self, event_num, period, clock, event_type, event_action_type
+    ):
+        row = self.row_for_event_num(event_num)
+        self._assert_equal("GAME_ID", row.get("GAME_ID"), self.game_id, event_num)
+        self._assert_equal("PERIOD", row.get("PERIOD"), period, event_num)
+        self._assert_clock_equal(row.get("PCTIMESTRING"), clock, event_num)
+        self._assert_equal(
+            "EVENTMSGTYPE", row.get("EVENTMSGTYPE"), event_type, event_num
+        )
+        self._assert_equal(
+            "EVENTMSGACTIONTYPE",
+            row.get("EVENTMSGACTIONTYPE"),
+            event_action_type,
+            event_num,
+        )
+        return [row.get(header) for header in V2_HEADERS]
+
+    def _assert_equal(self, field, actual, expected, event_num):
+        if str(actual) != str(expected):
+            raise StatsNbaV3SyntheticParityError(
+                f"v3/v2 supplement mismatch for {field}: game_id={self.game_id}, "
+                f"event_num={event_num}, v2={actual!r}, v3={expected!r}"
+            )
+
+    def _assert_clock_equal(self, actual, expected, event_num):
+        if _v2_v3_clock_values_match(actual, expected):
+            return
+        raise StatsNbaV3SyntheticParityError(
+            "v3/v2 supplement mismatch for PCTIMESTRING: "
+            f"game_id={self.game_id}, event_num={event_num}, "
+            f"v2={actual!r}, v3={expected!r}"
+        )
 
 
 @dataclass(frozen=True)
@@ -296,7 +459,9 @@ class _PlayerIndex:
             raise StatsNbaV3SyntheticRoleError(
                 action.get("gameId"), action, required_role
             )
-        return _PlayerRef(player_id, _clean_text(action.get("playerName")) or None, team_id)
+        return _PlayerRef(
+            player_id, _clean_text(action.get("playerName")) or None, team_id
+        )
 
     def resolve(self, name, team_id=None):
         normalized = _normalize_name(name)
@@ -373,6 +538,17 @@ class _SyntheticEventBuilder:
 
         return [self.row[header] for header in V2_HEADERS]
 
+    def build_row_from_v2_supplement(self, role_supplement):
+        event_type, event_action_type = self._map_event_type()
+        event_num = self.row["EVENTNUM"]
+        return role_supplement.build_validated_row(
+            event_num,
+            self.row["PERIOD"],
+            self.row["PCTIMESTRING"],
+            event_type,
+            event_action_type,
+        )
+
     def _find_primary_action(self):
         substitution_action = self._find_primary_substitution_action()
         if substitution_action is not None:
@@ -395,9 +571,7 @@ class _SyntheticEventBuilder:
         if not substitution_actions:
             return None
         for action in substitution_actions:
-            outgoing_name = _parse_substitution_outgoing_name(
-                action.get("description")
-            )
+            outgoing_name = _parse_substitution_outgoing_name(action.get("description"))
             if _normalize_name(action.get("playerName")) == _normalize_name(
                 outgoing_name
             ):
@@ -421,7 +595,7 @@ class _SyntheticEventBuilder:
         if action_key == "free throw":
             return 3, _map_from_table(_FREE_THROW_ACTION_TYPES, sub_type, self)
         if action_key == "rebound":
-            return 4, 0
+            return 4, _map_from_table(_REBOUND_ACTION_TYPES, sub_type, self)
         if action_key == "turnover":
             return 5, _map_from_table(_TURNOVER_ACTION_TYPES, sub_type, self)
         if action_key == "foul":
@@ -431,14 +605,26 @@ class _SyntheticEventBuilder:
         if action_key == "substitution":
             return 8, 0
         if action_key == "timeout":
-            return 9, _map_from_table(_TIMEOUT_ACTION_TYPES, sub_type, self)
+            return 9, _map_from_table(self._timeout_action_types, sub_type, self)
         if action_key == "jump ball":
             return 10, 0
         if action_key == "ejection":
             return 11, 0
         if action_key == "instant replay":
-            return 18, _map_from_table(_REPLAY_ACTION_TYPES, sub_type, self)
+            return 18, _map_from_table(self._replay_action_types, sub_type, self)
         raise StatsNbaV3SyntheticMappingError(self.game_id, self.primary)
+
+    @property
+    def _is_wnba(self):
+        return self.game_id[:2] == WNBA_GAME_ID_PREFIX
+
+    @property
+    def _timeout_action_types(self):
+        return _WNBA_TIMEOUT_ACTION_TYPES if self._is_wnba else _TIMEOUT_ACTION_TYPES
+
+    @property
+    def _replay_action_types(self):
+        return _WNBA_REPLAY_ACTION_TYPES if self._is_wnba else _REPLAY_ACTION_TYPES
 
     def _build_field_goal(self):
         shooter = self.player_index.primary_ref(self.primary, "shooter")
@@ -624,7 +810,9 @@ class _SyntheticEventBuilder:
                     team_id,
                 ),
             )
-        elif team_id and _clean_text(self.primary.get("actionType")).lower() != "period":
+        elif (
+            team_id and _clean_text(self.primary.get("actionType")).lower() != "period"
+        ):
             self._fill_team_slot(1, team_id)
         if _clean_text(self.primary.get("actionType")).lower() in {
             "instant replay",
@@ -695,10 +883,10 @@ class _SyntheticEventBuilder:
         player_id = _coerce_int(action.get("personId"))
         team_id = _event_team_id(action)
         if not player_id or _looks_like_team_id(player_id):
-            raise StatsNbaV3SyntheticRoleError(
-                self.game_id, action, f"{kind}_player"
-            )
-        return _PlayerRef(player_id, _clean_text(action.get("playerName")) or None, team_id)
+            raise StatsNbaV3SyntheticRoleError(self.game_id, action, f"{kind}_player")
+        return _PlayerRef(
+            player_id, _clean_text(action.get("playerName")) or None, team_id
+        )
 
     def _apply_score(self, event_type):
         score_home = _coerce_score(self.primary.get("scoreHome"))
@@ -792,6 +980,27 @@ def _format_v3_clock(clock):
     return f"{minutes}:{seconds:05.2f}"
 
 
+def _v2_v3_clock_values_match(v2_clock, v3_clock):
+    if str(v2_clock) == str(v3_clock):
+        return True
+    v2_seconds = _clock_to_seconds(v2_clock)
+    v3_seconds = _clock_to_seconds(v3_clock)
+    if v2_seconds is None or v3_seconds is None:
+        return False
+    return int(v3_seconds) == int(v2_seconds)
+
+
+def _clock_to_seconds(clock):
+    text = _clean_text(clock)
+    if ":" not in text:
+        return None
+    minutes, seconds = text.split(":", 1)
+    try:
+        return int(minutes) * 60 + float(seconds)
+    except (TypeError, ValueError):
+        return None
+
+
 def _normalize_name(name):
     return re.sub(r"[^a-z0-9]", "", _clean_text(name).lower())
 
@@ -837,9 +1046,20 @@ _SHOT_ACTION_TYPES = {
     "layup shot": 5,
     "driving layup shot": 6,
     "dunk shot": 7,
+    "alley oop layup shot": 43,
     "driving dunk shot": 9,
     "turnaround shot": 47,
     "turnaround jump shot": 47,
+    "running reverse layup shot": 74,
+    "finger roll layup shot": 71,
+    "driving finger roll layup shot": 75,
+    "running finger roll layup shot": 76,
+    "cutting finger roll layup shot": 99,
+    "putback layup shot": 72,
+    "jump bank shot": 66,
+    "driving hook shot": 57,
+    "driving bank hook shot": 93,
+    "turnaround bank hook shot": 96,
     "alley oop dunk shot": 52,
     "tip layup shot": 97,
     "cutting layup shot": 98,
@@ -851,6 +1071,7 @@ _SHOT_ACTION_TYPES = {
     "driving reverse layup shot": 73,
     "floating jump shot": 78,
     "pullup jump shot": 79,
+    "running pull up jump shot": 103,
     "step back jump shot": 80,
     "turnaround hook shot": 58,
     "turnaround fadeaway shot": 86,
@@ -881,6 +1102,12 @@ _FREE_THROW_ACTION_TYPES = {
     "free throw clear path 2 of 2": 12,
     "clear path free throw 1 of 2": 11,
     "clear path free throw 2 of 2": 12,
+}
+
+_REBOUND_ACTION_TYPES = {
+    "": 0,
+    "unknown": 0,
+    "normal rebound": 1,
 }
 
 _FOUL_ACTION_TYPES = {
@@ -949,10 +1176,12 @@ _TURNOVER_ACTION_TYPES = {
     "8 second violation": 10,
     "eight second violation": 10,
     "shot clock": 11,
+    "shot clock turnover": 11,
     "shot clock violation": 11,
     "backcourt violation": 13,
     "offensive goaltending": 15,
     "offensive goaltending violation": 15,
+    "offensive foul turnover": 37,
     "lane violation": 17,
     "kicked ball": 19,
     "kicked ball violation": 19,
@@ -962,8 +1191,10 @@ _TURNOVER_ACTION_TYPES = {
     "step out of bounds turnover": 39,
     "lost ball out of bounds": 40,
     "lost ball out of bounds turnover": 40,
+    "out of bounds lost ball turnover": 40,
     "bad pass out of bounds": 45,
     "bad pass out of bounds turnover": 45,
+    "out of bounds bad pass turnover": 45,
 }
 
 _VIOLATION_ACTION_TYPES = {
@@ -986,6 +1217,12 @@ _TIMEOUT_ACTION_TYPES = {
     "short": 2,
     "official": 3,
     "mandatory": 1,
+    "coach challenge": 7,
+}
+
+_WNBA_TIMEOUT_ACTION_TYPES = {
+    **_TIMEOUT_ACTION_TYPES,
+    "official": 4,
 }
 
 _REPLAY_ACTION_TYPES = {
@@ -995,6 +1232,16 @@ _REPLAY_ACTION_TYPES = {
     "overturn ruling": 5,
     "coach challenge overturn ruling": 5,
     "ruling stands": 6,
+    "coach challenge ruling stands": 6,
+}
+
+_WNBA_REPLAY_ACTION_TYPES = {
+    "replay center": 1,
+    "support ruling": 0,
+    "coach challenge support ruling": 4,
+    "overturn ruling": 1,
+    "coach challenge overturn ruling": 5,
+    "ruling stands": 3,
     "coach challenge ruling stands": 6,
 }
 
