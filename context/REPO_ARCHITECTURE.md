@@ -2,7 +2,7 @@ Paste this first.
 Pair with one `COMPRESSED_*.md` bundle for guided context, or with `FILE_INDEX.md` for oracle workflows.
 For implementation tasks, also paste raw source of the files you expect to edit.
 
-Architecture sync version: 1.3.11
+Architecture sync version: 1.4.0
 
 ## TL;DR
 pbpstats is a single-package Python library for loading NBA, WNBA, and G-League play-by-play data from `stats_nba`, `data_nba`, and `live` providers, then normalizing it into resource wrappers (`Game`, `Day`, `Season`, `Boxscore`, `EnhancedPbp`, `Possessions`, and related item types). The core idea is metadata-driven routing: `Client(settings)` discovers loader classes from package exports, binds them to object classes by `parent_object`, and lets resource loaders compose richer state like lineups, starters, shot clocks, possession splits, and offline repair flows without changing the public object/resource surface.
@@ -10,8 +10,9 @@ pbpstats is a single-package Python library for loading NBA, WNBA, and G-League 
 ## Behavior / Routing Matrix
 | Surface | Inputs | Route | Result |
 |---|---|---|---|
-| `Client(settings)` | Resource name + `source` + `data_provider` | `pbpstats.resources.__all__` + `DataLoaderFactory.loaders` | Binds `*DataLoaderClass`, `*DataSource`, and resource class onto `Game` / `Day` / `Season`. |
+| `Client(settings)` | Resource name + `source` + `data_provider` + supported source-loader options | `pbpstats.resources.__all__` + `DataLoaderFactory.loaders` | Binds `*DataLoaderClass`, `*DataSource`, supported `*DataSourceOptions`, and resource class onto `Game` / `Day` / `Season`. |
 | `Game(...)` resources | `Boxscore`, `Pbp`, `EnhancedPbp`, `Possessions`, `Shots` | Loader metadata with `parent_object = "Game"` | Instantiates snake-case attributes like `game.boxscore`, `game.enhanced_pbp`, `game.possessions`. |
+| stats PBP web/file source | v2 cache/endpoint or `endpoint_strategy` = `v3_synthetic` / `auto` | `StatsNbaPbp*Loader` + private v3 synthetic transformer | Returns v2-shaped rows; true v2 cache stays under `/pbp`, raw v3 under `/pbp_v3`, synthetic rows under `/pbp_synthetic_v3`. |
 | `Day(...)` games | `Games` + `stats_nba` scoreboard route | `StatsNbaScoreboardLoader` | Returns same `Games` resource surface, but day-scoped. |
 | `Season(...)` games | `Games` + provider season schedule route | `StatsNbaLeagueGameLogLoader`, `DataNbaScheduleLoader`, `LiveScheduleLoader` | Returns season-scoped `games`. |
 | stats enhanced PBP | raw stats rows + optional shots/v3/boxscore sources | `StatsNbaEnhancedPbpFactory(EVENTMSGTYPE)` -> enrich -> rebound order repair -> shot XY | Produces linked enhanced events with lineups, fouls-to-give, score, starters, and shot clock. |
@@ -21,6 +22,8 @@ pbpstats is a single-package Python library for loading NBA, WNBA, and G-League 
 
 ### Critical Invariants
 - Loader discovery only sees classes exported from `pbpstats.data_loader` that define `resource`, `data_provider`, and `parent_object`; breaking those attrs silently removes a route. (`pbpstats/data_loader/factory.py`, `tests/test_client.py`)
+- `stats_nba` synthetic v3 PBP must emit the existing playbyplayv2 row contract (`EVENTMSGTYPE`, `EVENTMSGACTIONTYPE`, `PLAYER1_*`, `PLAYER2_*`, `PLAYER3_*`) so the PBP, enhanced PBP, and possession stacks stay unchanged. (`pbpstats/data_loader/stats_nba/pbp/v3_synthetic.py`, `tests/data_loaders/test_stats_v3_synthetic.py`)
+- True v2 file/cache data remains canonical; synthetic v3 rows use `/pbp_synthetic_v3`, raw v3 uses `/pbp_v3`, and `auto` fallback only triggers for missing or malformed v2 source data. (`pbpstats/data_loader/stats_nba/pbp/file.py`, `pbpstats/data_loader/stats_nba/pbp/web.py`)
 - Event linking and enrichment happen before possession logic or shot-clock annotation; `previous_event` / `next_event`, score, foul state, and override flags must exist first. (`pbpstats/data_loader/nba_enhanced_pbp_loader.py`)
 - `StatsNbaPossessionLoader` expects possessions to alternate offensive teams unless a known bad-PBP override or flagrant-foul exception applies. (`pbpstats/data_loader/stats_nba/possessions/loader.py`)
 - Start-of-period handling must resolve five starters per team, optionally using overrides or previous-period ending lineups to fill gaps. (`pbpstats/resources/enhanced_pbp/start_of_period.py`, `tests/test_period_starters_carryover.py`)
@@ -31,6 +34,7 @@ pbpstats is a single-package Python library for loading NBA, WNBA, and G-League 
 
 ### Conventions
 - Resource configuration keys are CamelCase class names (`Boxscore`, `Possessions`, `Games`), but bound instance attributes are snake_case (`boxscore`, `possessions`, `games`).
+- `endpoint_strategy` is a supported source-loader option only for `Pbp`, `EnhancedPbp`, and `Possessions`; supported values are `v2`, `v3_synthetic`, and `auto`, with `v2` as the compatibility default.
 - Providers are named `stats_nba`, `data_nba`, and `live`; every routed loader pairs a `loader` with matching `file_source` and `web_source` classes.
 - Override files live under `<data dir>/overrides/` and should degrade to empty maps when absent.
 - `stats_nba` is the richest provider: it owns shot coordinates, v3 reorder repair, scoreboard/game-log splits for `Games`, and most regression coverage.

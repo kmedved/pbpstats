@@ -15,15 +15,30 @@ class LiveStartOfPeriod(StartOfPeriod, LiveEnhancedPbpItem):
 
     def get_offense_team_id(self):
         """
-        For live data, prefer the explicit "possession" field when present;
-        fall back to the generic :class:`~pbpstats.resources.enhanced_pbp.start_of_period.StartOfPeriod`
-        heuristic otherwise.
+        For live data, use the explicit "possession" field unless the canonical
+        period-start inference produces a conflicting non-zero team.
         """
-        offense_team_id = getattr(self, "offense_team_id", 0)
-        if offense_team_id not in (None, 0):
-            return offense_team_id
+        explicit = self._coerce_team_id(getattr(self, "offense_team_id", 0))
+        try:
+            inferred = self._coerce_team_id(self.get_team_starting_with_ball())
+        except AttributeError:
+            if explicit is not None:
+                return explicit
+            raise
 
-        return self.get_team_starting_with_ball()
+        if explicit is not None and inferred is not None and explicit != inferred:
+            return inferred
+        if explicit is not None:
+            return explicit
+        return inferred
+
+    @staticmethod
+    def _coerce_team_id(value):
+        try:
+            value = int(value)
+        except (TypeError, ValueError):
+            return None
+        return value or None
 
     def get_period_starters(self, file_directory=None, ignore_missing_starters=False):
         """

@@ -8,6 +8,8 @@ A package to scrape and parse NBA, WNBA and G-League play-by-play data.
 * Supports NBA, WNBA and G-League stats
 * All stats on pbpstats.com are derived from these stats
 * Fixes order of events for some common cases in which events are out of order
+* Supports an opt-in NBA stats.nba.com `playbyplayv3` synthetic fallback that
+  emits the existing playbyplayv2-shaped PBP contract
 
 # Installation
 Tested on Python 3.10-3.12
@@ -26,6 +28,18 @@ LLM-facing context artifacts live in `context/`.
 Refresh checked-in context artifacts with `python scripts/generate_repo_architecture_sync.py`.
 Refresh local bundles with `python scripts/build_context_bundle.py`.
 Version policy: Policy B, so only shipped/runtime behavior changes require a version bump.
+
+# stats.nba.com PBP Endpoint Strategy
+For NBA `stats_nba` `Pbp`, `EnhancedPbp`, and `Possessions` resources, the
+source loaders accept `endpoint_strategy`:
+
+* `v2` - default compatibility mode. Uses true playbyplayv2 file/web data.
+* `v3_synthetic` - uses playbyplayv3 and emits synthetic playbyplayv2-shaped rows.
+* `auto` - tries v2 first and falls back to synthetic v3 only when v2 is missing
+  or malformed.
+
+True v2 files remain canonical under `/pbp`. Raw v3 cache files are written under
+`/pbp_v3`, and synthetic rows are written under `/pbp_synthetic_v3`.
 
 # Local Development
 Using [poetry](https://python-poetry.org/) for package management. Install it first if it is not already installed on your system.

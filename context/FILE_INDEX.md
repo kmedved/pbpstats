@@ -100,6 +100,7 @@ For implementation work, still provide raw source of the files you expect to edi
 - `pbpstats/data_loader/stats_nba/pbp/__init__.py`
 - `pbpstats/data_loader/stats_nba/pbp/file.py`
 - `pbpstats/data_loader/stats_nba/pbp/loader.py`
+- `pbpstats/data_loader/stats_nba/pbp/v3_synthetic.py`
 - `pbpstats/data_loader/stats_nba/pbp/web.py`
 - `pbpstats/data_loader/stats_nba/possessions/__init__.py`
 - `pbpstats/data_loader/stats_nba/possessions/file.py`
@@ -264,6 +265,7 @@ For implementation work, still provide raw source of the files you expect to edi
 - `tests/data_loaders/test_stats_scoreboard_loader.py`
 - `tests/data_loaders/test_stats_shots_loader.py`
 - `tests/data_loaders/test_stats_summary_loader.py`
+- `tests/data_loaders/test_stats_v3_synthetic.py`
 
 ## tests/objects
 - `tests/objects/test_day.py`

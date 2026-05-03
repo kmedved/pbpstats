@@ -41,10 +41,17 @@ class Game(object):
             for a in attributes
             if a[0].endswith(client.DATA_SOURCE_SUFFIX)
         }
+        data_source_options_map = {
+            a[0].replace(client.DATA_SOURCE_OPTIONS_SUFFIX, ""): a[1]
+            for a in attributes
+            if a[0].endswith(client.DATA_SOURCE_OPTIONS_SUFFIX)
+        }
         for data_loader in data_loaders:
             attr_name = data_loader[0].replace(client.DATA_LOADER_SUFFIX, "")
             source_loader_cls = data_source_map[attr_name]
-            source_loader = source_loader_cls(self.data_directory)
+            source_loader = source_loader_cls(
+                self.data_directory, **data_source_options_map.get(attr_name, {})
+            )
             data = data_loader[1](game_id, source_loader)
             resource_cls = getattr(self, attr_name)
             setattr(

@@ -26,6 +26,12 @@ from pbpstats.data_loader.factory import DataLoaderFactory
 
 DATA_LOADER_SUFFIX = "DataLoaderClass"
 DATA_SOURCE_SUFFIX = "DataSource"
+DATA_SOURCE_OPTIONS_SUFFIX = "DataSourceOptions"
+SOURCE_LOADER_OPTIONS_BY_RESOURCE = {
+    "Pbp": {"endpoint_strategy"},
+    "EnhancedPbp": {"endpoint_strategy"},
+    "Possessions": {"endpoint_strategy"},
+}
 PATTERN = re.compile(r"(?<!^)(?=[A-Z])")  # for converting camel case to snake case
 
 
@@ -63,6 +69,11 @@ class Client(object):
                     )
                     setattr(
                         getattr(self, parent_cls_name),
+                        f"{resource}{DATA_SOURCE_OPTIONS_SUFFIX}",
+                        self._get_source_loader_options(resource, value),
+                    )
+                    setattr(
+                        getattr(self, parent_cls_name),
                         resource,
                         self.resource_dict[resource],
                     )
@@ -79,8 +90,31 @@ class Client(object):
             ]
         )
         for name, object_cls in object_dict.items():
-            setattr(self, name, object_cls)
+            self._clear_resource_bindings(object_cls)
+            bound_object_cls = type(name, (object_cls,), {})
+            self._clear_resource_bindings(bound_object_cls)
+            setattr(self, name, bound_object_cls)
             setattr(getattr(self, name), "data_directory", self.data_directory)
+
+    @staticmethod
+    def _get_source_loader_options(resource, config):
+        option_keys = SOURCE_LOADER_OPTIONS_BY_RESOURCE.get(resource, set())
+        return {
+            option_key: config[option_key]
+            for option_key in option_keys
+            if option_key in config
+        }
+
+    @staticmethod
+    def _clear_resource_bindings(object_cls):
+        binding_suffixes = (
+            DATA_LOADER_SUFFIX,
+            DATA_SOURCE_SUFFIX,
+            DATA_SOURCE_OPTIONS_SUFFIX,
+        )
+        for attr_name in list(vars(object_cls)):
+            if attr_name.endswith(binding_suffixes):
+                delattr(object_cls, attr_name)
 
     def _load_resources(self):
         """

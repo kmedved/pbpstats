@@ -30,7 +30,7 @@ testpaths = ["tests", "historic_backfill/tests"]
 
 [tool.poetry]
 name = "pbpstats"
-version = "1.3.11"
+version = "1.4.0"
 description = "A package to scrape and parse NBA, WNBA and G-League play-by-play data"
 authors = ["kmedved <bibigon@gmail.com>"]
 license = "MIT License"

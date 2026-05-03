@@ -1,5 +1,5 @@
 {
-  "arch_version": "1.3.11",
+  "arch_version": "1.4.0",
   "behavior_snapshot": {
     "archetype": {
       "primary": "Library / SDK",
@@ -425,11 +425,10 @@
     ".gitignore",
     ".repomixignore",
     "AGENTS.md",
-    "LICENSE",
-    "README.md",
     "docs/conf.py",
     "docs/index.rst",
     "docs/quickstart.rst",
+    "LICENSE",
     "pbpstats/__init__.py",
     "pbpstats/client.py",
     "pbpstats/data_loader/__init__.py",
@@ -504,6 +503,7 @@
     "pbpstats/data_loader/stats_nba/pbp/__init__.py",
     "pbpstats/data_loader/stats_nba/pbp/file.py",
     "pbpstats/data_loader/stats_nba/pbp/loader.py",
+    "pbpstats/data_loader/stats_nba/pbp/v3_synthetic.py",
     "pbpstats/data_loader/stats_nba/pbp/web.py",
     "pbpstats/data_loader/stats_nba/possessions/__init__.py",
     "pbpstats/data_loader/stats_nba/possessions/file.py",
@@ -623,6 +623,7 @@
     "pbpstats/resources/shots/shots.py",
     "pbpstats/resources/shots/stats_nba_shot.py",
     "pyproject.toml",
+    "README.md",
     "repomix.config.json",
     "scripts/__init__.py",
     "scripts/build_context_bundle.py",
@@ -646,6 +647,7 @@
     "tests/data_loaders/test_stats_scoreboard_loader.py",
     "tests/data_loaders/test_stats_shots_loader.py",
     "tests/data_loaders/test_stats_summary_loader.py",
+    "tests/data_loaders/test_stats_v3_synthetic.py",
     "tests/objects/test_day.py",
     "tests/objects/test_game.py",
     "tests/objects/test_season.py",

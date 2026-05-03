@@ -114,40 +114,17 @@ class StatsNbaEnhancedPbpLoader(StatsNbaPbpLoader, NbaEnhancedPbpLoader):
         checks rebound events to make sure they are ordered correctly
         """
         attempts = 0
+        last_event_order_error = None
 
         # First, try known pattern-based fixes up to max_retries times.
         while attempts <= max_retries:
             try:
-                for event_idx, event in enumerate(self.items): # Added enumerate for index
+                for event in self.items:
                     if hasattr(event, "missed_shot"):
-                        # Accessing missed_shot will raise EventOrderError if order is bad
                         event.missed_shot
-                # If we got here, all rebound -> missed_shot links are valid
                 return
             except EventOrderError as e:
-                # --- START OF ADDED DEBUG CODE (FIRST BLOCK) ---
-                print("\n" + "="*20 + " DEBUG: ORIGINAL EventOrderError CAUGHT " + "="*20)
-                print(f"DEBUG: Game ID: {self.game_id}")
-                print(f"DEBUG: Error Message: {e}")
-                # The EventOrderError in pbpstats is a custom exception.
-                # It might not have an 'event_num' attribute directly on 'e'.
-                # The error message itself usually contains context.
-                # Let's try to find the event that raised it.
-                # We need to know WHICH event in self.items failed.
-                # The original loop 'for event in self.items:' doesn't give us the event directly in the 'except'
-                # Let's re-iterate to find the problematic event if needed, or infer from message.
-                # For now, the error message 'e' should be quite descriptive.
-                
-                # Attempt to get more context about the specific event that failed
-                # This part is tricky because the exception is caught outside the direct loop iteration
-                # that caused it. 'e' itself might contain info, or we might need to re-scan.
-                # For now, we'll rely on the error message 'e' which is usually good.
-                # Example: "previous event: <StatsJumpBall ... EventNum: 358> is not a missed free throw or field goal"
-
-                print(f"DEBUG: Attempting self._fix_common_event_order_error for this error. Attempt: {attempts + 1}")
-                print("="*60 + "\n")
-                # --- END OF ADDED DEBUG CODE (FIRST BLOCK) ---
-
+                last_event_order_error = e
                 self._fix_common_event_order_error(e)
                 # rebuild items after modifying underlying source_data
                 self.items = [
@@ -173,12 +150,31 @@ class StatsNbaEnhancedPbpLoader(StatsNbaPbpLoader, NbaEnhancedPbpLoader):
                 if hasattr(event, "missed_shot"):
                     event.missed_shot
             return
-        except EventOrderError:
-            # v3 ordering still leads to errors; fall through to data.nba.com
-            pass
+        except EventOrderError as e:
+            last_event_order_error = e
         except Exception:
             # v3 unavailable or malformed; fall through
             pass
+
+        # If v3 did not resolve the ordering, fall back to data.nba.com order.
+        try:
+            self._use_data_nba_event_order()
+            self.items = [
+                self.factory.get_event_class(item["EVENTMSGTYPE"])(item, i)
+                for i, item in enumerate(self.data)
+            ]
+            self._add_extra_attrs_to_all_events()
+            for event in self.items:
+                if hasattr(event, "missed_shot"):
+                    event.missed_shot
+            return
+        except EventOrderError as e:
+            last_event_order_error = e
+        except Exception:
+            pass
+
+        if last_event_order_error is not None:
+            raise last_event_order_error
 
     def _fix_order_when_technical_foul_before_period_start(self):
         """
@@ -542,21 +538,8 @@ class StatsNbaEnhancedPbpLoader(StatsNbaPbpLoader, NbaEnhancedPbpLoader):
         reorders all events to be the same order as data.nba.com pbp
         """
         # Order event numbers of events in data.nba.com pbp
-        # --- START OF MODIFICATION ---
-        print("\nDEBUG: Inside _use_data_nba_event_order. INTENTIONALLY PREVENTING data.wnba.com CALL.\n")
-        # To see the original error that *led* to this fallback, we prevent this fallback from running.
-        # This will likely cause the EventOrderError from the previous 'except' block to propagate
-        # if it wasn't truly fixed by the common fixes, or if this method was called directly.
-        # For true debugging of the original error, you'd let the previous print statement
-        # show you the error, then let this method fail or return without doing anything.
-        # For now, let's just make it raise an error so we know it got here and didn't proceed.
-        raise RuntimeError("DEBUG: _use_data_nba_event_order called, but data.wnba.com fetch is disabled for debugging.")
-        # --- END OF MODIFICATION ---
-
-        # Original code (now effectively disabled by the raise above):
-        # data_nba_pbp = DataNbaPbpLoader(self.game_id, DataNbaPbpWebLoader())
-        # data_nba_event_num_order = [item.evt for item in data_nba_pbp.items]
-        # ... rest of the method
+        data_nba_pbp = DataNbaPbpLoader(self.game_id, DataNbaPbpWebLoader())
+        data_nba_event_num_order = [item.evt for item in data_nba_pbp.items]
 
         headers = self.source_data["resultSets"][0]["headers"]
         rows = self.source_data["resultSets"][0]["rowSet"]

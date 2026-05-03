@@ -1,4 +1,5 @@
 from pbpstats.data_loader.stats_nba.enhanced_pbp.web import StatsNbaEnhancedPbpWebLoader
+from pbpstats.data_loader.stats_nba.pbp.v3_synthetic import ENDPOINT_STRATEGY_V2
 
 
 class StatsNbaPossessionWebLoader(object):
@@ -11,6 +12,9 @@ class StatsNbaPossessionWebLoader(object):
         If not provided response data will not be saved on disk.
     """
 
-    def __init__(self, file_directory=None):
+    def __init__(self, file_directory=None, endpoint_strategy=ENDPOINT_STRATEGY_V2):
         self.file_directory = file_directory
-        self.enhanced_pbp_source_loader = StatsNbaEnhancedPbpWebLoader(file_directory)
+        self.endpoint_strategy = endpoint_strategy
+        self.enhanced_pbp_source_loader = StatsNbaEnhancedPbpWebLoader(
+            file_directory, endpoint_strategy=endpoint_strategy
+        )

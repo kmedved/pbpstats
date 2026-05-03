@@ -49,6 +49,18 @@ the settings and it will be saved in the appropriate subdirectory.
 
 Options for ``data_provider`` are 'stats_nba' and 'data_nba' and 'live'.
 
+For NBA ``stats_nba`` ``Pbp``, ``EnhancedPbp`` and ``Possessions`` resources,
+you can also set ``endpoint_strategy``. Options are:
+
+* ``v2`` - default compatibility mode using true playbyplayv2 file/web data.
+* ``v3_synthetic`` - use playbyplayv3 and emit synthetic playbyplayv2-shaped rows.
+* ``auto`` - try v2 first and fall back to synthetic v3 only when v2 is missing
+  or malformed.
+
+Synthetic v3 files are kept separate from true v2 files. True v2 PBP remains in
+``/pbp``, raw v3 responses are stored in ``/pbp_v3``, and synthetic rows are
+stored in ``/pbp_synthetic_v3``.
+
 See the code examples below for some examples settings.
 
 Resource options are:
@@ -84,6 +96,19 @@ since 'Boxscore' and 'Possessions' were provided in the settings dict boxscore a
 can be accessed via ``game.boxscore.items`` and ``game.possessions.items``. See
 :obj:`~pbpstats.resources.possessions.possessions.Possessions` for properties for working with possessions data. See
 :obj:`~pbpstats.resources.boxscore.boxscore.Boxscore` for properties for working with boxscore data.
+
+To opt into synthetic v3 PBP for a current NBA game:
+
+.. code-block:: python
+
+    settings = {
+        "dir": "/response_data",
+        "EnhancedPbp": {
+            "source": "web",
+            "data_provider": "stats_nba",
+            "endpoint_strategy": "v3_synthetic",
+        },
+    }
 
 All Final Games For Season
 ----------------------------
