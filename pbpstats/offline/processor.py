@@ -1,23 +1,29 @@
 from typing import Callable, List, Dict, Optional
 import pandas as pd
 
+import pbpstats
 from pbpstats.data_loader.nba_enhanced_pbp_loader import NbaEnhancedPbpLoader
 from pbpstats.data_loader.nba_possession_loader import NbaPossessionLoader
-from pbpstats.resources.enhanced_pbp import Rebound
-from pbpstats.resources.enhanced_pbp.rebound import EventOrderError as ReboundEventOrderError
+from pbpstats.resources.enhanced_pbp import Rebound, StartOfPeriod
+from pbpstats.resources.enhanced_pbp.rebound import (
+    EventOrderError as ReboundEventOrderError,
+)
 from pbpstats.resources.enhanced_pbp.stats_nba.enhanced_pbp_factory import (
     StatsNbaEnhancedPbpFactory,
 )
 from pbpstats.resources.possessions.possession import Possession
 from pbpstats.resources.possessions.possessions import Possessions
 
+from pbpstats.game_id import normalize_game_id
 from pbpstats.offline.ordering import (
     create_raw_dicts_from_df,
     dedupe_with_v3,
     enrich_clocks_with_v3,
+    _ensure_eventmsgtype_int,
     patch_start_of_periods,
     preserve_order_after_v3_repairs,
     _ensure_eventnum_int,
+    _infer_league_from_game_id,
 )
 
 FetchPbpV3Fn = Callable[[str], pd.DataFrame]
@@ -27,6 +33,12 @@ FetchPbpV3Fn = Callable[[str], pd.DataFrame]
 # rebounds are candidates.
 REBOUND_STRICT_MODE: bool = True
 MAX_REBOUND_REPAIR_RETRIES: int = 100
+RAW_INT_FIELDS = (
+    "EVENTNUM",
+    "EVENTMSGTYPE",
+    "EVENTMSGACTIONTYPE",
+    "PERIOD",
+)
 
 
 def set_rebound_strict_mode(strict: bool = True) -> None:
@@ -38,6 +50,28 @@ def set_rebound_strict_mode(strict: bool = True) -> None:
     """
     global REBOUND_STRICT_MODE
     REBOUND_STRICT_MODE = strict
+
+
+def _coerce_optional_int(value):
+    try:
+        if pd.isna(value):
+            return None
+    except (TypeError, ValueError):
+        pass
+
+    try:
+        return int(value)
+    except (TypeError, ValueError, OverflowError):
+        pass
+
+    try:
+        as_float = float(str(value).strip())
+    except (TypeError, ValueError, OverflowError):
+        return value
+
+    if as_float.is_integer():
+        return int(as_float)
+    return value
 
 
 class PbpProcessor(NbaEnhancedPbpLoader, NbaPossessionLoader):
@@ -55,17 +89,27 @@ class PbpProcessor(NbaEnhancedPbpLoader, NbaPossessionLoader):
 
     def __init__(
         self,
-        game_id: str,
+        game_id: object,
         raw_data_dicts: List[dict],
         rebound_deletions_list: Optional[List[Dict]] = None,
         boxscore_source_loader=None,
         period_boxscore_source_loader=None,
         file_directory: Optional[str] = None,
+        league: Optional[str] = None,
     ):
-        self.game_id = str(game_id).zfill(10)
-        self.league = "nba"
+        self.game_id = normalize_game_id(game_id, league=league)
+        self.league = (
+            league or _infer_league_from_game_id(self.game_id) or pbpstats.NBA_STRING
+        )
         self.file_directory = file_directory
-        self.data = raw_data_dicts
+        self.data = []
+        for row in raw_data_dicts:
+            normalized_row = dict(row)
+            normalized_row["GAME_ID"] = self.game_id
+            for key in RAW_INT_FIELDS:
+                if key in normalized_row:
+                    normalized_row[key] = _coerce_optional_int(normalized_row[key])
+            self.data.append(normalized_row)
         self.factory = StatsNbaEnhancedPbpFactory()
         self.boxscore_source_loader = boxscore_source_loader
         self.period_boxscore_source_loader = period_boxscore_source_loader
@@ -79,13 +123,17 @@ class PbpProcessor(NbaEnhancedPbpLoader, NbaPossessionLoader):
             self.factory.get_event_class(item["EVENTMSGTYPE"])(item, i)
             for i, item in enumerate(self.data)
         ]
+        for item in self.items:
+            if isinstance(item, StartOfPeriod):
+                try:
+                    item.loader_league = self.league
+                except AttributeError:
+                    pass
 
         if (
             self.boxscore_source_loader is not None
             or self.period_boxscore_source_loader is not None
         ):
-            from pbpstats.resources.enhanced_pbp import StartOfPeriod
-
             for item in self.items:
                 if isinstance(item, StartOfPeriod):
                     if self.boxscore_source_loader is not None:
@@ -194,7 +242,9 @@ class PbpProcessor(NbaEnhancedPbpLoader, NbaPossessionLoader):
                 return True
             return 0 <= ft_clock - rebound_clock <= 5
 
-        def sub_block_puts_rebounder_on_floor(sub_indices: List[int], rebound_idx: int) -> bool:
+        def sub_block_puts_rebounder_on_floor(
+            sub_indices: List[int], rebound_idx: int
+        ) -> bool:
             rebounder = player1_id(rebound_idx)
             if rebounder is None:
                 return False
@@ -205,7 +255,9 @@ class PbpProcessor(NbaEnhancedPbpLoader, NbaPossessionLoader):
             moved_rows = [rows[move_idx] for move_idx in move_indices]
             for move_idx in reversed(move_indices):
                 rows.pop(move_idx)
-            adjusted_anchor = anchor_idx - sum(1 for move_idx in move_indices if move_idx < anchor_idx)
+            adjusted_anchor = anchor_idx - sum(
+                1 for move_idx in move_indices if move_idx < anchor_idx
+            )
             rows[adjusted_anchor:adjusted_anchor] = moved_rows
 
         changed = True
@@ -237,9 +289,15 @@ class PbpProcessor(NbaEnhancedPbpLoader, NbaPossessionLoader):
                     if et(scan_idx) != 3 or player1_id(scan_idx) != ft_player:
                         continue
                     candidate_event_num = event_num(scan_idx)
-                    if candidate_event_num is None or candidate_event_num >= terminal_ft_event_num:
+                    if (
+                        candidate_event_num is None
+                        or candidate_event_num >= terminal_ft_event_num
+                    ):
                         continue
-                    if prior_ft_event_num is None or candidate_event_num > prior_ft_event_num:
+                    if (
+                        prior_ft_event_num is None
+                        or candidate_event_num > prior_ft_event_num
+                    ):
                         prior_ft_idx = scan_idx
                         prior_ft_event_num = candidate_event_num
 
@@ -249,7 +307,9 @@ class PbpProcessor(NbaEnhancedPbpLoader, NbaPossessionLoader):
                 rebound_idx = None
                 sub_indices: List[int] = []
                 terminal_clock = rows[terminal_ft_idx].get("PCTIMESTRING")
-                for scan_idx in range(terminal_ft_idx + 1, min(len(rows), terminal_ft_idx + 8)):
+                for scan_idx in range(
+                    terminal_ft_idx + 1, min(len(rows), terminal_ft_idx + 8)
+                ):
                     if not same_period(scan_idx, period):
                         break
                     scan_event_num = event_num(scan_idx)
@@ -307,9 +367,15 @@ class PbpProcessor(NbaEnhancedPbpLoader, NbaPossessionLoader):
                     sub_indices.append(scan_idx)
                     scan_idx += 1
 
-                if not sub_indices or scan_idx >= len(rows) or not is_real_player_rebound(scan_idx):
+                if (
+                    not sub_indices
+                    or scan_idx >= len(rows)
+                    or not is_real_player_rebound(scan_idx)
+                ):
                     continue
-                if not same_period(scan_idx, period) or not rebound_clock_follows_ft(missed_ft_idx, scan_idx):
+                if not same_period(scan_idx, period) or not rebound_clock_follows_ft(
+                    missed_ft_idx, scan_idx
+                ):
                     continue
 
                 rebound_event_num = event_num(scan_idx)
@@ -318,7 +384,10 @@ class PbpProcessor(NbaEnhancedPbpLoader, NbaPossessionLoader):
                 sub_event_nums = [event_num(sub_idx) for sub_idx in sub_indices]
                 if any(sub_event_num is None for sub_event_num in sub_event_nums):
                     continue
-                if not all(ft_event_num < sub_event_num < rebound_event_num for sub_event_num in sub_event_nums):
+                if not all(
+                    ft_event_num < sub_event_num < rebound_event_num
+                    for sub_event_num in sub_event_nums
+                ):
                     continue
 
                 ft_team = effective_team_id(missed_ft_idx)
@@ -405,7 +474,10 @@ class PbpProcessor(NbaEnhancedPbpLoader, NbaPossessionLoader):
                 ):
                     continue
                 period = rows[idx].get("PERIOD")
-                if any(rows[scan_idx].get("PERIOD") != period for scan_idx in range(idx, idx + 5)):
+                if any(
+                    rows[scan_idx].get("PERIOD") != period
+                    for scan_idx in range(idx, idx + 5)
+                ):
                     continue
                 ft_clock = clock_seconds(idx)
                 if (
@@ -477,7 +549,9 @@ class PbpProcessor(NbaEnhancedPbpLoader, NbaPossessionLoader):
                 # Split into possessions
                 self.events = self.items
                 events_by_possession = self._split_events_by_possession()
-                self.possessions = [Possession(events) for events in events_by_possession]
+                self.possessions = [
+                    Possession(events) for events in events_by_possession
+                ]
 
                 # Treat possessions as "items" for NbaPossessionLoader logic
                 self.items = self.possessions
@@ -524,12 +598,19 @@ class PbpProcessor(NbaEnhancedPbpLoader, NbaPossessionLoader):
                 raise exception
             issue_event_index = _find_index(legacy_event_num)
 
-        if issue_event_index is None and rebound_event_index is not None and rebound_event_index > 0:
+        if (
+            issue_event_index is None
+            and rebound_event_index is not None
+            and rebound_event_index > 0
+        ):
             issue_event_index = rebound_event_index - 1
 
         if rebound_event_index is None and issue_event_index is not None:
             candidate_index = issue_event_index + 1
-            if candidate_index < len(rows) and rows[candidate_index].get("EVENTMSGTYPE") == 4:
+            if (
+                candidate_index < len(rows)
+                and rows[candidate_index].get("EVENTMSGTYPE") == 4
+            ):
                 rebound_event_index = candidate_index
 
         if issue_event_index is None:
@@ -633,7 +714,10 @@ class PbpProcessor(NbaEnhancedPbpLoader, NbaPossessionLoader):
             search_limit = min(rebound_event_index + 4, len(rows))
             for candidate_idx in range(rebound_event_index + 1, search_limit):
                 candidate_row = rows[candidate_idx]
-                if rebound_period is not None and candidate_row.get("PERIOD") != rebound_period:
+                if (
+                    rebound_period is not None
+                    and candidate_row.get("PERIOD") != rebound_period
+                ):
                     break
                 candidate_clock = candidate_row.get("PCTIMESTRING")
                 if candidate_clock != rebound_clock:
@@ -671,7 +755,9 @@ class PbpProcessor(NbaEnhancedPbpLoader, NbaPossessionLoader):
                         continue
 
                     block_event_types = [et(block_idx) for block_idx in block_range]
-                    if not any(event_type in (3, 6) for event_type in block_event_types):
+                    if not any(
+                        event_type in (3, 6) for event_type in block_event_types
+                    ):
                         continue
 
                     if all(
@@ -703,13 +789,17 @@ class PbpProcessor(NbaEnhancedPbpLoader, NbaPossessionLoader):
                         continue
                     if en(candidate_idx) != rebound_event_number - 1:
                         continue
-                    if et(candidate_idx) != 3 or not is_missed_shot_or_ft(candidate_idx):
+                    if et(candidate_idx) != 3 or not is_missed_shot_or_ft(
+                        candidate_idx
+                    ):
                         continue
 
                     block_range = range(candidate_idx + 1, rebound_event_index)
                     if not block_range:
                         continue
-                    if not all(et(block_idx) in (3, 6, 8, 9) for block_idx in block_range):
+                    if not all(
+                        et(block_idx) in (3, 6, 8, 9) for block_idx in block_range
+                    ):
                         continue
 
                     rebound_team = effective_team_id(rebound_event_index)
@@ -722,9 +812,7 @@ class PbpProcessor(NbaEnhancedPbpLoader, NbaPossessionLoader):
                         continue
 
                     sub_indices = [
-                        block_idx
-                        for block_idx in block_range
-                        if et(block_idx) == 8
+                        block_idx for block_idx in block_range if et(block_idx) == 8
                     ]
                     rebounder_id = player_id(rebound_event_index, "PLAYER1_ID")
                     if (
@@ -738,7 +826,9 @@ class PbpProcessor(NbaEnhancedPbpLoader, NbaPossessionLoader):
                         sub_rows = [rows[sub_idx] for sub_idx in sub_indices]
                         for sub_idx in reversed(sub_indices):
                             rows.pop(sub_idx)
-                        candidate_idx -= sum(1 for sub_idx in sub_indices if sub_idx < candidate_idx)
+                        candidate_idx -= sum(
+                            1 for sub_idx in sub_indices if sub_idx < candidate_idx
+                        )
                         rows[candidate_idx:candidate_idx] = sub_rows
                         self.data = rows
                         return
@@ -888,7 +978,9 @@ class PbpProcessor(NbaEnhancedPbpLoader, NbaPossessionLoader):
                         break
                     if en(candidate_idx) != rebound_event_number - 1:
                         continue
-                    if et(candidate_idx) != 3 or not is_missed_shot_or_ft(candidate_idx):
+                    if et(candidate_idx) != 3 or not is_missed_shot_or_ft(
+                        candidate_idx
+                    ):
                         continue
 
                     missed_ft_team = effective_team_id(candidate_idx)
@@ -954,14 +1046,14 @@ class PbpProcessor(NbaEnhancedPbpLoader, NbaPossessionLoader):
                     return
 
         # --- PATTERN -1: Move an orphan rebound back to the nearest prior miss ---
-        if (
-            rebound_event_index is not None
-            and et(issue_event_index) != 4
-        ):
+        if rebound_event_index is not None and et(issue_event_index) != 4:
             search_start = rebound_event_index - 1
             search_stop = max(-1, rebound_event_index - 8)
             for candidate_idx in range(search_start, search_stop, -1):
-                if rebound_period is not None and rows[candidate_idx].get("PERIOD") != rebound_period:
+                if (
+                    rebound_period is not None
+                    and rows[candidate_idx].get("PERIOD") != rebound_period
+                ):
                     break
                 if is_missed_shot_or_ft(candidate_idx):
                     rebound_row = rows.pop(rebound_event_index)
@@ -993,10 +1085,14 @@ class PbpProcessor(NbaEnhancedPbpLoader, NbaPossessionLoader):
                         rows.insert(candidate_idx + 1, rebound_row)
                         self.data = rows
                         return
-            for candidate_idx in range(rebound_event_index + 1, min(rebound_event_index + 4, len(rows))):
+            for candidate_idx in range(
+                rebound_event_index + 1, min(rebound_event_index + 4, len(rows))
+            ):
                 if rows[candidate_idx].get("PERIOD") != rebound_period:
                     break
-                if is_missed_shot_or_ft(candidate_idx) and team_id(candidate_idx) == team_id(rebound_event_index):
+                if is_missed_shot_or_ft(candidate_idx) and team_id(
+                    candidate_idx
+                ) == team_id(rebound_event_index):
                     missed_shot = rows.pop(candidate_idx)
                     rows.insert(issue_event_index + 1, missed_shot)
                     self.data = rows
@@ -1019,7 +1115,10 @@ class PbpProcessor(NbaEnhancedPbpLoader, NbaPossessionLoader):
         ):
             first_rebound = rows[issue_event_index]
             missed_putback = rows[issue_event_index - 1]
-            rows[issue_event_index - 1], rows[issue_event_index] = first_rebound, missed_putback
+            rows[issue_event_index - 1], rows[issue_event_index] = (
+                first_rebound,
+                missed_putback,
+            )
             self.data = rows
             return
 
@@ -1044,7 +1143,9 @@ class PbpProcessor(NbaEnhancedPbpLoader, NbaPossessionLoader):
                     if not is_missed_shot_or_ft(candidate_idx):
                         continue
                     block_range = range(candidate_idx + 1, issue_event_index)
-                    if block_range and all(et(block_idx) in (3, 6) for block_idx in block_range):
+                    if block_range and all(
+                        et(block_idx) in (3, 6) for block_idx in block_range
+                    ):
                         rebound_row = rows.pop(rebound_event_index)
                         rows.insert(candidate_idx + 1, rebound_row)
                         self.data = rows
@@ -1164,13 +1265,19 @@ class PbpProcessor(NbaEnhancedPbpLoader, NbaPossessionLoader):
             search_limit = min(rebound_event_index + 3, len(rows))
             for candidate_idx in range(rebound_event_index + 1, search_limit):
                 candidate_row = rows[candidate_idx]
-                if rebound_period is not None and candidate_row.get("PERIOD") != rebound_period:
+                if (
+                    rebound_period is not None
+                    and candidate_row.get("PERIOD") != rebound_period
+                ):
                     break
                 if candidate_row.get("PCTIMESTRING") != rebound_clock:
                     break
                 if not is_missed_shot_or_ft(candidate_idx):
                     continue
-                if first_rebound_team is not None and team_id(candidate_idx) != first_rebound_team:
+                if (
+                    first_rebound_team is not None
+                    and team_id(candidate_idx) != first_rebound_team
+                ):
                     continue
 
                 rebound_row = rows.pop(rebound_event_index)
@@ -1198,7 +1305,10 @@ class PbpProcessor(NbaEnhancedPbpLoader, NbaPossessionLoader):
             if shadow_clock is not None:
                 for candidate_idx in range(issue_event_index + 1, search_limit):
                     candidate_row = rows[candidate_idx]
-                    if rebound_period is not None and candidate_row.get("PERIOD") != rebound_period:
+                    if (
+                        rebound_period is not None
+                        and candidate_row.get("PERIOD") != rebound_period
+                    ):
                         break
                     if candidate_idx == rebound_event_index:
                         continue
@@ -1230,13 +1340,17 @@ class PbpProcessor(NbaEnhancedPbpLoader, NbaPossessionLoader):
             and et(issue_event_index - 1) == 2
             and et(issue_event_index) == 1
             and et(rebound_event_index) == 4
-            and rows[issue_event_index].get("PCTIMESTRING") == rows[rebound_event_index].get("PCTIMESTRING")
+            and rows[issue_event_index].get("PCTIMESTRING")
+            == rows[rebound_event_index].get("PCTIMESTRING")
             and team_id(issue_event_index - 1) == team_id(issue_event_index)
             and team_id(issue_event_index) == team_id(rebound_event_index)
         ):
             rebound_event = rows[rebound_event_index]
             made_shot = rows[issue_event_index]
-            rows[issue_event_index], rows[rebound_event_index] = rebound_event, made_shot
+            rows[issue_event_index], rows[rebound_event_index] = (
+                rebound_event,
+                made_shot,
+            )
             self.data = rows
             return
 
@@ -1320,7 +1434,7 @@ class PbpProcessor(NbaEnhancedPbpLoader, NbaPossessionLoader):
             if self._rebound_deletions_list is None:
                 return
             entry = {
-                "game_id": str(self.game_id).zfill(10),
+                "game_id": self.game_id,
                 "deleted_EVENTNUM": deleted_row.get("EVENTNUM"),
                 "deleted_EVENTMSGTYPE": deleted_row.get("EVENTMSGTYPE"),
                 "deleted_PERIOD": deleted_row.get("PERIOD"),
@@ -1376,6 +1490,7 @@ def get_possessions_from_df(
     boxscore_source_loader=None,
     period_boxscore_source_loader=None,
     file_directory: Optional[str] = None,
+    league: Optional[str] = None,
 ) -> Possessions:
     """
     Build a pbpstats Possessions object from a single-game PBP DataFrame.
@@ -1392,9 +1507,22 @@ def get_possessions_from_df(
     if game_df.empty:
         raise ValueError("get_possessions_from_df: empty game_df")
 
-    game_id = str(game_df["GAME_ID"].iloc[0]).zfill(10)
+    normalized_game_ids = sorted(
+        {
+            normalize_game_id(value, league=league)
+            for value in game_df["GAME_ID"].dropna().unique()
+            if normalize_game_id(value, league=league)
+        }
+    )
+    if len(normalized_game_ids) != 1:
+        raise ValueError(
+            "get_possessions_from_df expects a single-game DataFrame; "
+            f"found GAME_IDs: {normalized_game_ids}"
+        )
+    game_id = normalized_game_ids[0]
 
     df = game_df.copy()
+    df["GAME_ID"] = game_id
 
     # v3-based dedupe if available
     df = dedupe_with_v3(df, game_id, fetch_pbp_v3_fn)
@@ -1406,7 +1534,10 @@ def get_possessions_from_df(
     df = enrich_clocks_with_v3(df, game_id, fetch_pbp_v3_fn)
 
     # Patch missing start-of-period markers
-    df = patch_start_of_periods(df, game_id, fetch_pbp_v3_fn)
+    if league is None:
+        df = patch_start_of_periods(df, game_id, fetch_pbp_v3_fn)
+    else:
+        df = patch_start_of_periods(df, game_id, fetch_pbp_v3_fn, league=league)
 
     # Preserve repaired offline row order; numeric re-sorts can break old-game chronology.
     if fetch_pbp_v3_fn is not None:
@@ -1421,13 +1552,22 @@ def get_possessions_from_df(
     if df_ordered.empty:
         df_ordered = df.reset_index(drop=True)
 
+    if "EVENTMSGTYPE" in df_ordered.columns:
+        df_ordered = _ensure_eventmsgtype_int(df_ordered)
+
     raw_dicts = create_raw_dicts_from_df(df_ordered)
+    processor_kwargs = {
+        "boxscore_source_loader": boxscore_source_loader,
+        "period_boxscore_source_loader": period_boxscore_source_loader,
+        "file_directory": file_directory,
+    }
+    if league is not None:
+        processor_kwargs["league"] = league
+
     processor = PbpProcessor(
         game_id,
         raw_dicts,
         rebound_deletions_list,
-        boxscore_source_loader=boxscore_source_loader,
-        period_boxscore_source_loader=period_boxscore_source_loader,
-        file_directory=file_directory,
+        **processor_kwargs,
     )
     return Possessions(processor.possessions)

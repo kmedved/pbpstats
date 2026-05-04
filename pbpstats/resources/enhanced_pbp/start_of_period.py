@@ -14,6 +14,12 @@ from pbpstats import (
     WNBA_GAME_ID_PREFIX,
     WNBA_STRING,
 )
+from pbpstats.game_id import (
+    is_overtime_period,
+    normalize_game_id,
+    regulation_period_count,
+    uses_wnba_twenty_minute_halves,
+)
 from pbpstats.overrides import IntDecoder
 from pbpstats.resources.enhanced_pbp import (
     Ejection,
@@ -89,6 +95,41 @@ class StartOfPeriod(metaclass=abc.ABCMeta):
         """
         return self.period_starters
 
+    def _normalize_game_id_for_inference(self):
+        return normalize_game_id(
+            getattr(self, "game_id", ""),
+            league=getattr(self, "loader_league", None),
+        )
+
+    def _infer_season_year_from_game_id(self):
+        raw_game_id = self._normalize_game_id_for_inference()
+        if len(raw_game_id) < 5:
+            return None
+        try:
+            suffix = int(raw_game_id[3:5])
+        except ValueError:
+            return None
+        return 2000 + suffix if suffix < 90 else 1900 + suffix
+
+    def _uses_wnba_twenty_minute_halves(self):
+        return uses_wnba_twenty_minute_halves(
+            self.league,
+            self._infer_season_year_from_game_id(),
+        )
+
+    def _regulation_period_count(self):
+        return regulation_period_count(
+            self.league,
+            self._infer_season_year_from_game_id(),
+        )
+
+    def _is_overtime_period(self):
+        return is_overtime_period(
+            self.period,
+            self.league,
+            self._infer_season_year_from_game_id(),
+        )
+
     @property
     def league(self):
         """
@@ -96,23 +137,42 @@ class StartOfPeriod(metaclass=abc.ABCMeta):
 
         First 2 in game id represent league - 00 for nba, 10 for wnba, 20 for g-league
         """
-        if self.game_id[0:2] == NBA_GAME_ID_PREFIX:
+        league_override = getattr(self, "loader_league", None)
+        if league_override is not None:
+            return league_override
+
+        game_id = self._normalize_game_id_for_inference()
+        if game_id[0:2] == NBA_GAME_ID_PREFIX:
             return NBA_STRING
-        elif self.game_id[0:2] == G_LEAGUE_GAME_ID_PREFIX:
+        elif game_id[0:2] == G_LEAGUE_GAME_ID_PREFIX:
             return G_LEAGUE_STRING
-        elif self.game_id[0:2] == WNBA_GAME_ID_PREFIX:
+        elif game_id[0:2] == WNBA_GAME_ID_PREFIX:
             return WNBA_STRING
 
     @property
     def league_url_part(self):
-        if self.game_id[0:2] == NBA_GAME_ID_PREFIX:
-            return NBA_STRING
-        elif self.game_id[0:2] == G_LEAGUE_GAME_ID_PREFIX:
+        league_override = getattr(self, "loader_league", None)
+        if league_override == G_LEAGUE_STRING:
             return f"{G_LEAGUE_STRING}.{NBA_STRING}"
-        elif self.game_id[0:2] == WNBA_GAME_ID_PREFIX:
+        if league_override in [NBA_STRING, WNBA_STRING]:
+            return league_override
+
+        game_id = self._normalize_game_id_for_inference()
+        if game_id[0:2] == NBA_GAME_ID_PREFIX:
+            return NBA_STRING
+        elif game_id[0:2] == G_LEAGUE_GAME_ID_PREFIX:
+            return f"{G_LEAGUE_STRING}.{NBA_STRING}"
+        elif game_id[0:2] == WNBA_GAME_ID_PREFIX:
             return WNBA_STRING
 
     def _get_period_start_tenths(self):
+        if self._uses_wnba_twenty_minute_halves():
+            if self.period == 1:
+                return 0
+            if self.period == 2:
+                return 12000
+            return int(24000 + 3000 * (self.period - 3))
+
         if self.league == WNBA_STRING:
             regulation_tenths = 6000
         else:
@@ -128,7 +188,7 @@ class StartOfPeriod(metaclass=abc.ABCMeta):
         period_start_tenths = self._get_period_start_tenths()
         if mode == "rt2_start_window":
             return {
-                "GameId": self.game_id,
+                "GameId": self._normalize_game_id_for_inference(),
                 "StartPeriod": 0,
                 "EndPeriod": 0,
                 "RangeType": 2,
@@ -137,7 +197,7 @@ class StartOfPeriod(metaclass=abc.ABCMeta):
             }
         if mode == "rt1_period_participants":
             return {
-                "GameId": self.game_id,
+                "GameId": self._normalize_game_id_for_inference(),
                 "StartPeriod": self.period,
                 "EndPeriod": self.period,
                 "RangeType": 1,
@@ -162,13 +222,14 @@ class StartOfPeriod(metaclass=abc.ABCMeta):
 
     def _load_period_boxscore_response(self, mode):
         loader_obj = getattr(self, "period_boxscore_source_loader", None)
+        game_id = self._normalize_game_id_for_inference()
         if loader_obj is not None:
             try:
-                return loader_obj.load_data(self.game_id, self.period, mode)
+                return loader_obj.load_data(game_id, self.period, mode)
             except Exception as exc:
                 raise StartOfPeriodSourceLoaderError(
                     "period_boxscore_source_loader",
-                    getattr(self, "game_id", "unknown"),
+                    game_id or getattr(self, "game_id", "unknown"),
                     getattr(self, "period", None),
                     mode=mode,
                 ) from exc
@@ -415,7 +476,7 @@ class StartOfPeriod(metaclass=abc.ABCMeta):
         """
         returns team id for team on starting period with the ball
         """
-        if (self.period == 1 or self.period >= 5) and isinstance(
+        if (self.period == 1 or self._is_overtime_period()) and isinstance(
             self.next_event, JumpBall
         ):
             # period starts with jump ball - team that wins starts with the ball
@@ -605,8 +666,17 @@ class StartOfPeriod(metaclass=abc.ABCMeta):
                     event.is_technical or event.is_double_technical
                 )
                 if player_id not in starters and player_id not in subbed_in_players:
+                    try:
+                        event_seconds = float(
+                            getattr(event, "seconds_remaining", None)
+                        )
+                    except (TypeError, ValueError):
+                        event_seconds = None
                     tech_ft_at_period_start = (
-                        isinstance(event, FreeThrow) and event.clock == "12:00"
+                        isinstance(event, FreeThrow)
+                        and event_seconds is not None
+                        and abs(event_seconds - self._get_period_start_seconds())
+                        <= 0.001
                     )
                     if not (
                         is_technical_foul
@@ -977,6 +1047,11 @@ class StartOfPeriod(metaclass=abc.ABCMeta):
         return saw_supported_difference
 
     def _get_period_start_seconds(self):
+        if self._uses_wnba_twenty_minute_halves():
+            if self.period <= 2:
+                return 1200.0
+            return 300.0
+
         if self.period <= 4:
             if self.league == WNBA_STRING:
                 return 600.0

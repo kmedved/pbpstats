@@ -7,6 +7,8 @@ from typing import Callable, Dict, List
 import numpy as np
 import pandas as pd
 
+import pbpstats
+from pbpstats.game_id import normalize_game_id, uses_wnba_twenty_minute_halves
 from pbpstats.offline.row_overrides import PBP_ROW_OVERRIDE_ACTION_COLUMN
 
 FetchPbpV3Fn = Callable[[str], pd.DataFrame]
@@ -24,6 +26,28 @@ def _ensure_eventnum_int(df: pd.DataFrame) -> pd.DataFrame:
     result["EVENTNUM"] = pd.to_numeric(result["EVENTNUM"], errors="coerce")
     result = result.dropna(subset=["EVENTNUM"])
     result["EVENTNUM"] = result["EVENTNUM"].astype(int)
+    return result
+
+
+def _ensure_period_int(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Ensure PERIOD is an int column before period comparisons and insertions.
+    """
+    result = df.copy()
+    result["PERIOD"] = pd.to_numeric(result["PERIOD"], errors="coerce")
+    result = result.dropna(subset=["PERIOD"])
+    result["PERIOD"] = result["PERIOD"].astype(int)
+    return result
+
+
+def _ensure_eventmsgtype_int(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Ensure EVENTMSGTYPE is an int column before event-type comparisons.
+    """
+    result = df.copy()
+    result["EVENTMSGTYPE"] = pd.to_numeric(result["EVENTMSGTYPE"], errors="coerce")
+    result = result.dropna(subset=["EVENTMSGTYPE"])
+    result["EVENTMSGTYPE"] = result["EVENTMSGTYPE"].astype(int)
     return result
 
 
@@ -90,8 +114,55 @@ def dedupe_with_v3(
     return df
 
 
-def _period_start_clock(period: int) -> str:
-    return "12:00" if int(period) <= 4 else "5:00"
+def _normalize_game_id_for_inference(
+    game_id: object | None,
+    league: str | None = None,
+) -> str:
+    return normalize_game_id(game_id, league=league)
+
+
+def _infer_league_from_game_id(game_id: object | None) -> str | None:
+    raw_game_id = _normalize_game_id_for_inference(game_id)
+    if raw_game_id.startswith(pbpstats.NBA_GAME_ID_PREFIX):
+        return pbpstats.NBA_STRING
+    if raw_game_id.startswith(pbpstats.WNBA_GAME_ID_PREFIX):
+        return pbpstats.WNBA_STRING
+    if raw_game_id.startswith(pbpstats.G_LEAGUE_GAME_ID_PREFIX):
+        return pbpstats.G_LEAGUE_STRING
+    return None
+
+
+def _infer_season_year_from_game_id(game_id: object | None) -> int | None:
+    raw_game_id = _normalize_game_id_for_inference(game_id)
+    if len(raw_game_id) < 5:
+        return None
+    try:
+        suffix = int(raw_game_id[3:5])
+    except ValueError:
+        return None
+    return 2000 + suffix if suffix < 90 else 1900 + suffix
+
+
+def _uses_wnba_twenty_minute_halves(
+    league: str | None,
+    season_year: int | None,
+) -> bool:
+    return uses_wnba_twenty_minute_halves(league, season_year)
+
+
+def _period_start_clock(
+    period: int,
+    league: str | None = None,
+    season_year: int | None = None,
+) -> str:
+    period = int(period)
+    if _uses_wnba_twenty_minute_halves(league, season_year):
+        return "20:00" if period <= 2 else "5:00"
+    if period > 4:
+        return "5:00"
+    if league == pbpstats.WNBA_STRING:
+        return "10:00"
+    return "12:00"
 
 
 def _build_start_of_period_row(
@@ -99,6 +170,8 @@ def _build_start_of_period_row(
     game_id: str,
     period: int,
     eventnum: int,
+    league: str | None = None,
+    season_year: int | None = None,
 ) -> Dict[str, object]:
     row: Dict[str, object] = {c: None for c in cols}
 
@@ -113,7 +186,11 @@ def _build_start_of_period_row(
     if "PERIOD" in cols:
         row["PERIOD"] = period
     if "PCTIMESTRING" in cols:
-        row["PCTIMESTRING"] = _period_start_clock(period)
+        row["PCTIMESTRING"] = _period_start_clock(
+            period,
+            league=league,
+            season_year=season_year,
+        )
 
     for fld in [
         "PLAYER1_ID",
@@ -139,7 +216,9 @@ def _insert_row_before_period(
 ) -> pd.DataFrame:
     period_mask = df["PERIOD"] == period
     if not period_mask.any():
-        return pd.concat([df, pd.DataFrame([row], columns=df.columns)], ignore_index=True)
+        return pd.concat(
+            [df, pd.DataFrame([row], columns=df.columns)], ignore_index=True
+        )
 
     insert_at = int(df.index[period_mask][0])
     return pd.concat(
@@ -152,7 +231,11 @@ def _insert_row_before_period(
     )
 
 
-def _move_existing_period_start_before_initial_live_action(df: pd.DataFrame) -> pd.DataFrame:
+def _move_existing_period_start_before_initial_live_action(
+    df: pd.DataFrame,
+    league: str | None = None,
+    season_year: int | None = None,
+) -> pd.DataFrame:
     """
     Move an existing StartOfPeriod marker ahead of malformed live action at the
     exact period-start clock, without changing other intra-period ordering.
@@ -193,10 +276,14 @@ def _move_existing_period_start_before_initial_live_action(df: pd.DataFrame) -> 
             prior_period_indices = [
                 idx for idx in period_indices if idx < first_start_idx
             ]
-            start_clock = _period_start_clock(period)
-            prior_clocks = result.loc[
-                prior_period_indices, "PCTIMESTRING"
-            ].astype(str).str.strip()
+            start_clock = _period_start_clock(
+                period,
+                league=league,
+                season_year=season_year,
+            )
+            prior_clocks = (
+                result.loc[prior_period_indices, "PCTIMESTRING"].astype(str).str.strip()
+            )
             if not prior_clocks.eq(start_clock).all():
                 continue
 
@@ -218,8 +305,9 @@ def _move_existing_period_start_before_initial_live_action(df: pd.DataFrame) -> 
 
 def patch_start_of_periods(
     game_df: pd.DataFrame,
-    game_id: str,
+    game_id: object,
     fetch_pbp_v3_fn: FetchPbpV3Fn | None = None,
+    league: str | None = None,
 ) -> pd.DataFrame:
     """
     Ensure there is at least one StartOfPeriod (EVENTMSGTYPE == 12) row for
@@ -235,7 +323,12 @@ def patch_start_of_periods(
     if "EVENTMSGTYPE" not in df.columns or "PERIOD" not in df.columns:
         return df
 
-    df = _ensure_eventnum_int(df)
+    df = _ensure_eventmsgtype_int(_ensure_period_int(_ensure_eventnum_int(df)))
+    resolved_game_id = _normalize_game_id_for_inference(game_id, league=league)
+    resolved_league = league or _infer_league_from_game_id(resolved_game_id)
+    resolved_season_year = _infer_season_year_from_game_id(resolved_game_id)
+    if "GAME_ID" in df.columns:
+        df["GAME_ID"] = resolved_game_id
     cols = list(df.columns)
 
     existing_periods = set(
@@ -244,31 +337,49 @@ def patch_start_of_periods(
 
     if 1 not in existing_periods and (df["PERIOD"] == 1).any():
         min_evnum_q1 = int(df.loc[df["PERIOD"] == 1, "EVENTNUM"].min())
-        q1_row = _build_start_of_period_row(cols, game_id, 1, min_evnum_q1 - 1)
+        q1_row = _build_start_of_period_row(
+            cols,
+            resolved_game_id,
+            1,
+            min_evnum_q1 - 1,
+            league=resolved_league,
+            season_year=resolved_season_year,
+        )
         df = pd.concat([pd.DataFrame([q1_row], columns=cols), df], ignore_index=True)
         existing_periods.add(1)
 
     all_periods_in_game = set(df["PERIOD"].dropna().astype(int).unique())
     missing_periods = all_periods_in_game - existing_periods
     if not missing_periods or fetch_pbp_v3_fn is None:
-        return _move_existing_period_start_before_initial_live_action(df)
+        return _move_existing_period_start_before_initial_live_action(
+            df,
+            league=resolved_league,
+            season_year=resolved_season_year,
+        )
 
-    df_v3 = fetch_pbp_v3_fn(game_id)
+    df_v3 = fetch_pbp_v3_fn(resolved_game_id)
     if (
         df_v3 is None
         or df_v3.empty
         or "actionType" not in df_v3.columns
         or "subType" not in df_v3.columns
     ):
-        return _move_existing_period_start_before_initial_live_action(df)
+        return _move_existing_period_start_before_initial_live_action(
+            df,
+            league=resolved_league,
+            season_year=resolved_season_year,
+        )
 
-    mask = (
-        df_v3["actionType"].astype(str).str.lower().eq("period")
-        & df_v3["subType"].astype(str).str.lower().eq("start")
-    )
+    mask = df_v3["actionType"].astype(str).str.lower().eq("period") & df_v3[
+        "subType"
+    ].astype(str).str.lower().eq("start")
     starts = df_v3.loc[mask]
     if starts.empty:
-        return _move_existing_period_start_before_initial_live_action(df)
+        return _move_existing_period_start_before_initial_live_action(
+            df,
+            league=resolved_league,
+            season_year=resolved_season_year,
+        )
 
     period_to_eventnum: Dict[int, int] = {}
     for _, row in starts.iterrows():
@@ -287,13 +398,19 @@ def patch_start_of_periods(
     for period in sorted(period_to_eventnum):
         start_row = _build_start_of_period_row(
             cols,
-            game_id,
+            resolved_game_id,
             period,
             period_to_eventnum[period],
+            league=resolved_league,
+            season_year=resolved_season_year,
         )
         df = _insert_row_before_period(df, start_row, period)
 
-    return _move_existing_period_start_before_initial_live_action(df)
+    return _move_existing_period_start_before_initial_live_action(
+        df,
+        league=resolved_league,
+        season_year=resolved_season_year,
+    )
 
 
 def enrich_clocks_with_v3(

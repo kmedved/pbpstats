@@ -1,5 +1,5 @@
 {
-  "arch_version": "1.5.0",
+  "arch_version": "1.5.2",
   "behavior_snapshot": {
     "archetype": {
       "primary": "Library / SDK",
@@ -191,6 +191,16 @@
           "key": "9"
         }
       ]
+    },
+    "offline_league_resolution": {
+      "default": "infer from game_id prefix, fallback nba",
+      "override_arg": "league",
+      "overtime_period_clock": "5:00",
+      "standard_regulation_period_count": 4,
+      "wnba_four_quarters_start_season": 2006,
+      "wnba_modern_regulation_period_clock": "10:00",
+      "wnba_pre_2006_regulation_period_clock": "20:00",
+      "wnba_pre_2006_regulation_period_count": 2
     },
     "offline_pipeline": [
       "_ensure_eventnum_int",
@@ -523,11 +533,13 @@
     "pbpstats/data_loader/stats_nba/summary/loader.py",
     "pbpstats/data_loader/stats_nba/summary/web.py",
     "pbpstats/data_loader/stats_nba/web_loader.py",
+    "pbpstats/game_id.py",
     "pbpstats/objects/__init__.py",
     "pbpstats/objects/day.py",
     "pbpstats/objects/game.py",
     "pbpstats/objects/season.py",
     "pbpstats/offline/__init__.py",
+    "pbpstats/offline/nba_on_court.py",
     "pbpstats/offline/ordering.py",
     "pbpstats/offline/processor.py",
     "pbpstats/offline/row_overrides.py",
@@ -652,6 +664,7 @@
     "tests/objects/test_game.py",
     "tests/objects/test_season.py",
     "tests/resources/test_boxscore.py",
+    "tests/resources/test_enhanced_pbp_item.py",
     "tests/resources/test_event_stats_contract.py",
     "tests/resources/test_field_goal.py",
     "tests/resources/test_foul.py",
@@ -665,9 +678,11 @@
     "tests/resources/test_stats_nba_factory.py",
     "tests/test_client.py",
     "tests/test_context_framework.py",
+    "tests/test_game_id.py",
     "tests/test_intraperiod_lineup_repair.py",
     "tests/test_lineup_window_overrides.py",
     "tests/test_offline_boxscore_loader.py",
+    "tests/test_offline_nba_on_court.py",
     "tests/test_offline_ordering.py",
     "tests/test_offline_repair.py",
     "tests/test_offline_row_overrides.py",
@@ -715,6 +730,7 @@
     ],
     "offline": [
       "data_loader.core",
+      "package.constants",
       "resources.core",
       "resources.enhanced_pbp"
     ],
@@ -838,10 +854,16 @@
     "offline": {
       "PbpProcessor": {
         "properties": [],
-        "signature": "(self, game_id, raw_data_dicts, rebound_deletions_list=..., boxscore_source_loader=..., period_boxscore_source_loader=..., file_directory=...)"
+        "signature": "(self, game_id, raw_data_dicts, rebound_deletions_list=..., boxscore_source_loader=..., period_boxscore_source_loader=..., file_directory=..., league=...)"
       },
       "get_possessions_from_df": {
-        "signature": "(game_df, fetch_pbp_v3_fn=..., rebound_deletions_list=..., boxscore_source_loader=..., period_boxscore_source_loader=..., file_directory=...)"
+        "signature": "(game_df, fetch_pbp_v3_fn=..., rebound_deletions_list=..., boxscore_source_loader=..., period_boxscore_source_loader=..., file_directory=..., league=...)"
+      },
+      "get_possessions_from_nba_on_court": {
+        "signature": "(season, game_id, league=..., season_type=..., path=..., fetch_pbp_v3_fn=..., rebound_deletions_list=..., boxscore_source_loader=..., period_boxscore_source_loader=..., file_directory=...)"
+      },
+      "load_nba_on_court_pbp": {
+        "signature": "(season, league=..., season_type=..., path=...)"
       },
       "set_rebound_strict_mode": {
         "signature": "(strict=...)"

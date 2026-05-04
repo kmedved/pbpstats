@@ -10,6 +10,7 @@ from pbpstats import (
     WNBA_GAME_ID_PREFIX,
     WNBA_STRING,
 )
+from pbpstats.game_id import is_overtime_period, normalize_game_id
 from pbpstats.overrides import IntDecoder
 from pbpstats.resources.enhanced_pbp import FieldGoal, Foul, FreeThrow, StartOfPeriod
 from pbpstats.resources.enhanced_pbp.intraperiod_lineup_repair import (
@@ -48,6 +49,12 @@ class NbaEnhancedPbpLoader(object):
         player_game_fouls = defaultdict(int)
         fouls_to_give = defaultdict(lambda: 4)
         score = defaultdict(int)
+        season_year = self._infer_season_year()
+        league = (
+            getattr(self, "league", None)
+            or self._infer_league_from_game_id()
+            or NBA_STRING
+        )
         for i, event in enumerate(self.items):
             event.previous_event_any_period = self.items[i - 1] if i > 0 else None
             event.next_event_any_period = (
@@ -60,10 +67,10 @@ class NbaEnhancedPbpLoader(object):
                 event.previous_event = None
                 event.next_event = self.items[i + 1] if i < len(self.items) - 1 else None
                 self.start_period_indices.append(i)
-                if event.period <= 4:
-                    fouls_to_give = defaultdict(lambda: 4)
-                else:
+                if is_overtime_period(event.period, league, season_year):
                     fouls_to_give = defaultdict(lambda: 3)
+                else:
+                    fouls_to_give = defaultdict(lambda: 4)
             elif i == len(self.items) - 1 or event.period != self.items[i + 1].period:
                 event.previous_event = self.items[i - 1]
                 event.next_event = None
@@ -230,10 +237,10 @@ class NbaEnhancedPbpLoader(object):
         return None
 
     def _normalize_game_id_for_inference(self):
-        raw_game_id = str(getattr(self, "game_id", "") or "").strip()
-        if raw_game_id.isdigit() and len(raw_game_id) < 10:
-            return raw_game_id.zfill(10)
-        return raw_game_id
+        return normalize_game_id(
+            getattr(self, "game_id", ""),
+            league=getattr(self, "league", None),
+        )
 
     def _load_possession_changing_event_overrides(self):
         """

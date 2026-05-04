@@ -18,16 +18,65 @@ Tested on Python 3.10-3.12
 pip install pbpstats
 ```
 
-# LLM Context
-LLM-facing context artifacts live in `context/`.
+# Offline data from nba-on-court / nba_data
+The dataframe offline path can process stats-style play-by-play from parquet,
+CSV, or any other source via `get_possessions_from_df`. For NBA and WNBA data
+from the `nba_data` repository, pbpstats also includes an optional
+`nba-on-court` adapter.
 
-- Start with `context/REPO_ARCHITECTURE.md`
+Install the optional source package only if you plan to use this adapter:
+
+```
+pip install git+https://github.com/shufinskiy/nba-on-court.git
+```
+
+Discover available game IDs for a season:
+
+```python
+import pbpstats
+from pbpstats.offline import load_nba_on_court_pbp
+
+nba_pbp = load_nba_on_court_pbp(2023, league=pbpstats.NBA_STRING)
+wnba_pbp = load_nba_on_court_pbp(2025, league=pbpstats.WNBA_STRING)
+
+print(nba_pbp["GAME_ID"].drop_duplicates().head())
+print(wnba_pbp["GAME_ID"].drop_duplicates().head())
+```
+
+Build possessions for one NBA or WNBA game:
+
+```python
+import pbpstats
+from pbpstats.offline import get_possessions_from_nba_on_court
+
+nba_possessions = get_possessions_from_nba_on_court(
+    season=2023,
+    game_id="0022300001",
+    league=pbpstats.NBA_STRING,
+)
+
+wnba_possessions = get_possessions_from_nba_on_court(
+    season=2025,
+    game_id="1022500001",
+    league=pbpstats.WNBA_STRING,
+)
+```
+
+The adapter is a convenience loader only. `nba-on-court` is not a required
+runtime dependency for pbpstats, and direct dataframe/parquet workflows should
+continue to use `get_possessions_from_df`.
+
+# LLM Context
+LLM-facing context artifacts live in `context/` as optional navigation aids.
+
+- Use `context/REPO_ARCHITECTURE.md` as the repo map
 - For guided context, add one `context/COMPRESSED_*.md`
 - For oracle workflows, add `context/FILE_INDEX.md`
 - For implementation tasks, add raw source for the touched files
 
-Refresh checked-in context artifacts with `python scripts/generate_repo_architecture_sync.py`.
-Refresh local bundles with `python scripts/build_context_bundle.py`.
+Runtime changes do not require companion context-artifact updates.
+When intentionally refreshing context docs, use `python scripts/generate_repo_architecture_sync.py`.
+When intentionally refreshing local bundles, use `python scripts/build_context_bundle.py`.
 Version policy: Policy B, so only shipped/runtime behavior changes require a version bump.
 
 # stats.nba.com PBP Endpoint Strategy

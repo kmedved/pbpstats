@@ -1,6 +1,6 @@
 Use this for oracle workflows when you want the model to request exact files by path.
 Pair with `context/REPO_ARCHITECTURE.md`, not instead of it.
-For implementation work, still provide raw source of the files you expect to edit.
+For implementation work, prefer raw source of the files you expect to edit.
 
 # File Index
 
@@ -25,6 +25,7 @@ For implementation work, still provide raw source of the files you expect to edi
 ## pbpstats
 - `pbpstats/__init__.py`
 - `pbpstats/client.py`
+- `pbpstats/game_id.py`
 - `pbpstats/overrides.py`
 
 ## pbpstats/data_loader
@@ -129,6 +130,7 @@ For implementation work, still provide raw source of the files you expect to edi
 
 ## pbpstats/offline
 - `pbpstats/offline/__init__.py`
+- `pbpstats/offline/nba_on_court.py`
 - `pbpstats/offline/ordering.py`
 - `pbpstats/offline/processor.py`
 - `pbpstats/offline/row_overrides.py`
@@ -236,9 +238,11 @@ For implementation work, still provide raw source of the files you expect to edi
 - `tests/conftest.py`
 - `tests/test_client.py`
 - `tests/test_context_framework.py`
+- `tests/test_game_id.py`
 - `tests/test_intraperiod_lineup_repair.py`
 - `tests/test_lineup_window_overrides.py`
 - `tests/test_offline_boxscore_loader.py`
+- `tests/test_offline_nba_on_court.py`
 - `tests/test_offline_ordering.py`
 - `tests/test_offline_repair.py`
 - `tests/test_offline_row_overrides.py`
@@ -274,6 +278,7 @@ For implementation work, still provide raw source of the files you expect to edi
 
 ## tests/resources
 - `tests/resources/test_boxscore.py`
+- `tests/resources/test_enhanced_pbp_item.py`
 - `tests/resources/test_event_stats_contract.py`
 - `tests/resources/test_field_goal.py`
 - `tests/resources/test_foul.py`

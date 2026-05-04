@@ -1,19 +1,9 @@
 import json
 import re
-import sys
-from pathlib import Path
-
-REPO_ROOT = Path(__file__).resolve().parents[1]
-if str(REPO_ROOT) not in sys.path:
-    sys.path.insert(0, str(REPO_ROOT))
 
 from scripts.context_framework import (
     BUNDLE_CONTRACT,
     build_sync_data,
-    collect_behavior_snapshot,
-    collect_file_inventory,
-    collect_module_dependencies,
-    collect_public_contracts,
     count_tokens,
     render_bundle,
     render_checked_in_artifacts,
@@ -22,46 +12,49 @@ from scripts.context_framework import (
 )
 
 
-def _read(relative_path):
-    return (REPO_ROOT / relative_path).read_text(encoding="utf-8")
+def _rendered_artifacts():
+    return render_checked_in_artifacts(build_sync_data())
 
 
-def _sync_json():
-    return json.loads(_read("context/REPO_ARCHITECTURE_SYNC.json"))
+def _rendered_architecture():
+    return _rendered_artifacts()["context/REPO_ARCHITECTURE.md"]
 
 
-def test_checked_in_context_artifacts_match_renderer():
-    expected = render_checked_in_artifacts(build_sync_data())
-    for relative_path, contents in expected.items():
-        assert _read(relative_path) == contents
+def _rendered_sync_json():
+    return json.loads(_rendered_artifacts()["context/REPO_ARCHITECTURE_SYNC.json"])
 
 
-def test_version_matches_source_of_truth_and_doc():
+def test_context_artifact_renderer_returns_expected_files():
+    artifacts = _rendered_artifacts()
+    assert set(artifacts) == {
+        "context/FILE_INDEX.md",
+        "context/REPO_ARCHITECTURE.md",
+        "context/REPO_ARCHITECTURE_SYNC.json",
+        "context/START_HERE.md",
+    }
+    for contents in artifacts.values():
+        assert contents.endswith("\n")
+
+
+def test_rendered_version_matches_source_of_truth_and_doc():
     version = read_version()
-    sync_data = _sync_json()
-    architecture = _read("context/REPO_ARCHITECTURE.md")
+    sync_data = _rendered_sync_json()
+    architecture = _rendered_architecture()
     assert sync_data["arch_version"] == version
     assert "Architecture sync version: %s" % version in architecture
 
 
-def test_file_inventory_matches_scoped_walk():
-    assert _sync_json()["file_inventory"] == collect_file_inventory()
-
-
-def test_behavior_snapshot_matches_live_source():
-    assert _sync_json()["behavior_snapshot"] == collect_behavior_snapshot()
-
-
-def test_module_dependencies_match_static_analysis():
-    assert _sync_json()["module_dependencies"] == collect_module_dependencies()
-
-
-def test_public_contracts_match_introspection_snapshot():
-    assert _sync_json()["public_contracts"] == collect_public_contracts()
+def test_build_sync_data_populates_expected_sections():
+    sync_data = build_sync_data()
+    assert "pbpstats/client.py" in sync_data["file_inventory"]
+    assert sync_data["behavior_snapshot"]["supported_sources"] == ["file", "web"]
+    assert "client" in sync_data["public_contracts"]
+    assert "resources.core" in sync_data["module_dependencies"]
+    assert sync_data["bundle_contract"] == BUNDLE_CONTRACT
 
 
 def test_required_headings_exist():
-    architecture = _read("context/REPO_ARCHITECTURE.md")
+    architecture = _rendered_architecture()
     required_headings = [
         "## TL;DR",
         "## Behavior / Routing Matrix",
@@ -78,19 +71,19 @@ def test_required_headings_exist():
 
 
 def test_architecture_doc_fits_token_budget():
-    architecture = _read("context/REPO_ARCHITECTURE.md")
+    architecture = _rendered_architecture()
     assert count_tokens(architecture) <= 4000
 
 
 def test_start_here_mentions_guided_and_oracle_workflows():
-    start_here = _read("context/START_HERE.md")
+    start_here = _rendered_artifacts()["context/START_HERE.md"]
     assert "Default:" in start_here
     assert "Oracle:" in start_here
     assert "raw source" in start_here
 
 
 def test_bundle_contract_names_match_architecture_doc_tables():
-    architecture = _read("context/REPO_ARCHITECTURE.md")
+    architecture = _rendered_architecture()
     declared_bundle_names = {bundle["name"] for bundle in BUNDLE_CONTRACT["bundles"]}
     referenced_bundle_names = set(
         re.findall(r"`(COMPRESSED_[^`]+\.md)`", architecture)
@@ -112,7 +105,7 @@ def test_bundle_contract_names_match_architecture_doc_tables():
 
 
 def test_bundle_renderer_and_budget_use_stable_names():
-    architecture = _read("context/REPO_ARCHITECTURE.md")
+    architecture = _rendered_architecture()
     rendered_bundles = {}
     for bundle in BUNDLE_CONTRACT["bundles"]:
         rendered = render_bundle(bundle["name"], bundle["purpose"])

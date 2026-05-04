@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from typing import List, Optional
 
 import pbpstats
+from pbpstats.game_id import normalize_game_id
 from pbpstats.resources.enhanced_pbp import (
     FieldGoal,
     FreeThrow,
@@ -174,10 +175,7 @@ def _is_retained_kicked_ball(event, possession_changed: bool) -> bool:
 
 
 def _normalize_game_id_for_inference(game_id) -> str:
-    game_id = str(game_id or "").strip()
-    if game_id.isdigit() and len(game_id) < 10:
-        return game_id.zfill(10)
-    return game_id
+    return normalize_game_id(game_id)
 
 
 def _infer_league_from_game_id(game_id) -> Optional[str]:

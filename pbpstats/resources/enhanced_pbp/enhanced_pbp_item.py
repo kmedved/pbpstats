@@ -6,6 +6,7 @@ import abc
 import logging
 
 import pbpstats
+from pbpstats.game_id import normalize_game_id, uses_wnba_twenty_minute_halves
 from pbpstats.resources.enhanced_pbp import FieldGoal, Foul, FreeThrow, Rebound
 
 logger = logging.getLogger(__name__)
@@ -336,19 +337,65 @@ class EnhancedPbpItem(metaclass=abc.ABCMeta):
         if self.previous_event is None:
             return 0
         prev_period = getattr(self.previous_event, "period", None)
-        if self.seconds_remaining == 720 and prev_period != self.period:
-            # Between-period subs (live data) where previous event is from a
-            # different period.  Without this guard the result would be negative
-            # (e.g. 0 - 720 = -720).
+        if prev_period != self.period and self._is_at_period_start_clock():
+            # Between-period subs or start markers where previous_event is from a
+            # different period. Without this guard the result would be negative.
             return 0
-        if (
-            self.seconds_remaining == 300
-            and self.period > 4
-            and prev_period != self.period
-        ):
-            # Same guard for overtime period boundaries.
-            return 0
-        return self.previous_event.seconds_remaining - self.seconds_remaining
+        elapsed = self.previous_event.seconds_remaining - self.seconds_remaining
+        return max(elapsed, 0)
+
+    def _normalize_game_id_for_inference(self):
+        return normalize_game_id(
+            getattr(self, "game_id", ""),
+            league=getattr(self, "loader_league", None),
+        )
+
+    def _infer_league_from_game_id(self):
+        game_id = self._normalize_game_id_for_inference()
+        if game_id.startswith(pbpstats.NBA_GAME_ID_PREFIX):
+            return pbpstats.NBA_STRING
+        if game_id.startswith(pbpstats.WNBA_GAME_ID_PREFIX):
+            return pbpstats.WNBA_STRING
+        if game_id.startswith(pbpstats.G_LEAGUE_GAME_ID_PREFIX):
+            return pbpstats.G_LEAGUE_STRING
+        return None
+
+    def _infer_season_year_from_game_id(self):
+        game_id = self._normalize_game_id_for_inference()
+        if len(game_id) < 5:
+            return None
+        try:
+            suffix = int(game_id[3:5])
+        except ValueError:
+            return None
+        return 2000 + suffix if suffix < 90 else 1900 + suffix
+
+    def _period_start_seconds(self):
+        try:
+            period = int(self.period)
+        except (TypeError, ValueError):
+            return 720.0
+
+        league = (
+            getattr(self, "loader_league", None)
+            or self._infer_league_from_game_id()
+            or pbpstats.NBA_STRING
+        )
+        season_year = self._infer_season_year_from_game_id()
+        if uses_wnba_twenty_minute_halves(league, season_year):
+            return 1200.0 if period <= 2 else 300.0
+        if period > 4:
+            return 300.0
+        if league == pbpstats.WNBA_STRING:
+            return 600.0
+        return 720.0
+
+    def _is_at_period_start_clock(self):
+        try:
+            seconds_remaining = float(self.seconds_remaining)
+        except (TypeError, ValueError):
+            return False
+        return abs(seconds_remaining - self._period_start_seconds()) <= 0.001
 
     def is_second_chance_event(self):
         """

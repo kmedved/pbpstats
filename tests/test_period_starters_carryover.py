@@ -10,8 +10,10 @@ from pbpstats.resources.enhanced_pbp import (
     EndOfPeriod,
     Foul,
     FreeThrow,
+    JumpBall,
     Substitution,
 )
+from pbpstats.data_loader.nba_enhanced_pbp_loader import NbaEnhancedPbpLoader
 from pbpstats.resources.enhanced_pbp.start_of_period import (
     InvalidNumberOfStartersException,
     StartOfPeriod,
@@ -57,6 +59,14 @@ class DummyEvent:
         self.player3_id = player3_id
         self.team_id = team_id
         self.player1_team_id = player1_team_id
+        self.period = period
+        self.seconds_remaining = seconds_remaining
+        self.next_event = next_event
+
+
+class DummyJumpBall(JumpBall):
+    def __init__(self, *, team_id, period=1, seconds_remaining=720.0, next_event=None):
+        self.team_id = team_id
         self.period = period
         self.seconds_remaining = seconds_remaining
         self.next_event = next_event
@@ -342,6 +352,170 @@ class DummyStatsStart(StatsStartOfPeriod):
     period = 2
 
 
+class DummyEnhancedLoader(NbaEnhancedPbpLoader):
+    def __init__(self, *, game_id, league, items):
+        self.game_id = game_id
+        self.league = league
+        self.items = items
+        self.file_directory = None
+        self.data_provider = "stats_nba"
+
+    def _set_period_start_items(self):
+        pass
+
+    def _build_generated_intraperiod_lineup_override_lookup(self):
+        return {}
+
+    def _merge_generated_lineup_override_lookup(self, generated_lookup):
+        pass
+
+    def _annotate_shot_clock(self):
+        pass
+
+
+def test_wnba_pre_2006_period_start_helpers_use_twenty_minute_halves():
+    start = DummyStart()
+    start.game_id = 1029700001.0
+    start.period = 2
+
+    assert start._get_period_start_seconds() == 1200.0
+    assert start._get_period_start_tenths() == 12000
+
+    start.period = 3
+
+    assert start._get_period_start_seconds() == 300.0
+    assert start._get_period_start_tenths() == 24000
+
+
+def test_wnba_pre_2006_overtime_start_uses_jump_ball_winner():
+    start = DummyStart()
+    start.game_id = "1029700001"
+    start.period = 3
+    start.next_event = DummyJumpBall(
+        team_id=TEAM_B,
+        period=3,
+        seconds_remaining=300.0,
+    )
+
+    assert start.get_team_starting_with_ball() == TEAM_B
+
+
+def test_wnba_pre_2006_overtime_start_uses_overtime_fouls_to_give():
+    start = DummyStart()
+    start.game_id = "1029700001"
+    start.period = 3
+    start.seconds_remaining = 300.0
+    start.event_num = 100
+    next_event = DummyEvent(period=3, seconds_remaining=299.0)
+    next_event.event_num = 101
+    loader = DummyEnhancedLoader(
+        game_id="1029700001",
+        league="wnba",
+        items=[start, next_event],
+    )
+
+    loader._add_extra_attrs_to_all_events()
+
+    assert start.fouls_to_give[TEAM_A] == 3
+
+
+def test_wnba_modern_period_start_helpers_use_ten_minute_quarters():
+    start = DummyStart()
+    start.game_id = "1020600001"
+    start.period = 4
+
+    assert start._get_period_start_seconds() == 600.0
+    assert start._get_period_start_tenths() == 18000
+
+    start.period = 5
+
+    assert start._get_period_start_seconds() == 300.0
+    assert start._get_period_start_tenths() == 24000
+
+
+def test_start_of_period_league_prefers_loader_override():
+    start = DummyStart()
+    start.game_id = "0022500234"
+    start.loader_league = "wnba"
+
+    assert start.league == "wnba"
+    assert start.league_url_part == "wnba"
+    assert (
+        start._get_period_boxscore_request_params("rt2_start_window")["GameId"]
+        == "1022500234"
+    )
+
+    start.loader_league = "gleague"
+
+    assert start.league_url_part == "gleague.nba"
+
+
+def test_wnba_period_start_technical_ft_is_not_starter_evidence():
+    start = DummyStart()
+    start.game_id = "1022500001"
+    start.period = 2
+    start.seconds_remaining = 600.0
+    tech_ft = DummyFreeThrow(
+        player1_id=99,
+        team_id=TEAM_A,
+        seconds_remaining=600.0,
+        period=2,
+        clock="10:00",
+    )
+    live_event = DummyEvent(
+        player1_id=1,
+        team_id=TEAM_A,
+        period=2,
+        seconds_remaining=599.0,
+    )
+    end = DummyEnd()
+    _link_events(start, tech_ft, live_event, end)
+
+    starters, _, _, _ = start._get_players_who_started_period_with_team_map()
+
+    assert 99 not in starters
+    assert 1 in starters
+
+
+@pytest.mark.parametrize(
+    "period,start_seconds,live_seconds,clock",
+    [
+        (2, 1200.0, 1199.0, "20:00"),
+        (3, 300.0, 299.0, "5:00"),
+    ],
+)
+def test_wnba_pre_2006_period_start_technical_ft_is_not_starter_evidence(
+    period,
+    start_seconds,
+    live_seconds,
+    clock,
+):
+    start = DummyStart()
+    start.game_id = "1029700001"
+    start.period = period
+    start.seconds_remaining = start_seconds
+    tech_ft = DummyFreeThrow(
+        player1_id=99,
+        team_id=TEAM_A,
+        seconds_remaining=start_seconds,
+        period=period,
+        clock=clock,
+    )
+    live_event = DummyEvent(
+        player1_id=1,
+        team_id=TEAM_A,
+        period=period,
+        seconds_remaining=live_seconds,
+    )
+    end = DummyEnd()
+    _link_events(start, tech_ft, live_event, end)
+
+    starters, _, _, _ = start._get_players_who_started_period_with_team_map()
+
+    assert 99 not in starters
+    assert 1 in starters
+
+
 def _link_events(*events):
     for index, event in enumerate(events[:-1]):
         event.next_event = events[index + 1]
@@ -547,7 +721,7 @@ def test_fill_missing_starters_still_treats_plain_period_start_sub_as_pre_cluste
     assert result[TEAM_A] == [1, 2, 3, 4]
 
 
-def test_fill_missing_starters_keeps_outgoing_player_for_pre_marker_same_clock_technical_ft_cluster():
+def test_fill_missing_starters_keeps_outgoing_player_for_pre_marker_same_clock_technical_ft_cluster_with_marker_event():
     end = DummyEnd()
     tech_ft = DummyFreeThrow(
         player1_id=5,
@@ -589,7 +763,7 @@ def test_fill_missing_starters_keeps_outgoing_player_for_pre_marker_same_clock_t
     assert result[TEAM_A] == [1, 2, 3, 4, 5]
 
 
-def test_fill_missing_starters_keeps_outgoing_player_for_pre_marker_same_clock_flagrant_ft_cluster():
+def test_fill_missing_starters_keeps_outgoing_player_for_pre_marker_same_clock_flagrant_ft_cluster_with_marker_event():
     end = DummyEnd()
     opponent_ft = DummyFreeThrow(
         player1_id=12,
@@ -638,7 +812,7 @@ def test_fill_missing_starters_keeps_outgoing_player_for_pre_marker_same_clock_f
     assert result[TEAM_A] == [1, 2, 3, 4, 5]
 
 
-def test_fill_missing_starters_keeps_outgoing_player_for_pre_marker_same_clock_technical_ft_cluster():
+def test_fill_missing_starters_keeps_outgoing_player_for_pre_marker_same_clock_technical_ft_cluster_with_pre_marker_sub():
     end = DummyEnd()
     tech_ft = DummyFreeThrow(
         player1_id=5,
@@ -680,7 +854,7 @@ def test_fill_missing_starters_keeps_outgoing_player_for_pre_marker_same_clock_t
     assert result[TEAM_A] == [1, 2, 3, 4, 5]
 
 
-def test_fill_missing_starters_keeps_outgoing_player_for_pre_marker_same_clock_flagrant_ft_cluster():
+def test_fill_missing_starters_keeps_outgoing_player_for_pre_marker_same_clock_flagrant_ft_cluster_with_pre_marker_sub():
     end = DummyEnd()
     second_flagrant_ft = DummyFreeThrow(
         player1_id=5,

@@ -14,12 +14,12 @@ from scripts.context_framework import render_checked_in_artifacts, write_artifac
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Generate checked-in context artifacts under context/."
+        description="Generate optional context artifacts under context/."
     )
     parser.add_argument(
         "--check",
         action="store_true",
-        help="Exit non-zero if checked-in artifacts are out of date.",
+        help="Exit non-zero if current context artifacts differ from the renderer.",
     )
     args = parser.parse_args()
 
