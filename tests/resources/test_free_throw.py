@@ -1,3 +1,7 @@
+from collections import defaultdict
+
+import pbpstats
+
 from pbpstats.resources.enhanced_pbp.data_nba.free_throw import DataFreeThrow
 from pbpstats.resources.enhanced_pbp.stats_nba.field_goal import StatsFieldGoal
 from pbpstats.resources.enhanced_pbp.stats_nba.foul import StatsFoul
@@ -9,6 +13,35 @@ class DummyReboundEvent:
 
     def __init__(self, team_id):
         self.team_id = team_id
+
+
+class CurrentPlayersSeed:
+    def __init__(self, current_players):
+        self._players = {
+            int(team_id): list(player_ids)
+            for team_id, player_ids in current_players.items()
+        }
+        self.game_id = "0020000001"
+        self.period = 3
+        self.clock = "3:49"
+        self.order = 0
+        self.seconds_remaining = 229.0
+        self.score = defaultdict(int)
+        self.player_game_fouls = defaultdict(int)
+        self.is_possession_ending_event = False
+        self.previous_event = None
+        self.next_event = None
+
+    @property
+    def current_players(self):
+        return {
+            int(team_id): list(player_ids)
+            for team_id, player_ids in self._players.items()
+        }
+
+    @property
+    def _raw_current_players(self):
+        return self.current_players
 
 
 def test_data_made_free_throw():
@@ -528,6 +561,221 @@ def test_flagrant_free_throw_type():
     ft_2_of_2_event.next_event = None
 
     assert ft_1_of_2_event.free_throw_type == "2 Shot Flagrant"
+
+
+def _stats_foul_event(event_num, event_action_type, player_id, team_id):
+    return StatsFoul(
+        {
+            "GAME_ID": "0020000001",
+            "EVENTNUM": event_num,
+            "PERIOD": 3,
+            "PCTIMESTRING": "3:49",
+            "VISITORDESCRIPTION": "Foul",
+            "EVENTMSGACTIONTYPE": event_action_type,
+            "EVENTMSGTYPE": 6,
+            "PLAYER1_ID": player_id,
+            "PLAYER1_TEAM_ID": team_id,
+            "PLAYER2_ID": 20,
+            "PLAYER2_TEAM_ID": 200,
+            "PLAYER3_ID": None,
+            "PLAYER3_TEAM_ID": None,
+        },
+        event_num,
+    )
+
+
+def _stats_free_throw_event(event_num, event_action_type, player_id, team_id, description):
+    return StatsFreeThrow(
+        {
+            "GAME_ID": "0020000001",
+            "EVENTNUM": event_num,
+            "PERIOD": 3,
+            "PCTIMESTRING": "3:49",
+            "HOMEDESCRIPTION": description,
+            "EVENTMSGACTIONTYPE": event_action_type,
+            "EVENTMSGTYPE": 3,
+            "PLAYER1_ID": player_id,
+            "PLAYER1_TEAM_ID": team_id,
+            "PLAYER2_ID": None,
+            "PLAYER2_TEAM_ID": None,
+            "PLAYER3_ID": None,
+            "PLAYER3_TEAM_ID": None,
+        },
+        event_num,
+    )
+
+
+def _wire_events(events):
+    for index, event in enumerate(events):
+        event.previous_event = events[index - 1] if index else None
+        event.next_event = events[index + 1] if index + 1 < len(events) else None
+    return events
+
+
+def test_event_for_efficiency_stats_keeps_normal_ft_context_after_same_player_technical():
+    shooting_foul = _stats_foul_event(388, 2, 14, 100)
+    ft1 = _stats_free_throw_event(389, 11, 20, 200, "Griner Free Throw 1 of 2 (1 PTS)")
+    technical_foul = _stats_foul_event(393, 11, 14, 100)
+    technical_ft = _stats_free_throw_event(
+        394, 10, 30, 200, "Taurasi Technical Free Throw 1 of 1 (1 PTS)"
+    )
+    ft2 = _stats_free_throw_event(395, 12, 20, 200, "Griner Free Throw 2 of 2 (2 PTS)")
+    _wire_events([shooting_foul, ft1, technical_foul, technical_ft, ft2])
+
+    assert ft1.event_for_efficiency_stats == shooting_foul
+    assert technical_ft.event_for_efficiency_stats == technical_foul
+    assert ft2.event_for_efficiency_stats == shooting_foul
+
+
+def test_interrupted_normal_ft_event_stats_use_original_foul_lineup(monkeypatch):
+    original_lineup = {
+        100: [10, 11, 12, 13, 14],
+        200: [20, 21, 22, 23, 24],
+    }
+    post_sub_lineup = {
+        100: [10, 11, 12, 13, 15],
+        200: [20, 21, 22, 23, 24],
+    }
+    shooting_foul = _stats_foul_event(388, 2, 14, 100)
+    ft1 = _stats_free_throw_event(389, 11, 20, 200, "Griner Free Throw 1 of 2 (1 PTS)")
+    technical_foul = _stats_foul_event(393, 11, 14, 100)
+    technical_ft = _stats_free_throw_event(
+        394, 10, 30, 200, "Taurasi Technical Free Throw 1 of 1 (1 PTS)"
+    )
+    ft2 = _stats_free_throw_event(395, 12, 20, 200, "Griner Free Throw 2 of 2 (2 PTS)")
+    _wire_events(
+        [
+            CurrentPlayersSeed(original_lineup),
+            shooting_foul,
+            ft1,
+            CurrentPlayersSeed(post_sub_lineup),
+            technical_foul,
+            technical_ft,
+            ft2,
+        ]
+    )
+    monkeypatch.setattr(StatsFreeThrow, "base_stats", property(lambda self: []))
+    monkeypatch.setattr(StatsFreeThrow, "is_penalty_event", lambda self: False)
+    monkeypatch.setattr(StatsFreeThrow, "is_second_chance_event", lambda self: False)
+
+    plus_minus_stats = [
+        stat
+        for stat in ft2.event_stats
+        if stat["stat_key"] == pbpstats.PLUS_MINUS_STRING
+    ]
+
+    assert any(
+        stat["player_id"] == 14 and stat["team_id"] == 100 and stat["stat_value"] == -1
+        for stat in plus_minus_stats
+    )
+    assert not any(stat["player_id"] == 15 for stat in plus_minus_stats)
+
+
+def test_event_for_efficiency_stats_keeps_2_of_3_context_after_same_player_technical():
+    shooting_foul = _stats_foul_event(388, 2, 14, 100)
+    ft1 = _stats_free_throw_event(389, 13, 20, 200, "Griner Free Throw 1 of 3 (1 PTS)")
+    ft2 = _stats_free_throw_event(390, 14, 20, 200, "Griner Free Throw 2 of 3 (2 PTS)")
+    technical_foul = _stats_foul_event(393, 11, 14, 100)
+    technical_ft = _stats_free_throw_event(
+        394, 10, 30, 200, "Taurasi Technical Free Throw 1 of 1 (1 PTS)"
+    )
+    ft3 = _stats_free_throw_event(395, 15, 20, 200, "Griner Free Throw 3 of 3 (3 PTS)")
+    _wire_events([shooting_foul, ft1, ft2, technical_foul, technical_ft, ft3])
+
+    assert ft3.event_for_efficiency_stats == shooting_foul
+
+
+def test_event_for_efficiency_stats_does_not_rewrite_first_normal_ft_after_technical():
+    shooting_foul = _stats_foul_event(388, 2, 14, 100)
+    technical_foul = _stats_foul_event(393, 11, 14, 100)
+    ft1 = _stats_free_throw_event(395, 11, 20, 200, "Griner Free Throw 1 of 2 (1 PTS)")
+    _wire_events([shooting_foul, technical_foul, ft1])
+
+    assert ft1.event_for_efficiency_stats == technical_foul
+
+
+def test_event_for_efficiency_stats_does_not_rewrite_ft2_when_technical_precedes_prior_ft():
+    shooting_foul = _stats_foul_event(388, 2, 14, 100)
+    technical_foul = _stats_foul_event(389, 11, 14, 100)
+    technical_ft = _stats_free_throw_event(
+        390, 10, 30, 200, "Taurasi Technical Free Throw 1 of 1 (1 PTS)"
+    )
+    ft1 = _stats_free_throw_event(391, 11, 20, 200, "Griner Free Throw 1 of 2 (1 PTS)")
+    ft2 = _stats_free_throw_event(392, 12, 20, 200, "Griner Free Throw 2 of 2 (2 PTS)")
+    _wire_events([shooting_foul, technical_foul, technical_ft, ft1, ft2])
+
+    assert ft1.event_for_efficiency_stats == technical_foul
+    assert ft2.event_for_efficiency_stats == technical_foul
+
+
+def test_event_for_efficiency_stats_does_not_rewrite_flagrant_context():
+    flagrant_foul = _stats_foul_event(388, 14, 14, 100)
+    ft1 = _stats_free_throw_event(
+        389, 11, 20, 200, "Griner Free Throw Flagrant 1 of 2 (1 PTS)"
+    )
+    technical_foul = _stats_foul_event(393, 11, 14, 100)
+    ft2 = _stats_free_throw_event(
+        395, 12, 20, 200, "Griner Free Throw Flagrant 2 of 2 (2 PTS)"
+    )
+    _wire_events([flagrant_foul, ft1, technical_foul, ft2])
+
+    assert ft2.event_for_efficiency_stats == technical_foul
+
+
+def test_event_for_efficiency_stats_does_not_rewrite_special_foul_contexts():
+    for action_type, description in [
+        (5, "Griner Free Throw Inbound 2 of 2 (2 PTS)"),
+        (6, "Griner Free Throw Away From Play 2 of 2 (2 PTS)"),
+        (9, "Griner Free Throw Clear Path 2 of 2 (2 PTS)"),
+        (31, "Griner Free Throw Transition Take 2 of 2 (2 PTS)"),
+    ]:
+        special_foul = _stats_foul_event(388, action_type, 14, 100)
+        ft1 = _stats_free_throw_event(
+            389, 11, 20, 200, description.replace("2 of 2", "1 of 2")
+        )
+        technical_foul = _stats_foul_event(393, 11, 14, 100)
+        ft2 = _stats_free_throw_event(395, 12, 20, 200, description)
+        _wire_events([special_foul, ft1, technical_foul, ft2])
+
+        assert ft2.event_for_efficiency_stats == technical_foul
+
+
+def test_event_for_efficiency_stats_does_not_rewrite_different_player_technical():
+    shooting_foul = _stats_foul_event(388, 2, 14, 100)
+    ft1 = _stats_free_throw_event(389, 11, 20, 200, "Griner Free Throw 1 of 2 (1 PTS)")
+    technical_foul = _stats_foul_event(393, 11, 99, 100)
+    ft2 = _stats_free_throw_event(395, 12, 20, 200, "Griner Free Throw 2 of 2 (2 PTS)")
+    _wire_events([shooting_foul, ft1, technical_foul, ft2])
+
+    assert ft2.event_for_efficiency_stats == technical_foul
+
+
+def test_event_for_efficiency_stats_does_not_rewrite_missing_player_technical():
+    shooting_foul = _stats_foul_event(388, 2, 0, 100)
+    ft1 = _stats_free_throw_event(389, 11, 20, 200, "Griner Free Throw 1 of 2 (1 PTS)")
+    technical_foul = _stats_foul_event(393, 11, 0, 100)
+    ft2 = _stats_free_throw_event(395, 12, 20, 200, "Griner Free Throw 2 of 2 (2 PTS)")
+    _wire_events([shooting_foul, ft1, technical_foul, ft2])
+
+    assert ft2.event_for_efficiency_stats == technical_foul
+
+
+def test_event_for_efficiency_stats_does_not_rewrite_and_one_after_technical():
+    shooting_foul = _stats_foul_event(388, 2, 14, 100)
+    technical_foul = _stats_foul_event(393, 11, 14, 100)
+    and_one_ft = _stats_free_throw_event(395, 10, 20, 200, "Griner Free Throw 1 of 1 (1 PTS)")
+    _wire_events([shooting_foul, technical_foul, and_one_ft])
+
+    assert and_one_ft.event_for_efficiency_stats == technical_foul
+
+
+def test_event_for_efficiency_stats_does_not_rewrite_without_prior_same_trip_ft():
+    shooting_foul = _stats_foul_event(388, 2, 14, 100)
+    technical_foul = _stats_foul_event(393, 11, 14, 100)
+    ft2 = _stats_free_throw_event(395, 12, 20, 200, "Griner Free Throw 2 of 2 (2 PTS)")
+    _wire_events([shooting_foul, technical_foul, ft2])
+
+    assert ft2.event_for_efficiency_stats == technical_foul
 
 
 def test_event_for_efficiency_stats_when_events_out_of_order():
