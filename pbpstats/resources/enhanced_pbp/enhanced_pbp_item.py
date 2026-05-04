@@ -422,8 +422,12 @@ class EnhancedPbpItem(metaclass=abc.ABCMeta):
                 return None
             if event_seconds > current_seconds + 0.001:
                 saw_clock_backtrack = True
-            elif saw_clock_backtrack and self._same_clock(event_seconds, current_seconds):
-                return self._elapsed_under_period_watermark(event)
+            elif self._same_clock(event_seconds, current_seconds):
+                if not saw_clock_backtrack:
+                    return None
+                deferred_elapsed = self._elapsed_under_period_watermark(event)
+                if deferred_elapsed > 0.001:
+                    return deferred_elapsed
             event = getattr(event, "previous_event", None)
         return None
 

@@ -238,6 +238,84 @@ def test_seconds_since_previous_event_defers_original_elapsed_on_overshoot_backt
     assert later_90.seconds_since_previous_event == 10.0
 
 
+def test_seconds_since_previous_event_does_not_replay_deferred_elapsed_on_post_duplicate_same_clock_event():
+    event_100 = DummyEnhancedEvent(
+        game_id="1022500001",
+        period=3,
+        seconds_remaining=100.0,
+        previous_event=None,
+    )
+    early_90 = DummyEnhancedEvent(
+        game_id="1022500001",
+        period=3,
+        seconds_remaining=90.0,
+        previous_event=event_100,
+    )
+    admin_95 = DummyEnhancedEvent(
+        game_id="1022500001",
+        period=3,
+        seconds_remaining=95.0,
+        previous_event=early_90,
+    )
+    later_90 = DummyEnhancedEvent(
+        game_id="1022500001",
+        period=3,
+        seconds_remaining=90.0,
+        previous_event=admin_95,
+    )
+    same_clock_admin_90 = DummyEnhancedEvent(
+        game_id="1022500001",
+        period=3,
+        seconds_remaining=90.0,
+        previous_event=later_90,
+    )
+    _wire_events([event_100, early_90, admin_95, later_90, same_clock_admin_90])
+
+    assert early_90.seconds_since_previous_event == 0
+    assert admin_95.seconds_since_previous_event == 0
+    assert later_90.seconds_since_previous_event == 10.0
+    assert same_clock_admin_90.seconds_since_previous_event == 0
+
+
+def test_seconds_since_previous_event_finds_positive_early_anchor_when_early_duplicate_has_same_clock_cluster():
+    event_100 = DummyEnhancedEvent(
+        game_id="1022500001",
+        period=3,
+        seconds_remaining=100.0,
+        previous_event=None,
+    )
+    early_90 = DummyEnhancedEvent(
+        game_id="1022500001",
+        period=3,
+        seconds_remaining=90.0,
+        previous_event=event_100,
+    )
+    early_same_clock_90 = DummyEnhancedEvent(
+        game_id="1022500001",
+        period=3,
+        seconds_remaining=90.0,
+        previous_event=early_90,
+    )
+    admin_95 = DummyEnhancedEvent(
+        game_id="1022500001",
+        period=3,
+        seconds_remaining=95.0,
+        previous_event=early_same_clock_90,
+    )
+    later_90 = DummyEnhancedEvent(
+        game_id="1022500001",
+        period=3,
+        seconds_remaining=90.0,
+        previous_event=admin_95,
+    )
+    _wire_events([event_100, early_90, early_same_clock_90, admin_95, later_90])
+
+    assert early_90.seconds_since_previous_event == 0
+    assert early_same_clock_90.seconds_since_previous_event == 0
+    assert admin_95.seconds_since_previous_event == 0
+    assert later_90.seconds_since_previous_event == 10.0
+
+
 def test_seconds_since_previous_event_respects_prior_low_watermark_for_duplicate_anchor():
     event_100 = DummyEnhancedEvent(
         game_id="1022500001",
