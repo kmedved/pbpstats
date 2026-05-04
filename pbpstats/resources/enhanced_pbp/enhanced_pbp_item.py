@@ -341,8 +341,154 @@ class EnhancedPbpItem(metaclass=abc.ABCMeta):
             # Between-period subs or start markers where previous_event is from a
             # different period. Without this guard the result would be negative.
             return 0
-        elapsed = self.previous_event.seconds_remaining - self.seconds_remaining
+        if not self._uses_monotone_clock_backtrack_seconds():
+            return self.previous_event.seconds_remaining - self.seconds_remaining
+        deferred_elapsed = self._elapsed_from_deferred_duplicate_clock_backtrack()
+        if deferred_elapsed is not None:
+            return deferred_elapsed
+        if self._defers_elapsed_to_later_duplicate_clock_backtrack():
+            return 0
+        previous_clock = self._period_elapsed_watermark_seconds()
+        if previous_clock is None:
+            previous_clock = getattr(self.previous_event, "seconds_remaining", None)
+        if previous_clock is None:
+            return 0
+        elapsed = previous_clock - self.seconds_remaining
         return max(elapsed, 0)
+
+    def _uses_monotone_clock_backtrack_seconds(self):
+        data_provider = getattr(self, "data_provider", None)
+        if data_provider is not None:
+            return str(data_provider).lower() == "live"
+        return type(self).__module__.startswith(
+            "pbpstats.resources.enhanced_pbp.live."
+        )
+
+    @staticmethod
+    def _event_seconds_remaining(event):
+        try:
+            return float(event.seconds_remaining)
+        except (TypeError, ValueError, AttributeError):
+            return None
+
+    @staticmethod
+    def _same_clock(first, second):
+        if first is None or second is None:
+            return False
+        return abs(first - second) <= 0.001
+
+    def _defers_elapsed_to_later_duplicate_clock_backtrack(self):
+        """
+        True when this event is an early duplicate lower-clock anchor.
+
+        Some feeds insert an event at a lower clock, jump back to a higher clock
+        for same-deadball administration, and then return to the same lower
+        clock. The elapsed segment should be credited once, at the later
+        duplicate where the post-admin lineup is known.
+        """
+        current_seconds = self._event_seconds_remaining(self)
+        previous_seconds = self._event_seconds_remaining(self.previous_event)
+        if current_seconds is None or previous_seconds is None:
+            return False
+        if self._elapsed_under_period_watermark(self) <= 0:
+            return False
+
+        event = getattr(self, "next_event", None)
+        saw_clock_backtrack = False
+        while event is not None:
+            if getattr(event, "period", None) != self.period:
+                return False
+            event_seconds = self._event_seconds_remaining(event)
+            if event_seconds is None:
+                event = getattr(event, "next_event", None)
+                continue
+            if event_seconds < current_seconds - 0.001:
+                return False
+            if event_seconds > current_seconds + 0.001:
+                saw_clock_backtrack = True
+            elif saw_clock_backtrack and self._same_clock(event_seconds, current_seconds):
+                return True
+            event = getattr(event, "next_event", None)
+        return False
+
+    def _elapsed_from_deferred_duplicate_clock_backtrack(self):
+        """
+        Return elapsed seconds deferred by an earlier duplicate lower-clock event.
+        """
+        current_seconds = self._event_seconds_remaining(self)
+        if current_seconds is None:
+            return None
+
+        event = getattr(self, "previous_event", None)
+        saw_clock_backtrack = False
+        while event is not None:
+            if getattr(event, "period", None) != self.period:
+                return None
+            event_seconds = self._event_seconds_remaining(event)
+            if event_seconds is None:
+                event = getattr(event, "previous_event", None)
+                continue
+            if event_seconds < current_seconds - 0.001:
+                return None
+            if event_seconds > current_seconds + 0.001:
+                saw_clock_backtrack = True
+            elif self._same_clock(event_seconds, current_seconds):
+                if not saw_clock_backtrack:
+                    return None
+                deferred_elapsed = self._elapsed_under_period_watermark(event)
+                if deferred_elapsed > 0.001:
+                    return deferred_elapsed
+                event_deferred_elapsed = getattr(
+                    event,
+                    "_elapsed_from_deferred_duplicate_clock_backtrack",
+                    lambda: None,
+                )()
+                if event_deferred_elapsed is not None:
+                    return None
+            event = getattr(event, "previous_event", None)
+        return None
+
+    def _elapsed_under_period_watermark(self, event):
+        current_seconds = self._event_seconds_remaining(event)
+        if current_seconds is None:
+            return 0
+
+        previous_clock = self._period_elapsed_watermark_seconds_for_event(event)
+        if previous_clock is None:
+            previous_clock = self._event_seconds_remaining(
+                getattr(event, "previous_event", None)
+            )
+        if previous_clock is None:
+            return 0
+        return max(previous_clock - current_seconds, 0)
+
+    def _period_elapsed_watermark_seconds(self):
+        return self._period_elapsed_watermark_seconds_for_event(self)
+
+    @classmethod
+    def _period_elapsed_watermark_seconds_for_event(cls, event):
+        """
+        Return the lowest clock already reached in this event's period.
+
+        Some feeds can insert same-period events after the play stream has
+        already advanced to a lower clock. Crediting from the immediate previous
+        event would double count the repeated interval; using the lowest prior
+        clock keeps seconds played monotonic within a period.
+        """
+        period = getattr(event, "period", None)
+        previous_event = getattr(event, "previous_event", None)
+        prior_seconds_remaining = []
+        while previous_event is not None:
+            if getattr(previous_event, "period", None) != period:
+                break
+            try:
+                prior_seconds_remaining.append(float(previous_event.seconds_remaining))
+            except (TypeError, ValueError, AttributeError):
+                pass
+            previous_event = getattr(previous_event, "previous_event", None)
+        if not prior_seconds_remaining:
+            return None
+        return min(prior_seconds_remaining)
 
     def _normalize_game_id_for_inference(self):
         return normalize_game_id(
@@ -496,7 +642,8 @@ class EnhancedPbpItem(metaclass=abc.ABCMeta):
         offense_team_id = self.get_offense_team_id()
         is_penalty_event = self.is_penalty_event()
         is_second_chance_event = self.is_second_chance_event()
-        if self.seconds_since_previous_event != 0:
+        seconds_since_previous_event = self.seconds_since_previous_event
+        if seconds_since_previous_event != 0:
             for team_id, players in previous_players.items():
                 seconds_stat_key = (
                     pbpstats.SECONDS_PLAYED_OFFENSE_STRING
@@ -535,7 +682,7 @@ class EnhancedPbpItem(metaclass=abc.ABCMeta):
                                 opponent_team_id
                             ],
                             "stat_key": stat_key,
-                            "stat_value": self.seconds_since_previous_event,
+                            "stat_value": seconds_since_previous_event,
                         }
                         stat_items.append(stat_item)
         return stat_items
