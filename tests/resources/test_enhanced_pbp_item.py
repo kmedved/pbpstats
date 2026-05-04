@@ -11,6 +11,7 @@ class DummyEnhancedEvent(EnhancedPbpItem):
         self.period = period
         self._seconds_remaining = seconds_remaining
         self.previous_event = previous_event
+        self.next_event = None
 
     @property
     def is_possession_ending_event(self):
@@ -26,6 +27,12 @@ class DummyEnhancedEvent(EnhancedPbpItem):
     @property
     def seconds_remaining(self):
         return self._seconds_remaining
+
+
+def _wire_events(events):
+    for index, event in enumerate(events):
+        event.previous_event = events[index - 1] if index else None
+        event.next_event = events[index + 1] if index + 1 < len(events) else None
 
 
 @pytest.mark.parametrize(
@@ -76,3 +83,73 @@ def test_seconds_since_previous_event_clamps_repaired_same_period_clock_reversal
     )
 
     assert event.seconds_since_previous_event == 0
+
+
+def test_seconds_since_previous_event_does_not_double_credit_after_clock_backtrack():
+    first = DummyEnhancedEvent(
+        game_id="1022500001",
+        period=3,
+        seconds_remaining=322.0,
+        previous_event=None,
+    )
+    advanced = DummyEnhancedEvent(
+        game_id="1022500001",
+        period=3,
+        seconds_remaining=271.0,
+        previous_event=first,
+    )
+    backtracked = DummyEnhancedEvent(
+        game_id="1022500001",
+        period=3,
+        seconds_remaining=322.0,
+        previous_event=advanced,
+    )
+    after_backtrack = DummyEnhancedEvent(
+        game_id="1022500001",
+        period=3,
+        seconds_remaining=268.0,
+        previous_event=backtracked,
+    )
+
+    assert advanced.seconds_since_previous_event == 51.0
+    assert backtracked.seconds_since_previous_event == 0
+    assert after_backtrack.seconds_since_previous_event == 3.0
+
+
+def test_seconds_since_previous_event_defers_to_later_duplicate_clock_after_backtrack():
+    high_clock_event = DummyEnhancedEvent(
+        game_id="1022500001",
+        period=3,
+        seconds_remaining=187.0,
+        previous_event=None,
+    )
+    first_lower_clock_event = DummyEnhancedEvent(
+        game_id="1022500001",
+        period=3,
+        seconds_remaining=184.0,
+        previous_event=high_clock_event,
+    )
+    backtracked_admin_event = DummyEnhancedEvent(
+        game_id="1022500001",
+        period=3,
+        seconds_remaining=187.0,
+        previous_event=first_lower_clock_event,
+    )
+    later_duplicate_lower_clock_event = DummyEnhancedEvent(
+        game_id="1022500001",
+        period=3,
+        seconds_remaining=184.0,
+        previous_event=backtracked_admin_event,
+    )
+    _wire_events(
+        [
+            high_clock_event,
+            first_lower_clock_event,
+            backtracked_admin_event,
+            later_duplicate_lower_clock_event,
+        ]
+    )
+
+    assert first_lower_clock_event.seconds_since_previous_event == 0
+    assert backtracked_admin_event.seconds_since_previous_event == 0
+    assert later_duplicate_lower_clock_event.seconds_since_previous_event == 3.0
