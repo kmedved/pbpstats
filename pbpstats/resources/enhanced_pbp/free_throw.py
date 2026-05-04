@@ -314,6 +314,13 @@ class FreeThrow(metaclass=abc.ABCMeta):
         that resulted in the free throw. Plus/minus points should go to
         the players on the floor at the time of the foul, not the free throw.
         """
+        default_context = self._default_event_for_efficiency_stats()
+        interrupted_context = self._interrupted_normal_ft_context(default_context)
+        if interrupted_context is not None:
+            return interrupted_context
+        return default_context
+
+    def _default_event_for_efficiency_stats(self):
         clock = self.clock
         # foul should be before FT so start by going backwards
         event = self
@@ -335,6 +342,161 @@ class FreeThrow(metaclass=abc.ABCMeta):
         if isinstance(event, Foul) and event.clock == clock:
             return event
         return self
+
+    def _interrupted_normal_ft_context(self, context_event):
+        if (
+            not isinstance(context_event, Foul)
+            or not context_event.is_technical
+            or self.is_technical_ft
+        ):
+            return None
+
+        trip_position = self._multi_shot_ft_trip_position()
+        if trip_position is None or trip_position[0] == 1:
+            return None
+
+        original_context = self._normal_shooting_foul_that_led_to_ft()
+        if original_context is None:
+            return None
+
+        previous_ft = self._previous_same_trip_normal_ft_before_context(
+            trip_position, context_event
+        )
+        if previous_ft is None:
+            return None
+
+        previous_context = previous_ft._normal_shooting_foul_that_led_to_ft()
+        if previous_context is None:
+            return None
+
+        if not self._same_foul_player_team_clock(previous_context, original_context):
+            return None
+
+        if self._same_foul_player_team_clock(context_event, original_context):
+            return original_context
+
+        return None
+
+    def _multi_shot_ft_trip_position(self):
+        if self._normal_shooting_foul_that_led_to_ft() is None:
+            return None
+        if (
+            self.is_technical_ft
+            or self._bool_attr("is_flagrant_ft")
+            or self._bool_attr("is_away_from_play_ft")
+            or self._bool_attr("is_inbound_foul_ft")
+            or self._bool_attr("is_transition_take_foul_ft")
+        ):
+            return None
+        if self.is_ft_1_of_2:
+            return (1, 2)
+        if self.is_ft_2_of_2:
+            return (2, 2)
+        if self.is_ft_1_of_3:
+            return (1, 3)
+        if self.is_ft_2_of_3:
+            return (2, 3)
+        if self.is_ft_3_of_3:
+            return (3, 3)
+        return None
+
+    def _normal_shooting_foul_that_led_to_ft(self):
+        foul = self.foul_that_led_to_ft
+        if not isinstance(foul, Foul):
+            return None
+        if (
+            foul.is_technical
+            or foul.is_double_technical
+            or foul.is_flagrant
+            or foul.is_away_from_play_foul
+            or foul.is_inbound_foul
+            or foul.is_transition_take_foul
+            or foul.is_clear_path_foul
+        ):
+            return None
+        if foul.is_shooting_foul or foul.is_shooting_block_foul:
+            return foul
+        return None
+
+    def _bool_attr(self, attr):
+        return bool(getattr(self, attr, False))
+
+    def _previous_same_trip_normal_ft_before_context(
+        self, trip_position, context_event
+    ):
+        saw_context = False
+        event = getattr(self, "previous_event", None)
+        while event is not None and getattr(event, "clock", None) == self.clock:
+            if event is context_event:
+                saw_context = True
+            elif (
+                saw_context
+                and isinstance(event, FreeThrow)
+                and event is not self
+                and event._is_same_ft_trip(self, trip_position)
+            ):
+                return event
+            event = getattr(event, "previous_event", None)
+        return None
+
+    def _is_same_ft_trip(self, other, other_trip_position):
+        trip_position = self._multi_shot_ft_trip_position()
+        return (
+            trip_position is not None
+            and trip_position[1] == other_trip_position[1]
+            and trip_position[0] < other_trip_position[0]
+            and self._same_event_player_team_clock(other)
+        )
+
+    def _same_event_player_team_clock(self, other):
+        player_id = self._coerced_id(getattr(self, "player1_id", None))
+        other_player_id = self._coerced_id(getattr(other, "player1_id", None))
+        team_id = self._coerced_id(getattr(self, "team_id", None))
+        other_team_id = self._coerced_id(getattr(other, "team_id", None))
+        return (
+            self._valid_id(player_id)
+            and player_id == other_player_id
+            and self._valid_id(team_id)
+            and team_id == other_team_id
+            and getattr(self, "clock", None) == getattr(other, "clock", None)
+            and self._same_period_if_available(other)
+        )
+
+    def _same_period_if_available(self, other):
+        if not hasattr(self, "period") or not hasattr(other, "period"):
+            return True
+        return self.period == other.period
+
+    @classmethod
+    def _same_foul_player_team_clock(cls, first, second):
+        first_player_id = cls._coerced_id(getattr(first, "player1_id", None))
+        second_player_id = cls._coerced_id(getattr(second, "player1_id", None))
+        first_team_id = cls._coerced_id(getattr(first, "team_id", None))
+        second_team_id = cls._coerced_id(getattr(second, "team_id", None))
+        same_period = (
+            not hasattr(first, "period")
+            or not hasattr(second, "period")
+            or first.period == second.period
+        )
+        return (
+            cls._valid_id(first_player_id)
+            and first_player_id == second_player_id
+            and cls._valid_id(first_team_id)
+            and first_team_id == second_team_id
+            and getattr(first, "clock", None) == getattr(second, "clock", None)
+            and same_period
+        )
+
+    @staticmethod
+    def _valid_id(value):
+        return value not in (None, 0, "")
+
+    @staticmethod
+    def _coerced_id(value):
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return value
 
     @property
     def event_stats(self):
