@@ -119,6 +119,50 @@ def test_seconds_since_previous_event_preserves_non_live_same_period_negative_el
     assert event.seconds_since_previous_event == -3.0
 
 
+def test_seconds_played_base_stats_emit_non_live_negative_elapsed_compensation():
+    players = {1: [11, 12, 13, 14, 15], 2: [21, 22, 23, 24, 25]}
+    previous = DummyEnhancedEvent(
+        game_id="0021900700",
+        period=2,
+        seconds_remaining=251.0,
+        previous_event=None,
+        current_players=players,
+        offense_team_id=1,
+        data_provider="stats_nba",
+    )
+    event = DummyEnhancedEvent(
+        game_id="0021900700",
+        period=2,
+        seconds_remaining=254.0,
+        previous_event=previous,
+        current_players=players,
+        offense_team_id=1,
+        data_provider="stats_nba",
+    )
+    _wire_events([previous, event])
+
+    seconds_rows = [
+        row
+        for row in event.base_stats
+        if row["stat_key"] in {"SecondsPlayedOff", "SecondsPlayedDef"}
+    ]
+
+    assert len(seconds_rows) == 10
+    assert {row["player_id"] for row in seconds_rows} == {
+        11,
+        12,
+        13,
+        14,
+        15,
+        21,
+        22,
+        23,
+        24,
+        25,
+    }
+    assert {row["stat_value"] for row in seconds_rows} == {-3.0}
+
+
 def test_seconds_since_previous_event_does_not_double_credit_after_clock_backtrack():
     first = DummyEnhancedEvent(
         game_id="1022500001",
