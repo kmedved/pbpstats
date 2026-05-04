@@ -359,13 +359,10 @@ class FreeThrow(metaclass=abc.ABCMeta):
         if original_context is None:
             return None
 
-        previous_ft = self._previous_same_trip_normal_ft(trip_position)
+        previous_ft = self._previous_same_trip_normal_ft_before_context(
+            trip_position, context_event
+        )
         if previous_ft is None:
-            return None
-
-        if not self._context_event_between_previous_ft_and_current_ft(
-            previous_ft, context_event
-        ):
             return None
 
         previous_context = previous_ft._normal_shooting_foul_that_led_to_ft()
@@ -424,29 +421,23 @@ class FreeThrow(metaclass=abc.ABCMeta):
     def _bool_attr(self, attr):
         return bool(getattr(self, attr, False))
 
-    def _previous_same_trip_normal_ft(self, trip_position):
+    def _previous_same_trip_normal_ft_before_context(
+        self, trip_position, context_event
+    ):
+        saw_context = False
         event = getattr(self, "previous_event", None)
         while event is not None and getattr(event, "clock", None) == self.clock:
-            if (
-                isinstance(event, FreeThrow)
+            if event is context_event:
+                saw_context = True
+            elif (
+                saw_context
+                and isinstance(event, FreeThrow)
                 and event is not self
                 and event._is_same_ft_trip(self, trip_position)
             ):
                 return event
             event = getattr(event, "previous_event", None)
         return None
-
-    def _context_event_between_previous_ft_and_current_ft(
-        self, previous_ft, context_event
-    ):
-        event = getattr(self, "previous_event", None)
-        while event is not None and getattr(event, "clock", None) == self.clock:
-            if event is context_event:
-                return True
-            if event is previous_ft:
-                return False
-            event = getattr(event, "previous_event", None)
-        return False
 
     def _is_same_ft_trip(self, other, other_trip_position):
         trip_position = self._multi_shot_ft_trip_position()

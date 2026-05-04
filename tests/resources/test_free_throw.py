@@ -685,6 +685,21 @@ def test_event_for_efficiency_stats_keeps_2_of_3_context_after_same_player_techn
     assert ft3.event_for_efficiency_stats == shooting_foul
 
 
+def test_event_for_efficiency_stats_keeps_all_remaining_3shot_fts_after_same_player_technical_after_ft1():
+    shooting_foul = _stats_foul_event(388, 2, 14, 100)
+    ft1 = _stats_free_throw_event(389, 13, 20, 200, "Griner Free Throw 1 of 3 (1 PTS)")
+    technical_foul = _stats_foul_event(393, 11, 14, 100)
+    technical_ft = _stats_free_throw_event(
+        394, 10, 30, 200, "Taurasi Technical Free Throw 1 of 1 (1 PTS)"
+    )
+    ft2 = _stats_free_throw_event(395, 14, 20, 200, "Griner Free Throw 2 of 3 (2 PTS)")
+    ft3 = _stats_free_throw_event(396, 15, 20, 200, "Griner Free Throw 3 of 3 (3 PTS)")
+    _wire_events([shooting_foul, ft1, technical_foul, technical_ft, ft2, ft3])
+
+    assert ft2.event_for_efficiency_stats == shooting_foul
+    assert ft3.event_for_efficiency_stats == shooting_foul
+
+
 def test_event_for_efficiency_stats_does_not_rewrite_first_normal_ft_after_technical():
     shooting_foul = _stats_foul_event(388, 2, 14, 100)
     technical_foul = _stats_foul_event(393, 11, 14, 100)
