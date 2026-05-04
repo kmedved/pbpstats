@@ -53,6 +53,13 @@ def test_build_sync_data_populates_expected_sections():
     assert sync_data["bundle_contract"] == BUNDLE_CONTRACT
 
 
+def test_behavior_snapshot_covers_current_offline_semantics():
+    behavior = build_sync_data()["behavior_snapshot"]
+    assert "enrich_clocks_with_v3" in behavior["offline_pipeline"]
+    assert "overrides/lineup_window_overrides.json" in behavior["override_files"]
+    assert "overrides/period_starters_overrides.json" in behavior["override_files"]
+
+
 def test_required_headings_exist():
     architecture = _rendered_architecture()
     required_headings = [
@@ -85,9 +92,7 @@ def test_start_here_mentions_guided_and_oracle_workflows():
 def test_bundle_contract_names_match_architecture_doc_tables():
     architecture = _rendered_architecture()
     declared_bundle_names = {bundle["name"] for bundle in BUNDLE_CONTRACT["bundles"]}
-    referenced_bundle_names = set(
-        re.findall(r"`(COMPRESSED_[^`]+\.md)`", architecture)
-    )
+    referenced_bundle_names = set(re.findall(r"`(COMPRESSED_[^`]+\.md)`", architecture))
     assert declared_bundle_names.issubset(referenced_bundle_names)
 
     where_to_edit_rows = [

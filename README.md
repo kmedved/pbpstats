@@ -43,28 +43,33 @@ print(nba_pbp["GAME_ID"].drop_duplicates().head())
 print(wnba_pbp["GAME_ID"].drop_duplicates().head())
 ```
 
-Build possessions for one NBA or WNBA game:
+After choosing a game ID from those dataframes, build possessions:
 
 ```python
 import pbpstats
 from pbpstats.offline import get_possessions_from_nba_on_court
 
+nba_game_id = "..."  # choose an NBA GAME_ID from nba_pbp
 nba_possessions = get_possessions_from_nba_on_court(
     season=2023,
-    game_id="0022300001",
+    game_id=nba_game_id,
     league=pbpstats.NBA_STRING,
 )
 
+wnba_game_id = "..."  # choose a WNBA GAME_ID from wnba_pbp
 wnba_possessions = get_possessions_from_nba_on_court(
     season=2025,
-    game_id="1022500001",
+    game_id=wnba_game_id,
     league=pbpstats.WNBA_STRING,
 )
 ```
 
 The adapter is a convenience loader only. `nba-on-court` is not a required
 runtime dependency for pbpstats, and direct dataframe/parquet workflows should
-continue to use `get_possessions_from_df`.
+continue to use `get_possessions_from_df`. Possession construction still uses
+the same offline processor, so malformed source games may need the same optional
+v3 fetcher, boxscore loaders, or rebound override setup you would pass to
+`get_possessions_from_df`.
 
 # LLM Context
 LLM-facing context artifacts live in `context/` as optional navigation aids.

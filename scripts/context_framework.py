@@ -306,13 +306,16 @@ def collect_behavior_snapshot() -> Dict[str, object]:
         "enhanced_pbp_factory_dispatch": _collect_factory_dispatch(),
         "override_files": [
             "overrides/bad_pbp_possessions.json",
+            "overrides/lineup_window_overrides.json",
             "overrides/missing_period_starters.json",
             "overrides/non_possession_changing_event_overrides.json",
+            "overrides/period_starters_overrides.json",
             "overrides/possession_change_event_overrides.json",
         ],
         "offline_pipeline": [
             "_ensure_eventnum_int",
             "dedupe_with_v3",
+            "enrich_clocks_with_v3",
             "patch_start_of_periods",
             "preserve_order_after_v3_repairs",
             "create_raw_dicts_from_df",
