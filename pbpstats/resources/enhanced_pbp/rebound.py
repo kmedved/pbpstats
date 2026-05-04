@@ -256,23 +256,33 @@ class Rebound(object):
                         }
                         stats.append(on_floor_oreb_stat_item)
 
-            # DARKO: on-floor team rebounds off FGA only
-            # These count actual offensive/defensive rebounds off field goal attempts
-            # for each player on the rebounding team.
+            # DARKO: on-floor FGA rebound opportunities for both teams.
             if isinstance(self.missed_shot, FieldGoal):
-                if self.oreb:
-                    rebound_fga_key = pbpstats.ON_FLOOR_OFFENSIVE_REBOUND_FGA_STRING
-                else:
-                    rebound_fga_key = pbpstats.ON_FLOOR_DEFENSIVE_REBOUND_FGA_STRING
-                team_players = self.current_players.get(self.team_id, [])
-                for player_id in team_players:
-                    rebound_fga_stat_item = {
-                        "player_id": player_id,
-                        "team_id": self.team_id,
-                        "stat_key": rebound_fga_key,
-                        "stat_value": 1,
-                    }
-                    stats.append(rebound_fga_stat_item)
+                (
+                    current_players,
+                    _team_ids,
+                    _lineup_ids,
+                    defending_team_id,
+                ) = self._require_team_in_event_stat_context(self.missed_shot.team_id)
+                shooting_team_id = self.missed_shot.team_id
+                for player_id in current_players[shooting_team_id]:
+                    stats.append(
+                        {
+                            "player_id": player_id,
+                            "team_id": shooting_team_id,
+                            "stat_key": pbpstats.ON_FLOOR_OFFENSIVE_REBOUND_FGA_STRING,
+                            "stat_value": 1,
+                        }
+                    )
+                for player_id in current_players[defending_team_id]:
+                    stats.append(
+                        {
+                            "player_id": player_id,
+                            "team_id": defending_team_id,
+                            "stat_key": pbpstats.ON_FLOOR_DEFENSIVE_REBOUND_FGA_STRING,
+                            "stat_value": 1,
+                        }
+                    )
 
             # player missed shot rebound stats
             shooter_player_id = self.missed_shot.player1_id
