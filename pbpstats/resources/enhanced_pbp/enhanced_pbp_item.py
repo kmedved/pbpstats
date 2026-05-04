@@ -341,6 +341,8 @@ class EnhancedPbpItem(metaclass=abc.ABCMeta):
             # Between-period subs or start markers where previous_event is from a
             # different period. Without this guard the result would be negative.
             return 0
+        if not self._uses_monotone_clock_backtrack_seconds():
+            return self.previous_event.seconds_remaining - self.seconds_remaining
         deferred_elapsed = self._elapsed_from_deferred_duplicate_clock_backtrack()
         if deferred_elapsed is not None:
             return deferred_elapsed
@@ -353,6 +355,14 @@ class EnhancedPbpItem(metaclass=abc.ABCMeta):
             return 0
         elapsed = previous_clock - self.seconds_remaining
         return max(elapsed, 0)
+
+    def _uses_monotone_clock_backtrack_seconds(self):
+        data_provider = getattr(self, "data_provider", None)
+        if data_provider is not None:
+            return str(data_provider).lower() == "live"
+        return type(self).__module__.startswith(
+            "pbpstats.resources.enhanced_pbp.live."
+        )
 
     @staticmethod
     def _event_seconds_remaining(event):

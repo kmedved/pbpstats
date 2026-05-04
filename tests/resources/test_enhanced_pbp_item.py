@@ -16,6 +16,7 @@ class DummyEnhancedEvent(EnhancedPbpItem):
         previous_event,
         current_players=None,
         offense_team_id=1,
+        data_provider="live",
     ):
         self.game_id = game_id
         self.period = period
@@ -24,6 +25,7 @@ class DummyEnhancedEvent(EnhancedPbpItem):
         self.next_event = None
         self._current_players = current_players
         self.offense_team_id = offense_team_id
+        self.data_provider = data_provider
         self.player_game_fouls = defaultdict(int)
 
     @property
@@ -92,7 +94,7 @@ def test_seconds_since_previous_event_keeps_same_period_elapsed_time():
     assert event.seconds_since_previous_event == 10.0
 
 
-def test_seconds_since_previous_event_clamps_repaired_same_period_clock_reversal():
+def test_seconds_since_previous_event_clamps_live_same_period_clock_reversal():
     previous = SimpleNamespace(period=1, seconds_remaining=314.0)
     event = DummyEnhancedEvent(
         game_id="1022500001",
@@ -102,6 +104,19 @@ def test_seconds_since_previous_event_clamps_repaired_same_period_clock_reversal
     )
 
     assert event.seconds_since_previous_event == 0
+
+
+def test_seconds_since_previous_event_preserves_non_live_same_period_negative_elapsed():
+    previous = SimpleNamespace(period=2, seconds_remaining=251.0)
+    event = DummyEnhancedEvent(
+        game_id="0021900700",
+        period=2,
+        seconds_remaining=254.0,
+        previous_event=previous,
+        data_provider="stats_nba",
+    )
+
+    assert event.seconds_since_previous_event == -3.0
 
 
 def test_seconds_since_previous_event_does_not_double_credit_after_clock_backtrack():
