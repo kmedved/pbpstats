@@ -1,3 +1,4 @@
+from collections import defaultdict
 from types import SimpleNamespace
 
 import pytest
@@ -6,12 +7,24 @@ from pbpstats.resources.enhanced_pbp.enhanced_pbp_item import EnhancedPbpItem
 
 
 class DummyEnhancedEvent(EnhancedPbpItem):
-    def __init__(self, *, game_id, period, seconds_remaining, previous_event):
+    def __init__(
+        self,
+        *,
+        game_id,
+        period,
+        seconds_remaining,
+        previous_event,
+        current_players=None,
+        offense_team_id=1,
+    ):
         self.game_id = game_id
         self.period = period
         self._seconds_remaining = seconds_remaining
         self.previous_event = previous_event
         self.next_event = None
+        self._current_players = current_players
+        self.offense_team_id = offense_team_id
+        self.player_game_fouls = defaultdict(int)
 
     @property
     def is_possession_ending_event(self):
@@ -22,11 +35,17 @@ class DummyEnhancedEvent(EnhancedPbpItem):
         return []
 
     def get_offense_team_id(self):
-        return None
+        return self.offense_team_id
 
     @property
     def seconds_remaining(self):
         return self._seconds_remaining
+
+    @property
+    def current_players(self):
+        if self._current_players is not None:
+            return self._current_players
+        return super().current_players
 
 
 def _wire_events(events):
@@ -153,3 +172,198 @@ def test_seconds_since_previous_event_defers_to_later_duplicate_clock_after_back
     assert first_lower_clock_event.seconds_since_previous_event == 0
     assert backtracked_admin_event.seconds_since_previous_event == 0
     assert later_duplicate_lower_clock_event.seconds_since_previous_event == 3.0
+
+
+def test_seconds_since_previous_event_defers_original_elapsed_on_partial_backtrack():
+    event_100 = DummyEnhancedEvent(
+        game_id="1022500001",
+        period=3,
+        seconds_remaining=100.0,
+        previous_event=None,
+    )
+    early_90 = DummyEnhancedEvent(
+        game_id="1022500001",
+        period=3,
+        seconds_remaining=90.0,
+        previous_event=event_100,
+    )
+    partial_backtrack_95 = DummyEnhancedEvent(
+        game_id="1022500001",
+        period=3,
+        seconds_remaining=95.0,
+        previous_event=early_90,
+    )
+    later_90 = DummyEnhancedEvent(
+        game_id="1022500001",
+        period=3,
+        seconds_remaining=90.0,
+        previous_event=partial_backtrack_95,
+    )
+    _wire_events([event_100, early_90, partial_backtrack_95, later_90])
+
+    assert early_90.seconds_since_previous_event == 0
+    assert partial_backtrack_95.seconds_since_previous_event == 0
+    assert later_90.seconds_since_previous_event == 10.0
+
+
+def test_seconds_since_previous_event_defers_original_elapsed_on_overshoot_backtrack():
+    event_100 = DummyEnhancedEvent(
+        game_id="1022500001",
+        period=3,
+        seconds_remaining=100.0,
+        previous_event=None,
+    )
+    early_90 = DummyEnhancedEvent(
+        game_id="1022500001",
+        period=3,
+        seconds_remaining=90.0,
+        previous_event=event_100,
+    )
+    overshoot_105 = DummyEnhancedEvent(
+        game_id="1022500001",
+        period=3,
+        seconds_remaining=105.0,
+        previous_event=early_90,
+    )
+    later_90 = DummyEnhancedEvent(
+        game_id="1022500001",
+        period=3,
+        seconds_remaining=90.0,
+        previous_event=overshoot_105,
+    )
+    _wire_events([event_100, early_90, overshoot_105, later_90])
+
+    assert early_90.seconds_since_previous_event == 0
+    assert overshoot_105.seconds_since_previous_event == 0
+    assert later_90.seconds_since_previous_event == 10.0
+
+
+def test_seconds_since_previous_event_respects_prior_low_watermark_for_duplicate_anchor():
+    event_100 = DummyEnhancedEvent(
+        game_id="1022500001",
+        period=3,
+        seconds_remaining=100.0,
+        previous_event=None,
+    )
+    event_80 = DummyEnhancedEvent(
+        game_id="1022500001",
+        period=3,
+        seconds_remaining=80.0,
+        previous_event=event_100,
+    )
+    backtrack_90 = DummyEnhancedEvent(
+        game_id="1022500001",
+        period=3,
+        seconds_remaining=90.0,
+        previous_event=event_80,
+    )
+    early_85 = DummyEnhancedEvent(
+        game_id="1022500001",
+        period=3,
+        seconds_remaining=85.0,
+        previous_event=backtrack_90,
+    )
+    second_backtrack_90 = DummyEnhancedEvent(
+        game_id="1022500001",
+        period=3,
+        seconds_remaining=90.0,
+        previous_event=early_85,
+    )
+    later_85 = DummyEnhancedEvent(
+        game_id="1022500001",
+        period=3,
+        seconds_remaining=85.0,
+        previous_event=second_backtrack_90,
+    )
+    _wire_events([event_100, event_80, backtrack_90, early_85, second_backtrack_90, later_85])
+
+    assert event_80.seconds_since_previous_event == 20.0
+    assert backtrack_90.seconds_since_previous_event == 0
+    assert early_85.seconds_since_previous_event == 0
+    assert second_backtrack_90.seconds_since_previous_event == 0
+    assert later_85.seconds_since_previous_event == 0
+
+
+def test_seconds_played_base_stats_credit_deferred_duplicate_clock_to_later_lineup():
+    pre_lineup = {1: [11, 12, 13, 14, 15], 2: [21, 22, 23, 24, 25]}
+    post_lineup = {1: [11, 12, 13, 14, 16], 2: [21, 22, 23, 24, 26]}
+    high_clock_event = DummyEnhancedEvent(
+        game_id="1022500001",
+        period=3,
+        seconds_remaining=100.0,
+        previous_event=None,
+        current_players=pre_lineup,
+        offense_team_id=1,
+    )
+    early_lower_clock_event = DummyEnhancedEvent(
+        game_id="1022500001",
+        period=3,
+        seconds_remaining=90.0,
+        previous_event=high_clock_event,
+        current_players=pre_lineup,
+        offense_team_id=1,
+    )
+    backtracked_admin_event = DummyEnhancedEvent(
+        game_id="1022500001",
+        period=3,
+        seconds_remaining=95.0,
+        previous_event=early_lower_clock_event,
+        current_players=post_lineup,
+        offense_team_id=1,
+    )
+    later_duplicate_lower_clock_event = DummyEnhancedEvent(
+        game_id="1022500001",
+        period=3,
+        seconds_remaining=90.0,
+        previous_event=backtracked_admin_event,
+        current_players=post_lineup,
+        offense_team_id=1,
+    )
+    _wire_events(
+        [
+            high_clock_event,
+            early_lower_clock_event,
+            backtracked_admin_event,
+            later_duplicate_lower_clock_event,
+        ]
+    )
+
+    early_seconds = [
+        row
+        for row in early_lower_clock_event.base_stats
+        if row["stat_key"] in {"SecondsPlayedOff", "SecondsPlayedDef"}
+    ]
+    later_seconds = [
+        row
+        for row in later_duplicate_lower_clock_event.base_stats
+        if row["stat_key"] in {"SecondsPlayedOff", "SecondsPlayedDef"}
+    ]
+
+    assert early_seconds == []
+    assert {row["player_id"] for row in later_seconds} == {11, 12, 13, 14, 16, 21, 22, 23, 24, 26}
+    assert {row["stat_value"] for row in later_seconds} == {10.0}
+
+
+def test_seconds_since_previous_event_normal_same_clock_substitution_cluster():
+    event_100 = DummyEnhancedEvent(
+        game_id="1022500001",
+        period=3,
+        seconds_remaining=100.0,
+        previous_event=None,
+    )
+    same_clock_sub = DummyEnhancedEvent(
+        game_id="1022500001",
+        period=3,
+        seconds_remaining=100.0,
+        previous_event=event_100,
+    )
+    event_90 = DummyEnhancedEvent(
+        game_id="1022500001",
+        period=3,
+        seconds_remaining=90.0,
+        previous_event=same_clock_sub,
+    )
+    _wire_events([event_100, same_clock_sub, event_90])
+
+    assert same_clock_sub.seconds_since_previous_event == 0
+    assert event_90.seconds_since_previous_event == 10.0

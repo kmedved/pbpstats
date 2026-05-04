@@ -380,7 +380,7 @@ class EnhancedPbpItem(metaclass=abc.ABCMeta):
         previous_seconds = self._event_seconds_remaining(self.previous_event)
         if current_seconds is None or previous_seconds is None:
             return False
-        if previous_seconds <= current_seconds + 0.001:
+        if self._elapsed_under_period_watermark(self) <= 0:
             return False
 
         event = getattr(self, "next_event", None)
@@ -411,7 +411,6 @@ class EnhancedPbpItem(metaclass=abc.ABCMeta):
 
         event = getattr(self, "previous_event", None)
         saw_clock_backtrack = False
-        highest_intervening_seconds = None
         while event is not None:
             if getattr(event, "period", None) != self.period:
                 return None
@@ -423,28 +422,43 @@ class EnhancedPbpItem(metaclass=abc.ABCMeta):
                 return None
             if event_seconds > current_seconds + 0.001:
                 saw_clock_backtrack = True
-                highest_intervening_seconds = max(
-                    highest_intervening_seconds or event_seconds,
-                    event_seconds,
-                )
             elif saw_clock_backtrack and self._same_clock(event_seconds, current_seconds):
-                return max(highest_intervening_seconds - current_seconds, 0)
+                return self._elapsed_under_period_watermark(event)
             event = getattr(event, "previous_event", None)
         return None
 
+    def _elapsed_under_period_watermark(self, event):
+        current_seconds = self._event_seconds_remaining(event)
+        if current_seconds is None:
+            return 0
+
+        previous_clock = self._period_elapsed_watermark_seconds_for_event(event)
+        if previous_clock is None:
+            previous_clock = self._event_seconds_remaining(
+                getattr(event, "previous_event", None)
+            )
+        if previous_clock is None:
+            return 0
+        return max(previous_clock - current_seconds, 0)
+
     def _period_elapsed_watermark_seconds(self):
+        return self._period_elapsed_watermark_seconds_for_event(self)
+
+    @classmethod
+    def _period_elapsed_watermark_seconds_for_event(cls, event):
         """
-        Return the lowest clock already reached in this period before this event.
+        Return the lowest clock already reached in this event's period.
 
         Some feeds can insert same-period events after the play stream has
         already advanced to a lower clock. Crediting from the immediate previous
         event would double count the repeated interval; using the lowest prior
         clock keeps seconds played monotonic within a period.
         """
-        previous_event = getattr(self, "previous_event", None)
+        period = getattr(event, "period", None)
+        previous_event = getattr(event, "previous_event", None)
         prior_seconds_remaining = []
         while previous_event is not None:
-            if getattr(previous_event, "period", None) != self.period:
+            if getattr(previous_event, "period", None) != period:
                 break
             try:
                 prior_seconds_remaining.append(float(previous_event.seconds_remaining))
@@ -607,7 +621,8 @@ class EnhancedPbpItem(metaclass=abc.ABCMeta):
         offense_team_id = self.get_offense_team_id()
         is_penalty_event = self.is_penalty_event()
         is_second_chance_event = self.is_second_chance_event()
-        if self.seconds_since_previous_event != 0:
+        seconds_since_previous_event = self.seconds_since_previous_event
+        if seconds_since_previous_event != 0:
             for team_id, players in previous_players.items():
                 seconds_stat_key = (
                     pbpstats.SECONDS_PLAYED_OFFENSE_STRING
@@ -646,7 +661,7 @@ class EnhancedPbpItem(metaclass=abc.ABCMeta):
                                 opponent_team_id
                             ],
                             "stat_key": stat_key,
-                            "stat_value": self.seconds_since_previous_event,
+                            "stat_value": seconds_since_previous_event,
                         }
                         stat_items.append(stat_item)
         return stat_items
