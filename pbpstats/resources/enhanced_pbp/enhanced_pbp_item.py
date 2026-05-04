@@ -428,6 +428,13 @@ class EnhancedPbpItem(metaclass=abc.ABCMeta):
                 deferred_elapsed = self._elapsed_under_period_watermark(event)
                 if deferred_elapsed > 0.001:
                     return deferred_elapsed
+                event_deferred_elapsed = getattr(
+                    event,
+                    "_elapsed_from_deferred_duplicate_clock_backtrack",
+                    lambda: None,
+                )()
+                if event_deferred_elapsed is not None:
+                    return None
             event = getattr(event, "previous_event", None)
         return None
 
