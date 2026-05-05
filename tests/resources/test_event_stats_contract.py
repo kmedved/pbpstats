@@ -1,5 +1,6 @@
 from collections import defaultdict
 
+import pbpstats
 import pytest
 
 from pbpstats.resources.enhanced_pbp import Substitution
@@ -80,6 +81,71 @@ class DummySubstitution(Substitution):
     @property
     def outgoing_player_id(self):
         return self._outgoing_player_id
+
+
+def _link_missed_shot_to_rebound(missed_shot, rebound, current_players):
+    seed = SeedEvent(current_players, clock="09:31")
+    missed_shot.previous_event = seed
+    missed_shot.next_event = rebound
+    rebound.previous_event = missed_shot
+    rebound.next_event = None
+    return rebound
+
+
+def _missed_field_goal(team_id=1):
+    return StatsFieldGoal(
+        {
+            "GAME_ID": "0021900001",
+            "EVENTNUM": 21,
+            "PCTIMESTRING": "09:31",
+            "VISITORDESCRIPTION": "MISS Shooter 10' Jump Shot",
+            "EVENTMSGACTIONTYPE": 1,
+            "EVENTMSGTYPE": 2,
+            "PLAYER1_ID": 101,
+            "PLAYER1_TEAM_ID": team_id,
+        },
+        1,
+    )
+
+
+def _missed_free_throw(team_id=1):
+    return StatsFreeThrow(
+        {
+            "GAME_ID": "0021900001",
+            "EVENTNUM": 21,
+            "PCTIMESTRING": "09:31",
+            "HOMEDESCRIPTION": "MISS Free Throw 2 of 2",
+            "EVENTMSGACTIONTYPE": 12,
+            "EVENTMSGTYPE": 3,
+            "PLAYER1_ID": 101,
+            "PLAYER1_TEAM_ID": team_id,
+        },
+        1,
+    )
+
+
+def _rebound(team_id, player_id, event_action_type=0):
+    return StatsRebound(
+        {
+            "GAME_ID": "0021900001",
+            "EVENTNUM": 22,
+            "PCTIMESTRING": "09:31",
+            "HOMEDESCRIPTION": "Rebound",
+            "EVENTMSGACTIONTYPE": event_action_type,
+            "EVENTMSGTYPE": 4,
+            "PLAYER1_ID": player_id,
+            "PLAYER1_TEAM_ID": team_id,
+        },
+        2,
+    )
+
+
+def _players_with_stat(stats, team_id, stat_key):
+    return sorted(
+        stat["player_id"]
+        for stat in stats
+        if stat["team_id"] == team_id and stat["stat_key"] == stat_key
+    )
 
 
 def test_stats_free_throw_event_stats_without_game_id_do_not_crash(monkeypatch):
@@ -212,6 +278,127 @@ def test_rebound_sparse_current_players_raise_incomplete_context(monkeypatch):
         _ = event.event_stats
 
 
+def test_defensive_rebound_fga_denominators_include_both_teams(monkeypatch):
+    current_players = {1: [1, 2, 3, 4, 5], 2: [6, 7, 8, 9, 10]}
+    rebound = _link_missed_shot_to_rebound(
+        _missed_field_goal(team_id=1),
+        _rebound(team_id=2, player_id=6),
+        current_players,
+    )
+    monkeypatch.setattr(StatsRebound, "base_stats", property(lambda self: []))
+
+    stats = rebound.event_stats
+
+    assert _players_with_stat(
+        stats, 1, pbpstats.ON_FLOOR_OFFENSIVE_REBOUND_FGA_STRING
+    ) == [1, 2, 3, 4, 5]
+    assert _players_with_stat(
+        stats, 2, pbpstats.ON_FLOOR_DEFENSIVE_REBOUND_FGA_STRING
+    ) == [6, 7, 8, 9, 10]
+    assert not _players_with_stat(
+        stats, 1, pbpstats.ON_FLOOR_DEFENSIVE_REBOUND_FGA_STRING
+    )
+    assert not _players_with_stat(
+        stats, 2, pbpstats.ON_FLOOR_OFFENSIVE_REBOUND_FGA_STRING
+    )
+    denominator_stats = [
+        stat
+        for stat in stats
+        if stat["stat_key"]
+        in {
+            pbpstats.ON_FLOOR_OFFENSIVE_REBOUND_FGA_STRING,
+            pbpstats.ON_FLOOR_DEFENSIVE_REBOUND_FGA_STRING,
+        }
+    ]
+    assert all("lineup_id" in stat for stat in denominator_stats)
+    assert all("opponent_team_id" in stat for stat in denominator_stats)
+    assert all("opponent_lineup_id" in stat for stat in denominator_stats)
+
+
+def test_offensive_rebound_fga_denominators_include_both_teams(monkeypatch):
+    current_players = {1: [1, 2, 3, 4, 5], 2: [6, 7, 8, 9, 10]}
+    rebound = _link_missed_shot_to_rebound(
+        _missed_field_goal(team_id=1),
+        _rebound(team_id=1, player_id=1),
+        current_players,
+    )
+    monkeypatch.setattr(StatsRebound, "base_stats", property(lambda self: []))
+
+    stats = rebound.event_stats
+
+    assert _players_with_stat(
+        stats, 1, pbpstats.ON_FLOOR_OFFENSIVE_REBOUND_FGA_STRING
+    ) == [1, 2, 3, 4, 5]
+    assert _players_with_stat(
+        stats, 2, pbpstats.ON_FLOOR_DEFENSIVE_REBOUND_FGA_STRING
+    ) == [6, 7, 8, 9, 10]
+    assert _players_with_stat(stats, 1, pbpstats.ON_FLOOR_OFFENSIVE_REBOUND_STRING) == [
+        1,
+        2,
+        3,
+        4,
+        5,
+    ]
+
+
+def test_team_rebound_fga_denominators_include_both_teams(monkeypatch):
+    current_players = {1: [1, 2, 3, 4, 5], 2: [6, 7, 8, 9, 10]}
+    rebound = _link_missed_shot_to_rebound(
+        _missed_field_goal(team_id=1),
+        _rebound(team_id=2, player_id=0),
+        current_players,
+    )
+    monkeypatch.setattr(StatsRebound, "base_stats", property(lambda self: []))
+
+    stats = rebound.event_stats
+
+    assert _players_with_stat(
+        stats, 1, pbpstats.ON_FLOOR_OFFENSIVE_REBOUND_FGA_STRING
+    ) == [1, 2, 3, 4, 5]
+    assert _players_with_stat(
+        stats, 2, pbpstats.ON_FLOOR_DEFENSIVE_REBOUND_FGA_STRING
+    ) == [6, 7, 8, 9, 10]
+
+
+def test_placeholder_rebound_has_no_fga_denominator_rows(monkeypatch):
+    current_players = {1: [1, 2, 3, 4, 5], 2: [6, 7, 8, 9, 10]}
+    rebound = _link_missed_shot_to_rebound(
+        _missed_field_goal(team_id=1),
+        _rebound(team_id=2, player_id=0, event_action_type=1),
+        current_players,
+    )
+    monkeypatch.setattr(StatsRebound, "base_stats", property(lambda self: []))
+
+    stats = rebound.event_stats
+
+    assert not _players_with_stat(
+        stats, 1, pbpstats.ON_FLOOR_OFFENSIVE_REBOUND_FGA_STRING
+    )
+    assert not _players_with_stat(
+        stats, 2, pbpstats.ON_FLOOR_DEFENSIVE_REBOUND_FGA_STRING
+    )
+
+
+def test_free_throw_rebound_has_no_fga_denominator_rows(monkeypatch):
+    current_players = {1: [1, 2, 3, 4, 5], 2: [6, 7, 8, 9, 10]}
+    rebound = _link_missed_shot_to_rebound(
+        _missed_free_throw(team_id=1),
+        _rebound(team_id=2, player_id=6),
+        current_players,
+    )
+    rebound.previous_event.next_event = rebound
+    monkeypatch.setattr(StatsRebound, "base_stats", property(lambda self: []))
+
+    stats = rebound.event_stats
+
+    assert not _players_with_stat(
+        stats, 1, pbpstats.ON_FLOOR_OFFENSIVE_REBOUND_FGA_STRING
+    )
+    assert not _players_with_stat(
+        stats, 2, pbpstats.ON_FLOOR_DEFENSIVE_REBOUND_FGA_STRING
+    )
+
+
 def test_anonymous_rebound_returns_base_stats_and_logs_warning(monkeypatch, caplog):
     missed_shot = StatsFieldGoal(
         {
@@ -319,8 +506,7 @@ def test_anonymous_no_shot_returns_base_stats_and_logs_warning(monkeypatch, capl
 
     assert stats == [{"stat_key": "sentinel", "stat_value": 1}]
     assert any(
-        "source_limited_anonymous_no_shot" in message
-        for message in caplog.messages
+        "source_limited_anonymous_no_shot" in message for message in caplog.messages
     )
 
 
@@ -377,7 +563,9 @@ def test_turnover_same_clock_lineup_fix_keeps_rows_fully_keyed(monkeypatch):
     assert all("lineup_id" in stat for stat in stats)
     assert all("opponent_team_id" in stat for stat in stats)
     assert all("opponent_lineup_id" in stat for stat in stats)
-    assert all(stat["lineup_id"] == "1-2-3-4-5" for stat in stats if stat["team_id"] == 1)
+    assert all(
+        stat["lineup_id"] == "1-2-3-4-5" for stat in stats if stat["team_id"] == 1
+    )
 
 
 @pytest.mark.parametrize(

@@ -1,8 +1,11 @@
+from collections import Counter
+
 import pbpstats
 import pytest
 from pbpstats.client import Client
 from pbpstats.resources.enhanced_pbp.field_goal import FieldGoal
 from pbpstats.resources.enhanced_pbp.free_throw import FreeThrow
+from pbpstats.resources.enhanced_pbp.rebound import Rebound
 
 
 @pytest.fixture(scope="module")
@@ -67,6 +70,62 @@ def _lookup_team_stat(team_stats, team_id, stat_key):
     raise AssertionError(f"Missing {stat_key} for team {team_id}")
 
 
+def _collect_rebound_fga_expected_stats(events):
+    rebound_fga_keys = {
+        pbpstats.ON_FLOOR_OFFENSIVE_REBOUND_FGA_STRING,
+        pbpstats.ON_FLOOR_DEFENSIVE_REBOUND_FGA_STRING,
+    }
+    expected_team = Counter()
+    expected_player = Counter()
+    for event in events:
+        if not isinstance(event, Rebound):
+            continue
+        if not event.is_real_rebound:
+            continue
+        if not isinstance(event.missed_shot, FieldGoal):
+            continue
+
+        shooting_team_id = event.missed_shot.team_id
+        current_players = event.current_players
+        defending_team_id = next(
+            team_id for team_id in current_players if team_id != shooting_team_id
+        )
+        expected_team[
+            (shooting_team_id, pbpstats.ON_FLOOR_OFFENSIVE_REBOUND_FGA_STRING)
+        ] += 1
+        expected_team[
+            (defending_team_id, pbpstats.ON_FLOOR_DEFENSIVE_REBOUND_FGA_STRING)
+        ] += 1
+        for player_id in current_players[shooting_team_id]:
+            expected_player[
+                (
+                    player_id,
+                    shooting_team_id,
+                    pbpstats.ON_FLOOR_OFFENSIVE_REBOUND_FGA_STRING,
+                )
+            ] += 1
+        for player_id in current_players[defending_team_id]:
+            expected_player[
+                (
+                    player_id,
+                    defending_team_id,
+                    pbpstats.ON_FLOOR_DEFENSIVE_REBOUND_FGA_STRING,
+                )
+            ] += 1
+    return rebound_fga_keys, expected_team, expected_player
+
+
+def _collect_actual_player_rebound_fga_stats(player_stats, rebound_fga_keys):
+    actual_player = Counter()
+    for stat in player_stats:
+        if stat["stat_key"] not in rebound_fga_keys:
+            continue
+        actual_player[(stat["player_id"], stat["team_id"], stat["stat_key"])] += stat[
+            "stat_value"
+        ]
+    return actual_player
+
+
 def test_team_on_court_constants_present():
     for const_name in [
         "TEAM_FGA_STRING",
@@ -75,6 +134,8 @@ def test_team_on_court_constants_present():
         "TEAM_3PM_STRING",
         "TEAM_FTA_STRING",
         "TEAM_FTM_STRING",
+        "ON_FLOOR_OFFENSIVE_REBOUND_FGA_STRING",
+        "ON_FLOOR_DEFENSIVE_REBOUND_FGA_STRING",
     ]:
         assert hasattr(pbpstats, const_name)
 
@@ -92,16 +153,14 @@ def test_player_team_on_court_stats_cover_personal_offense(game):
 
     for pid in player_ids:
         assert (
-            on_court_stats[pid][pbpstats.TEAM_FGA_STRING]
-            >= personal_counts[pid]["fga"]
+            on_court_stats[pid][pbpstats.TEAM_FGA_STRING] >= personal_counts[pid]["fga"]
         )
         assert (
             on_court_stats[pid][pbpstats.TEAM_3PA_STRING]
             >= personal_counts[pid]["fg3a"]
         )
         assert (
-            on_court_stats[pid][pbpstats.TEAM_FTA_STRING]
-            >= personal_counts[pid]["fta"]
+            on_court_stats[pid][pbpstats.TEAM_FTA_STRING] >= personal_counts[pid]["fta"]
         )
 
 
@@ -117,3 +176,29 @@ def test_team_on_court_totals_match_boxscore_counts(game):
         assert _lookup_team_stat(
             game.possessions.team_stats, team_id, pbpstats.TEAM_FTA_STRING
         ) == pytest.approx(expected_counts["fta"])
+
+
+def test_rebound_fga_team_totals_match_real_missed_fg_opportunities(game):
+    rebound_fga_keys, expected_team, _expected_player = (
+        _collect_rebound_fga_expected_stats(game.enhanced_pbp.items)
+    )
+    actual_team = {
+        (stat["team_id"], stat["stat_key"]): stat["stat_value"]
+        for stat in game.possessions.team_stats
+        if stat["stat_key"] in rebound_fga_keys
+    }
+
+    assert set(actual_team) == set(expected_team)
+    for key, expected_value in expected_team.items():
+        assert actual_team[key] == pytest.approx(expected_value)
+
+
+def test_rebound_fga_player_totals_match_on_floor_context(game):
+    rebound_fga_keys, _expected_team, expected_player = (
+        _collect_rebound_fga_expected_stats(game.enhanced_pbp.items)
+    )
+    actual_player = _collect_actual_player_rebound_fga_stats(
+        game.possessions.player_stats, rebound_fga_keys
+    )
+
+    assert actual_player == expected_player
